@@ -120,3 +120,10 @@ Then browse the longer, real-world examples:
 - [Layout examples](docs/examples/layout.md)
 - [Operations examples](docs/examples/operations.md)
 - [Formats examples](docs/examples/formats.md)
+
+## License
+
+Apache 2.0
+
+Conduit is maintained within the Qlustra Engineering Tooling Lab.
+https://github.com/Qlustra
