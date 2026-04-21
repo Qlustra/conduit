@@ -5,6 +5,12 @@ import (
 	"github.com/qlustra/conduit/internal/layout"
 )
 
+// Context
+
+type Context = layout.Context
+
+var DefaultContext = layout.DefaultContext
+
 // Layout
 
 type File = layout.File

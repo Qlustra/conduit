@@ -115,10 +115,10 @@ func (s *Slot[T]) MustAt(name string) T {
 	return v
 }
 
-func (s *Slot[T]) Add(name string, dirMode, fileMode os.FileMode) (T, error) {
+func (s *Slot[T]) Add(name string, ctx Context) (T, error) {
 	childRoot := s.root.Dir(name)
 
-	if err := childRoot.Ensure(dirMode); err != nil {
+	if err := childRoot.Ensure(ctx); err != nil {
 		var zero T
 		return zero, err
 	}
@@ -129,7 +129,7 @@ func (s *Slot[T]) Add(name string, dirMode, fileMode os.FileMode) (T, error) {
 		return zero, err
 	}
 
-	if err := EnsureDeep(item, dirMode, fileMode); err != nil {
+	if err := EnsureDeep(item, ctx); err != nil {
 		var zero T
 		return zero, err
 	}
@@ -168,12 +168,12 @@ func (s *Slot[T]) ComposePath(path string) {
 
 // Ensure
 
-func (s *Slot[T]) Ensure(dirMode os.FileMode) error {
-	return s.root.Ensure(dirMode)
+func (s *Slot[T]) Ensure(ctx Context) error {
+	return s.root.Ensure(ctx)
 }
 
-func (s *Slot[T]) EnsureDeep(dirMode, fileMode os.FileMode) error {
-	if err := s.root.Ensure(dirMode); err != nil {
+func (s *Slot[T]) EnsureDeep(ctx Context) error {
+	if err := s.root.Ensure(ctx); err != nil {
 		return err
 	}
 
@@ -185,10 +185,10 @@ func (s *Slot[T]) EnsureDeep(dirMode, fileMode os.FileMode) error {
 	s.mu.RUnlock()
 
 	for name, item := range items {
-		if err := s.root.Dir(name).Ensure(dirMode); err != nil {
+		if err := s.root.Dir(name).Ensure(ctx); err != nil {
 			return fmt.Errorf("slot item root %q: %w", name, err)
 		}
-		if err := EnsureDeep(item, dirMode, fileMode); err != nil {
+		if err := EnsureDeep(item, ctx); err != nil {
 			return fmt.Errorf("slot item %q: %w", name, err)
 		}
 	}
@@ -198,10 +198,7 @@ func (s *Slot[T]) EnsureDeep(dirMode, fileMode os.FileMode) error {
 
 // Load
 
-func (s *Slot[T]) LoadDeep() error {
-	// if err := s.root.Ensure(0o755); err != nil && !os.IsExist(err) {
-	// 	// maybe don't ensure here; maybe just stat/read dir
-	// }
+func (s *Slot[T]) LoadDeep(ctx Context) error {
 	entries, err := os.ReadDir(s.root.Path())
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -221,7 +218,7 @@ func (s *Slot[T]) LoadDeep() error {
 			return fmt.Errorf("compose slot item %q: %w", name, err)
 		}
 
-		if err := LoadDeep(item); err != nil {
+		if err := LoadDeep(item, ctx); err != nil {
 			return fmt.Errorf("load slot item %q: %w", name, err)
 		}
 	}
@@ -231,7 +228,7 @@ func (s *Slot[T]) LoadDeep() error {
 
 // Scan
 
-func (s *Slot[T]) ScanDeep() error {
+func (s *Slot[T]) ScanDeep(ctx Context) error {
 	s.mu.RLock()
 	items := make(map[string]T, len(s.items))
 	for name, item := range s.items {
@@ -240,7 +237,7 @@ func (s *Slot[T]) ScanDeep() error {
 	s.mu.RUnlock()
 
 	for name, item := range items {
-		if err := ScanDeep(item); err != nil {
+		if err := ScanDeep(item, ctx); err != nil {
 			return fmt.Errorf("scan slot item %q: %w", name, err)
 		}
 	}
@@ -250,7 +247,7 @@ func (s *Slot[T]) ScanDeep() error {
 
 // Sync
 
-func (s *Slot[T]) SyncDeep() error {
+func (s *Slot[T]) SyncDeep(ctx Context) error {
 	s.mu.RLock()
 	items := make(map[string]T, len(s.items))
 	for name, item := range s.items {
@@ -259,10 +256,10 @@ func (s *Slot[T]) SyncDeep() error {
 	s.mu.RUnlock()
 
 	for name, item := range items {
-		if err := EnsureDeep(item, 0o755, 0o644); err != nil {
+		if err := EnsureDeep(item, ctx); err != nil {
 			return fmt.Errorf("ensure slot item %q: %w", name, err)
 		}
-		if err := SyncDeep(item); err != nil {
+		if err := SyncDeep(item, ctx); err != nil {
 			return fmt.Errorf("sync slot item %q: %w", name, err)
 		}
 	}

@@ -9,15 +9,15 @@ import (
 // Scans filesystem according to in-memory semantic structures and compares observed state.
 // Observes both sides without mutating either.
 // Observational, filesystem presence -> handler state/cache metadata
-func ScanDeep(target any) error {
+func ScanDeep(target any, ctx Context) error {
 	if target == nil {
 		return fmt.Errorf("target must not be nil")
 	}
 
-	return scanDeepValue(reflect.ValueOf(target))
+	return scanDeepValue(reflect.ValueOf(target), ctx)
 }
 
-func scanDeepValue(v reflect.Value) error {
+func scanDeepValue(v reflect.Value, ctx Context) error {
 	if !v.IsValid() {
 		return nil
 	}
@@ -28,7 +28,7 @@ func scanDeepValue(v reflect.Value) error {
 		}
 
 		if v.Type().Implements(deepScannerType) {
-			return v.Interface().(DeepScanner).ScanDeep()
+			return v.Interface().(DeepScanner).ScanDeep(ctx)
 		}
 
 		if v.Type().Implements(scannerType) {
@@ -43,7 +43,7 @@ func scanDeepValue(v reflect.Value) error {
 		ptr := v.Addr()
 
 		if ptr.Type().Implements(deepScannerType) {
-			return ptr.Interface().(DeepScanner).ScanDeep()
+			return ptr.Interface().(DeepScanner).ScanDeep(ctx)
 		}
 
 		if ptr.Type().Implements(scannerType) {
@@ -69,7 +69,7 @@ func scanDeepValue(v reflect.Value) error {
 			continue
 		}
 
-		if err := scanDeepValue(field); err != nil {
+		if err := scanDeepValue(field, ctx); err != nil {
 			return fmt.Errorf("field %q: %w", sf.Name, err)
 		}
 	}

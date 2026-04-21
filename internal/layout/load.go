@@ -12,14 +12,14 @@ import (
 // - loads discovered typed files
 // - populates caches
 // - does not create missing files
-func LoadDeep(target any) error {
+func LoadDeep(target any, ctx Context) error {
 	if target == nil {
 		return fmt.Errorf("target must not be nil")
 	}
-	return loadDeepValue(reflect.ValueOf(target))
+	return loadDeepValue(reflect.ValueOf(target), ctx)
 }
 
-func loadDeepValue(v reflect.Value) error {
+func loadDeepValue(v reflect.Value, ctx Context) error {
 	if !v.IsValid() {
 		return nil
 	}
@@ -30,7 +30,7 @@ func loadDeepValue(v reflect.Value) error {
 		}
 
 		if v.Type().Implements(deepLoaderType) {
-			return v.Interface().(DeepLoader).LoadDeep()
+			return v.Interface().(DeepLoader).LoadDeep(ctx)
 		}
 
 		if v.Type().Implements(loaderType) {
@@ -44,7 +44,7 @@ func loadDeepValue(v reflect.Value) error {
 		ptr := v.Addr()
 
 		if ptr.Type().Implements(deepLoaderType) {
-			return ptr.Interface().(DeepLoader).LoadDeep()
+			return ptr.Interface().(DeepLoader).LoadDeep(ctx)
 		}
 
 		if ptr.Type().Implements(loaderType) {
@@ -70,7 +70,7 @@ func loadDeepValue(v reflect.Value) error {
 			continue
 		}
 
-		if err := loadDeepValue(field); err != nil {
+		if err := loadDeepValue(field, ctx); err != nil {
 			return fmt.Errorf("field %q: %w", sf.Name, err)
 		}
 	}

@@ -60,12 +60,12 @@ func (f Format[T, C]) codec() C {
 	return c
 }
 
-func (f Format[T, C]) Write(value T, dirMode os.FileMode, fileMode os.FileMode) error {
+func (f Format[T, C]) Write(value T, ctx Context) error {
 	data, err := f.codec().Marshal(value)
 	if err != nil {
 		return err
 	}
-	return f.File.WriteBytes(data, dirMode, fileMode)
+	return f.File.WriteBytes(data, ctx.DirMode, ctx.FileMode)
 }
 
 func (f Format[T, C]) Read() (T, error) {
@@ -99,11 +99,11 @@ func (f *Format[T, C]) LoadOrInit(defaultValue T) error {
 	return nil
 }
 
-func (f *Format[T, C]) Save(dirMode, fileMode os.FileMode) error {
+func (f *Format[T, C]) Save(ctx Context) error {
 	if f.content == nil {
 		return fmt.Errorf("file content is not loaded")
 	}
-	if err := f.Write(*f.content, dirMode, fileMode); err != nil {
+	if err := f.Write(*f.content, ctx); err != nil {
 		return err
 	}
 	f.disk = DiskPresent
@@ -150,11 +150,11 @@ func (f *Format[T, C]) Unload() {
 
 // Sync
 
-func (f *Format[T, C]) Sync() error {
+func (f *Format[T, C]) Sync(ctx Context) error {
 	if f.content == nil {
 		return nil
 	}
-	return f.Save(0o755, 0o644)
+	return f.Save(ctx)
 }
 
 // States

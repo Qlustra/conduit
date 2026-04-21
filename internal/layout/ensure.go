@@ -2,22 +2,21 @@ package layout
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 )
 
 // EnsureDeep
 // Materializes declared structure.
 // Constructive, memory shape -> filesystem structure
-func EnsureDeep(target any, dirMode, fileMode os.FileMode) error {
+func EnsureDeep(target any, ctx Context) error {
 	if target == nil {
 		return fmt.Errorf("target must not be nil")
 	}
 
-	return ensureDeepValue(reflect.ValueOf(target), dirMode, fileMode)
+	return ensureDeepValue(reflect.ValueOf(target), ctx)
 }
 
-func ensureDeepValue(v reflect.Value, dirMode, fileMode os.FileMode) error {
+func ensureDeepValue(v reflect.Value, ctx Context) error {
 	if !v.IsValid() {
 		return nil
 	}
@@ -27,7 +26,7 @@ func ensureDeepValue(v reflect.Value, dirMode, fileMode os.FileMode) error {
 			return nil
 		}
 		if v.Type().Implements(deepEnsurerType) {
-			return v.Interface().(DeepEnsurer).EnsureDeep(dirMode, fileMode)
+			return v.Interface().(DeepEnsurer).EnsureDeep(ctx)
 		}
 		v = v.Elem()
 	}
@@ -35,16 +34,16 @@ func ensureDeepValue(v reflect.Value, dirMode, fileMode os.FileMode) error {
 	if v.CanAddr() {
 		ptr := v.Addr()
 		if ptr.Type().Implements(deepEnsurerType) {
-			return ptr.Interface().(DeepEnsurer).EnsureDeep(dirMode, fileMode)
+			return ptr.Interface().(DeepEnsurer).EnsureDeep(ctx)
 		}
 	}
 
 	switch v.Type() {
 	case dirType:
-		return v.Interface().(Dir).Ensure(dirMode)
+		return v.Interface().(Dir).Ensure(ctx)
 
 	case fileType:
-		return v.Interface().(File).Ensure(dirMode, fileMode)
+		return v.Interface().(File).Ensure(ctx)
 	}
 
 	// If this is a struct that embeds Dir/File or wraps them, recurse into fields.
@@ -69,7 +68,7 @@ func ensureDeepValue(v reflect.Value, dirMode, fileMode os.FileMode) error {
 			continue
 		}
 
-		if err := ensureDeepValue(field, dirMode, fileMode); err != nil {
+		if err := ensureDeepValue(field, ctx); err != nil {
 			return fmt.Errorf("field %q: %w", sf.Name, err)
 		}
 	}

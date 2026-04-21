@@ -13,14 +13,14 @@ import (
 // - ensures parent structure as needed
 // - does not invent missing slot entries unless they are already cached in the slot
 // - does not delete anything absent from memory
-func SyncDeep(target any) error {
+func SyncDeep(target any, ctx Context) error {
 	if target == nil {
 		return fmt.Errorf("target must not be nil")
 	}
-	return syncDeepValue(reflect.ValueOf(target))
+	return syncDeepValue(reflect.ValueOf(target), ctx)
 }
 
-func syncDeepValue(v reflect.Value) error {
+func syncDeepValue(v reflect.Value, ctx Context) error {
 	if !v.IsValid() {
 		return nil
 	}
@@ -31,11 +31,11 @@ func syncDeepValue(v reflect.Value) error {
 		}
 
 		if v.Type().Implements(deepSyncerType) {
-			return v.Interface().(DeepSyncer).SyncDeep()
+			return v.Interface().(DeepSyncer).SyncDeep(ctx)
 		}
 
 		if v.Type().Implements(syncerType) {
-			return v.Interface().(Syncer).Sync()
+			return v.Interface().(Syncer).Sync(ctx)
 		}
 
 		v = v.Elem()
@@ -45,11 +45,11 @@ func syncDeepValue(v reflect.Value) error {
 		ptr := v.Addr()
 
 		if ptr.Type().Implements(deepSyncerType) {
-			return ptr.Interface().(DeepSyncer).SyncDeep()
+			return ptr.Interface().(DeepSyncer).SyncDeep(ctx)
 		}
 
 		if ptr.Type().Implements(syncerType) {
-			return ptr.Interface().(Syncer).Sync()
+			return ptr.Interface().(Syncer).Sync(ctx)
 		}
 	}
 
@@ -70,7 +70,7 @@ func syncDeepValue(v reflect.Value) error {
 			continue
 		}
 
-		if err := syncDeepValue(field); err != nil {
+		if err := syncDeepValue(field, ctx); err != nil {
 			return fmt.Errorf("field %q: %w", sf.Name, err)
 		}
 	}

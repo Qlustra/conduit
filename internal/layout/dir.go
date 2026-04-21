@@ -51,6 +51,6 @@ func (d *Dir) ComposePath(path string) {
 
 // Ensure
 
-func (d Dir) Ensure(mode os.FileMode) error {
-	return os.MkdirAll(d.path, mode)
+func (d Dir) Ensure(ctx Context) error {
+	return os.MkdirAll(d.path, ctx.DirMode)
 }

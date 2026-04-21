@@ -1,7 +1,6 @@
 package layout
 
 import (
-	"os"
 	"reflect"
 )
 
@@ -29,7 +28,7 @@ var (
 )
 
 type DeepEnsurer interface {
-	EnsureDeep(dirMode, fileMode os.FileMode) error
+	EnsureDeep(ctx Context) error
 }
 
 // Load
@@ -46,7 +45,7 @@ var (
 )
 
 type DeepLoader interface {
-	LoadDeep() error
+	LoadDeep(ctx Context) error
 }
 
 // Sync
@@ -57,11 +56,11 @@ var (
 )
 
 type Syncer interface {
-	Sync() error
+	Sync(ctx Context) error
 }
 
 type DeepSyncer interface {
-	SyncDeep() error
+	SyncDeep(ctx Context) error
 }
 
 // Scan
@@ -106,5 +105,5 @@ type Scannable interface {
 }
 
 type DeepScanner interface {
-	ScanDeep() error
+	ScanDeep(ctx Context) error
 }

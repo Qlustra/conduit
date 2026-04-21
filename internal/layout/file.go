@@ -61,12 +61,12 @@ func (f *File) ComposePath(path string) {
 
 // Ensure
 
-func (f File) Ensure(dirMode os.FileMode, fileMode os.FileMode) error {
-	if err := os.MkdirAll(filepath.Dir(f.path), dirMode); err != nil {
+func (f File) Ensure(ctx Context) error {
+	if err := os.MkdirAll(filepath.Dir(f.path), ctx.DirMode); err != nil {
 		return err
 	}
 
-	handle, err := os.OpenFile(f.path, os.O_CREATE, fileMode)
+	handle, err := os.OpenFile(f.path, os.O_CREATE, ctx.FileMode)
 	if err != nil {
 		return err
 	}
