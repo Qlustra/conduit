@@ -31,3 +31,8 @@ tasks:
     desc: Build the local development image
     cmds:
       - docker compose -f tooling/docker-compose.yaml build dev
+
+  enter:dev:
+    desc: Enter the dev image
+    cmds:
+      - shade enter go -- bash
