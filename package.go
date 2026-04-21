@@ -15,9 +15,11 @@ var DefaultContext = layout.DefaultContext
 
 type File = layout.File
 type Dir = layout.Dir
+type Exec = layout.Exec
 type Slot[T any] = layout.Slot[T]
 type Codec[T any] = layout.Codec[T]
 type Format[T any] = layout.Format[T, Codec[T]]
+type RunOptions = layout.RunOptions
 
 var Compose = layout.Compose
 var EnsureDeep = layout.EnsureDeep
