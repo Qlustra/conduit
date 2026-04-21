@@ -90,16 +90,66 @@ You choose the timing.
 
 ## Concepts
 
-### Dir and File
+### Dir, File, and Exec
 
 Stateless path handles.
 
 ```go
 type Dir
 type File
+type Exec
 ```
 
 They represent locations, not state.
+
+`Exec` is a file node with executable semantics.
+
+It participates in composition like any other layout node:
+
+```go
+type Tooling struct {
+    Root  conduit.Dir  `layout:"."`
+    Build conduit.Exec `layout:"bin/build"`
+}
+```
+
+On `Ensure` / `EnsureDeep`, executable files use `Context.ExecMode`.
+If `ExecMode` is unset, `FileMode` is used and execution bits are added automatically.
+`IsExecutable()` reports whether the target currently exists as an executable regular file.
+For direct use, `Ensure()` and `EnsureExecutable()` both materialize the file with executable permissions.
+
+`Exec` also exposes `Command`, `Run`, `Output`, and `CombinedOutput` helpers for running managed files:
+
+```go
+var tooling Tooling
+_ = conduit.Compose("/workspace", &tooling)
+
+cmd := tooling.Build.Command(context.Background(), conduit.RunOptions{
+    Args: []string{"--check"},
+    Dir:  tooling.Root.Path(),
+})
+
+err := cmd.Run()
+```
+
+Or directly:
+
+```go
+out, err := tooling.Build.Output(context.Background(), conduit.RunOptions{
+    Args: []string{"--json"},
+    Env:  []string{"APP_ENV=dev"},
+})
+```
+
+`RunOptions` supports:
+
+* `Args` for argv passed to the executable
+* `Dir` for the working directory
+* `Env` for extra environment variables
+* `Stdin`, `Stdout`, `Stderr` for stream wiring
+* `Interpreter` for running the file through an explicit interpreter such as `[]string{"sh"}`
+
+`Output` and `CombinedOutput` follow the standard library behavior and reject explicit `Stdout` / `Stderr` writers.
 
 ---
 
@@ -200,6 +250,7 @@ conduit.EnsureDeep(&ws, ctx)
 ```
 
 Creates directories and files declared in the structure.
+`Exec` nodes are created with executable permissions.
 
 ---
 
@@ -253,6 +304,7 @@ Operations accept a context:
 type Context struct {
     DirMode  os.FileMode
     FileMode os.FileMode
+    ExecMode os.FileMode
 }
 ```
 
@@ -262,6 +314,7 @@ Example:
 ctx := conduit.Context{
     DirMode:  0o755,
     FileMode: 0o644,
+    ExecMode: 0o755,
 }
 ```
 
