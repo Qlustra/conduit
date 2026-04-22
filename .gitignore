@@ -113,6 +113,7 @@ vendor/
 # go.sum (Recommended to keep)
 *.test
 *.prof
+.task
 
 ### Python
 __pycache__/
