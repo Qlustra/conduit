@@ -245,6 +245,36 @@ func (s *Slot[T]) ScanDeep(ctx Context) error {
 	return nil
 }
 
+// Discover
+
+func (s *Slot[T]) DiscoverDeep(ctx Context) error {
+	entries, err := os.ReadDir(s.root.Path())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+		item, err := s.At(name)
+		if err != nil {
+			return fmt.Errorf("compose slot item %q: %w", name, err)
+		}
+
+		if err := DiscoverDeep(item, ctx); err != nil {
+			return fmt.Errorf("discover slot item %q: %w", name, err)
+		}
+	}
+
+	return nil
+}
+
 // Sync
 
 func (s *Slot[T]) SyncDeep(ctx Context) error {

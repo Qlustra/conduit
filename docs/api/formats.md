@@ -55,6 +55,7 @@ Content methods:
 - `LoadOrInit(defaultValue T) error`: loads existing content or stores a default value in memory when missing
 - `Save(ctx Context) error`: writes the cached value and marks memory state synced
 - `Load() (bool, error)`: loads content into memory and reports whether the file existed
+- `Discover()`: refreshes disk-state metadata without replacing in-memory content and returns the observed state value
 - `HasContent() bool`: reports whether a value is currently cached
 - `Unload()`: clears cached content and resets memory state to unknown
 - `Sync(ctx Context) error`: writes cached content when present, otherwise no-op
@@ -72,6 +73,7 @@ Notable behavior:
 - `Save` fails when no content is loaded
 - `Sync` is a no-op when no content is loaded
 - `Load` on a missing file clears cached content, sets disk state to missing, and resets memory state to unknown
+- `Discover` updates disk state but preserves current cached content and memory state
 - `Scan` only updates disk state; it preserves current cached content and memory state
 - `MustGet` panics when content is absent
 - the package does not currently re-export the state enum types or constants directly

@@ -148,6 +148,12 @@ func (f *Format[T, C]) Unload() {
 	f.memory = MemoryUnknown
 }
 
+// Discover
+
+func (f *Format[T, C]) Discover() (DiskState, error) {
+	return f.Scan()
+}
+
 // Sync
 
 func (f *Format[T, C]) Sync(ctx Context) error {

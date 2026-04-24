@@ -109,5 +109,6 @@ type Tenants struct {
 This pattern is useful when keys come from user input or disk discovery:
 
 - `Items.Add("acme", ctx)` creates a new tenant
+- `DiscoverDeep(&tenants, ctx)` discovers tenants already present on disk without loading their typed files
 - `LoadDeep(&tenants, ctx)` discovers tenants already present on disk
 - `Items.Keys()` gives you a stable list of cached tenant names

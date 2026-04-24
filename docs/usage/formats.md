@@ -122,6 +122,7 @@ The important behavioral rules are:
 - `Set` marks the value dirty.
 - `Load` marks the value loaded when the file exists.
 - `Save` and `Sync` mark the value synced after a successful write.
+- `Discover` updates disk knowledge without overwriting in-memory content.
 - `Scan` updates disk knowledge without overwriting in-memory content.
 - loading a missing file clears in-memory content and marks disk as missing.
 
@@ -138,6 +139,8 @@ _, err := service.YAML.Scan()
 ```
 
 That makes it safe to ask "is this file present?" without loading or replacing the current cached value.
+
+`Discover()` has the same typed-file behavior as `Scan()`. The distinction shows up during deep traversal: `DiscoverDeep` discovers slot items from disk, while `ScanDeep` only visits already cached items.
 
 ## Codec behavior
 

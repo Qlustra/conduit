@@ -48,6 +48,21 @@ type DeepLoader interface {
 	LoadDeep(ctx Context) error
 }
 
+// Discover
+
+var (
+	discovererType     = reflect.TypeOf((*Discoverable)(nil)).Elem()
+	deepDiscovererType = reflect.TypeOf((*DeepDiscoverer)(nil)).Elem()
+)
+
+type Discoverable interface {
+	Discover() (DiskState, error)
+}
+
+type DeepDiscoverer interface {
+	DiscoverDeep(ctx Context) error
+}
+
 // Sync
 
 var (

@@ -24,6 +24,7 @@ type RunOptions = layout.RunOptions
 var Compose = layout.Compose
 var EnsureDeep = layout.EnsureDeep
 var LoadDeep = layout.LoadDeep
+var DiscoverDeep = layout.DiscoverDeep
 var SyncDeep = layout.SyncDeep
 var ScanDeep = layout.ScanDeep
 

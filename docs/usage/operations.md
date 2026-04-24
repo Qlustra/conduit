@@ -58,6 +58,29 @@ What it does not do:
 
 For a typed file, loading a missing file clears in-memory content and marks the file as missing.
 
+## Discover
+
+`DiscoverDeep(target, ctx)` discovers the declared layout from disk without loading typed file content:
+
+```go
+err := conduit.DiscoverDeep(&ws, conduit.DefaultContext)
+```
+
+What it does:
+
+- discovers slot entries by listing child directories on disk
+- composes discovered slot items recursively
+- updates typed-file disk state through the declared layout
+- preserves the current in-memory content and memory state
+
+What it does not do:
+
+- load file content into memory
+- create missing files
+- write anything back to disk
+
+This makes `DiscoverDeep` the middle ground between `LoadDeep` and `ScanDeep`: it discovers structure like `LoadDeep`, but it only observes typed files like `ScanDeep`.
+
 ## Sync
 
 `SyncDeep(target, ctx)` writes loaded or dirty in-memory content back to disk:
@@ -147,6 +170,15 @@ Load an existing workspace, edit it, then persist:
 ```go
 var ws Workspace
 _ = conduit.Compose("/srv/workspace", &ws)
+_ = conduit.DiscoverDeep(&ws, conduit.DefaultContext)
+```
+
+Load discovered content into memory:
+
+```go
+var ws Workspace
+
+_ = conduit.Compose("/srv/workspace", &ws)
 _ = conduit.LoadDeep(&ws, conduit.DefaultContext)
 
 svc := ws.Services.MustAt("billing")
@@ -164,4 +196,4 @@ svc := ws.Services.MustAt("billing")
 _ = conduit.ScanDeep(svc, conduit.DefaultContext)
 ```
 
-The core rule is simple: Conduit never decides direction for you. You choose whether the next step is ensure, load, sync, or scan.
+The core rule is simple: Conduit never decides direction for you. You choose whether the next step is ensure, discover, load, sync, or scan.

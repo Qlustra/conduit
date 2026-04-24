@@ -1,6 +1,6 @@
 ---
 name: conduit
-description: Use this skill when working with github.com/qlustra/conduit in Go projects. It teaches the library's contract-based filesystem model, how to declare layouts with `layout` tags, when to use `Compose`, `EnsureDeep`, `LoadDeep`, `SyncDeep`, and `ScanDeep`, and how to work safely with `Dir`, `File`, `Exec`, `Slot[T]`, and typed files such as `YAMLFile[T]`, `JSONFile[T]`, and `TOMLFile[T]`.
+description: Use this skill when working with github.com/qlustra/conduit in Go projects. It teaches the library's contract-based filesystem model, how to declare layouts with `layout` tags, when to use `Compose`, `EnsureDeep`, `DiscoverDeep`, `LoadDeep`, `SyncDeep`, and `ScanDeep`, and how to work safely with `Dir`, `File`, `Exec`, `Slot[T]`, and typed files such as `YAMLFile[T]`, `JSONFile[T]`, and `TOMLFile[T]`.
 ---
 
 # Conduit
@@ -11,21 +11,24 @@ Treat these as separate phases:
 
 1. `Compose(root, &layout)` binds paths to a struct.
 2. `EnsureDeep` creates declared structure.
-3. `LoadDeep` reads typed file content and discovers slot entries from disk.
-4. `SyncDeep` writes loaded or dirty typed content back to disk.
-5. `ScanDeep` refreshes disk-presence metadata without loading content.
+3. `DiscoverDeep` discovers slot entries from disk without loading typed file content.
+4. `LoadDeep` reads typed file content and discovers slot entries from disk.
+5. `SyncDeep` writes loaded or dirty typed content back to disk.
+6. `ScanDeep` refreshes disk-presence metadata without loading content.
 
-Conduit does not reconcile disk and memory for you. There is no background sync, no merge policy, and no implicit discovery except where `LoadDeep` on `Slot[T]` is explicitly asked to discover child directories.
+Conduit does not reconcile disk and memory for you. There is no background sync and no merge policy. Discovery only happens when you explicitly ask for `DiscoverDeep` or `LoadDeep`.
 
 ## Core rules
 
 - Always `Compose` before using any node or deep operation.
 - `Compose` binds paths only. It does not touch the filesystem.
 - `EnsureDeep` creates structure but does not load data.
+- `DiscoverDeep` discovers `Slot[T]` items that already exist on disk without loading typed files.
 - `LoadDeep` reads typed files and discovers `Slot[T]` items that already exist on disk.
 - `SyncDeep` only writes typed files that currently hold content in memory.
 - `ScanDeep` updates "present vs missing" knowledge only; it does not load bytes or replace memory.
 - `Slot[T]` discovery is asymmetric:
+  `DiscoverDeep` discovers entries from disk and preserves unloaded typed-file memory.
   `LoadDeep` discovers entries from disk.
   `ScanDeep` and `SyncDeep` only recurse into already cached entries.
 
@@ -131,6 +134,7 @@ They all expose the same `Format[T]` behavior:
 - `Set(value)`
 - `Save(ctx)`
 - `Sync(ctx)`
+- `Discover()`
 - `Scan()`
 - `Clear()`
 - `Unload()`
@@ -155,6 +159,7 @@ High-value behavioral rules:
 - `Save` fails if no content is loaded.
 - `Sync` is a no-op if no content is loaded.
 - `Scan` preserves memory and only refreshes disk knowledge.
+- `Discover` has the same typed-file effect as `Scan`; the distinction shows up during deep traversal.
 - `Delete` removes the file on disk and clears memory.
 
 Choose format by consumer:
@@ -185,10 +190,11 @@ Important methods:
 - `Require(name)` only succeeds if the child directory already exists
 - `Get(name)` returns cached items only
 - `Keys()` returns sorted cached keys only
+- `DiscoverDeep(ctx)` discovers child directories from disk and scans them without loading typed files
 - `LoadDeep(ctx)` discovers child directories from disk and loads them
 - `ScanDeep(ctx)` and `SyncDeep(ctx)` recurse only into cached items
 
-Use `Add` for explicit creation. Use `LoadDeep` when disk is authoritative and you want discovery.
+Use `Add` for explicit creation. Use `DiscoverDeep` when you want discovery without loading typed content. Use `LoadDeep` when disk is authoritative and you want both discovery and content loading.
 
 ## Canonical workflows
 
@@ -240,7 +246,7 @@ return conduit.SyncDeep(&ws, conduit.DefaultContext)
 _, err := app.Config.Scan()
 ```
 
-Use `Scan` / `ScanDeep` when you need existence information without loading or overwriting current in-memory state.
+Use `Scan` / `ScanDeep` when you need existence information without loading or overwriting current in-memory state for already cached items. Use `DiscoverDeep` when you also need slot discovery.
 
 ## Common mistakes to avoid
 
@@ -248,7 +254,7 @@ Use `Scan` / `ScanDeep` when you need existence information without loading or o
 - expecting `EnsureDeep` to discover `Slot[T]` entries from disk
 - expecting `LoadOrInit` to write defaults immediately
 - expecting `SyncDeep` to create uncached slot items automatically
-- assuming `Keys()` reflects the filesystem without a prior `LoadDeep`
+- assuming `Keys()` reflects the filesystem without a prior `DiscoverDeep` or `LoadDeep`
 - using `MustGet()` before `Load`, `LoadOrInit`, or `Set`
 - using `Save` when no content is loaded and expecting a no-op; use `Sync` for that
 
@@ -258,6 +264,6 @@ When modifying code that uses Conduit:
 
 - identify whether disk or memory is authoritative for the current step
 - keep the operation sequence explicit rather than collapsing it into helper magic
-- prefer `LoadDeep` for "read existing state", `EnsureDeep` for "declare structure", and `SyncDeep` for "persist current memory"
+- prefer `DiscoverDeep` for "enumerate existing structure", `LoadDeep` for "read existing state", `EnsureDeep` for "declare structure", and `SyncDeep` for "persist current memory"
 - use `Slot[T]` only when children are keyed directories with the same layout shape
 - use plain `File` for bytes and typed files only when state tracking or codec-backed reads/writes are actually needed

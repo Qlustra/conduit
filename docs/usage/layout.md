@@ -135,7 +135,7 @@ Useful methods:
 
 The tag is always resolved relative to the containing struct's root. `layout:"."` means "bind this field to the current root".
 
-The deep operations (`EnsureDeep`, `LoadDeep`, `SyncDeep`, `ScanDeep`) also recurse through anonymous embedded fields.
+The deep operations (`EnsureDeep`, `DiscoverDeep`, `LoadDeep`, `SyncDeep`, `ScanDeep`) also recurse through anonymous embedded fields.
 
 Nested structs work naturally:
 

@@ -19,7 +19,7 @@ That means a typed file can legitimately be in states like:
 - disk present, memory dirty: you know the file exists, but your in-memory value has diverged from disk
 - disk missing, memory dirty: you have prepared a value in memory, but have not written it yet
 
-Those combinations are expected. They are what make `Load`, `Scan`, `Set`, and `Sync` distinct operations instead of one hidden merge process.
+Those combinations are expected. They are what make `Load`, `Discover`, `Scan`, `Set`, and `Sync` distinct operations instead of one hidden merge process.
 
 ## Disk state
 
@@ -35,6 +35,7 @@ How disk state changes:
 
 - `Compose` or `ComposePath` resets it to `DiskUnknown`
 - `Scan` sets it to `DiskMissing` or `DiskPresent`
+- `Discover` sets it to `DiskMissing` or `DiskPresent`
 - `Load` sets it to `DiskMissing` or `DiskPresent`
 - `Save` and successful `Sync` set it to `DiskPresent`
 - `Delete` sets it to `DiskMissing`
@@ -44,12 +45,12 @@ How disk state changes:
 ```mermaid
 stateDiagram
   [*] --> DiskUnknown
-  DiskUnknown --> DiskMissing: Scan() / Load() missing / Delete()
-  DiskUnknown --> DiskPresent: Scan() / Load() present / Save()
-  DiskMissing --> DiskMissing: Scan() / Load() missing / Delete()
-  DiskMissing --> DiskPresent: Scan() / Load() present / Save()
-  DiskPresent --> DiskMissing: Scan() / Load() missing / Delete()
-  DiskPresent --> DiskPresent: Scan() / Load() present / Save()
+  DiskUnknown --> DiskMissing: Scan() / Discover() / Load() missing / Delete()
+  DiskUnknown --> DiskPresent: Scan() / Discover() / Load() present / Save()
+  DiskMissing --> DiskMissing: Scan() / Discover() / Load() missing / Delete()
+  DiskMissing --> DiskPresent: Scan() / Discover() / Load() present / Save()
+  DiskPresent --> DiskMissing: Scan() / Discover() / Load() missing / Delete()
+  DiskPresent --> DiskPresent: Scan() / Discover() / Load() present / Save()
 ```
 
 ## Memory state
@@ -72,6 +73,7 @@ How memory state changes:
 - `Set` sets it to `MemoryDirty`
 - `Save` and successful `Sync` set it to `MemorySynced`
 - `Clear`, `Unload`, and `Delete` set it to `MemoryUnknown`
+- `Discover` does not change it
 - `Scan` does not change it
 - `Sync` without content is a no-op, so state stays unchanged
 
@@ -101,6 +103,8 @@ The table below focuses on `Format[T]` behavior.
 | Operation                 | Disk state effect   | Memory state effect   | Content effect                  |
 |---------------------------|---------------------|-----------------------|---------------------------------|
 | `Compose` / `ComposePath` | reset to unknown    | reset to unknown      | clears content                  |
+| `Discover()` present      | set to present      | unchanged             | unchanged                       |
+| `Discover()` missing      | set to missing      | unchanged             | unchanged                       |
 | `Scan()` present          | set to present      | unchanged             | unchanged                       |
 | `Scan()` missing          | set to missing      | unchanged             | unchanged                       |
 | `Load()` present          | set to present      | set to loaded         | replace content from disk       |
@@ -133,6 +137,15 @@ After this:
 - disk state reflects whether the file exists
 - memory state is still dirty
 - the in-memory value is still `preview:3000`
+
+### `Discover` preserves memory too
+
+For a typed file, `Discover` has the same state effect as `Scan`.
+
+The difference appears in deep traversal:
+
+- `DiscoverDeep` discovers slot-backed children from disk before recursing
+- `ScanDeep` only observes items that are already cached in memory
 
 ### `Load` is authoritative for memory
 

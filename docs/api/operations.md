@@ -119,6 +119,30 @@ Notable behavior:
 - leaves uncached missing slot entries undiscovered until they exist on disk
 - returns an error if `target` is nil
 
+### `DiscoverDeep`
+
+```go
+func DiscoverDeep(target any, ctx Context) error
+```
+
+Description:
+
+- recursively discovers slot-backed structure from disk without loading typed file content
+
+Arguments:
+
+- `target`: composed struct or node tree
+- `ctx`: passed through to deep discoverers
+
+Notable behavior:
+
+- discovers `Slot[T]` entries by reading child directories from disk
+- composes discovered children recursively
+- updates typed-file disk state without loading bytes into memory
+- preserves existing in-memory values and memory state
+- does not create missing files
+- returns an error if `target` is nil
+
 ### `SyncDeep`
 
 ```go

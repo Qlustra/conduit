@@ -146,6 +146,7 @@ Methods:
 - `Require(name string) (T, error)`: returns an item only when the child root already exists on disk
 - `Ensure(ctx Context) error`: ensures the slot root directory
 - `EnsureDeep(ctx Context) error`: ensures the slot root and all cached items
+- `DiscoverDeep(ctx Context) error`: discovers child directories on disk and scans them without loading typed content
 - `LoadDeep(ctx Context) error`: discovers child directories on disk and loads them
 - `ScanDeep(ctx Context) error`: scans only cached items
 - `SyncDeep(ctx Context) error`: ensures and syncs only cached items
@@ -155,5 +156,6 @@ Notable behavior:
 - `At` composes items relative to `slotRoot/<name>` and caches them
 - `Add` ensures the child root and calls `EnsureDeep` on the new child
 - `Keys` is cache-based; it does not list the filesystem directly
+- `DiscoverDeep` discovers directory-backed entries from disk without loading typed files
 - `LoadDeep` discovers directory-backed entries from disk
 - `ScanDeep` and `SyncDeep` do not discover uncached entries

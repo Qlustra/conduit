@@ -69,12 +69,31 @@ This is useful for validation or status reporting.
 
 ## Discover dynamic entries from disk
 
-Goal: find existing service directories and load their typed files.
+Goal: find existing service directories without loading their typed files.
 
 ```go
 var ws Workspace
 
 _ = conduit.Compose("/srv/workspace", &ws)
+_ = conduit.DiscoverDeep(&ws, conduit.DefaultContext)
+
+for _, name := range ws.Services.Keys() {
+	svc := ws.Services.MustAt(name)
+	_, _ = svc.Config.Get()
+}
+```
+
+Use `DiscoverDeep` when you want slot discovery but do not want typed file content in memory.
+
+## Discover and then load content
+
+Goal: enumerate existing services first, then load only when you choose to.
+
+```go
+var ws Workspace
+
+_ = conduit.Compose("/srv/workspace", &ws)
+_ = conduit.DiscoverDeep(&ws, conduit.DefaultContext)
 _ = conduit.LoadDeep(&ws, conduit.DefaultContext)
 
 for _, name := range ws.Services.Keys() {
@@ -84,7 +103,7 @@ for _, name := range ws.Services.Keys() {
 }
 ```
 
-Use `LoadDeep` for discovery. `ScanDeep` does not enumerate new slot entries.
+`ScanDeep` does not enumerate new slot entries. `DiscoverDeep` does, while still preserving unloaded typed-file memory.
 
 ## Initialize defaults lazily
 
