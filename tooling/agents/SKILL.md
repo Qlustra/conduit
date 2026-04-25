@@ -1,6 +1,6 @@
 ---
 name: conduit
-description: Use this skill when working with github.com/qlustra/conduit in Go projects. It teaches the library's contract-based filesystem model, how to declare layouts with `layout` tags, when to use `Compose`, `EnsureDeep`, `DiscoverDeep`, `LoadDeep`, `SyncDeep`, and `ScanDeep`, and how to work safely with `Dir`, `File`, `Exec`, `Slot[T]`, and typed files such as `YAMLFile[T]`, `JSONFile[T]`, and `TOMLFile[T]`.
+description: Use this skill when working with github.com/qlustra/conduit in Go projects. It teaches the library's contract-based filesystem model, how to declare layouts with `layout` tags, when to use `Compose`, `EnsureDeep`, `DefaultDeep`, `DiscoverDeep`, `LoadDeep`, `RenderDeep`, `SyncDeep`, and `ScanDeep`, and how to work safely with `Dir`, `File`, `Exec`, `Slot[T]`, typed files such as `YAMLFile[T]`, `JSONFile[T]`, and `TOMLFile[T]`, and derived text via `TextTemplate[C]`.
 ---
 
 # Conduit
@@ -11,10 +11,12 @@ Treat these as separate phases:
 
 1. `Compose(root, &layout)` binds paths to a struct.
 2. `EnsureDeep` creates declared structure.
-3. `DiscoverDeep` discovers slot entries from disk without loading typed file content.
-4. `LoadDeep` reads typed file content and discovers slot entries from disk.
-5. `SyncDeep` writes loaded or dirty typed content back to disk.
-6. `ScanDeep` refreshes disk-presence metadata without loading content.
+3. `DefaultDeep` seeds missing in-memory defaults for already composed or cached items.
+4. `DiscoverDeep` discovers slot entries from disk without loading typed file content.
+5. `LoadDeep` reads typed file content and discovers slot entries from disk.
+6. `RenderDeep` derives text content into memory for renderable template files.
+7. `SyncDeep` writes loaded or dirty typed or rendered content back to disk.
+8. `ScanDeep` refreshes disk-presence metadata without loading content.
 
 Conduit does not reconcile disk and memory for you. There is no background sync and no merge policy. Discovery only happens when you explicitly ask for `DiscoverDeep` or `LoadDeep`.
 
@@ -23,14 +25,16 @@ Conduit does not reconcile disk and memory for you. There is no background sync 
 - Always `Compose` before using any node or deep operation.
 - `Compose` binds paths only. It does not touch the filesystem.
 - `EnsureDeep` creates structure but does not load data.
+- `DefaultDeep` applies defaults in memory only. It does not read or write disk state.
 - `DiscoverDeep` discovers `Slot[T]` items that already exist on disk without loading typed files.
 - `LoadDeep` reads typed files and discovers `Slot[T]` items that already exist on disk.
+- `RenderDeep` derives text into memory only. It does not discover slots or write files.
 - `SyncDeep` only writes typed files that currently hold content in memory.
 - `ScanDeep` updates "present vs missing" knowledge only; it does not load bytes or replace memory.
 - `Slot[T]` discovery is asymmetric:
   `DiscoverDeep` discovers entries from disk and preserves unloaded typed-file memory.
   `LoadDeep` discovers entries from disk.
-  `ScanDeep` and `SyncDeep` only recurse into already cached entries.
+  `DefaultDeep`, `RenderDeep`, `ScanDeep`, and `SyncDeep` only recurse into already cached entries.
 
 ## Layout declaration
 
@@ -125,13 +129,15 @@ The stateful types are:
 - `JSONFile[T]`
 - `YAMLFile[T]`
 - `TOMLFile[T]`
+- `TextTemplate[C]`
 
-They all expose the same `Format[T]` behavior:
+The typed files expose the same `Format[T]` behavior:
 
 - `Load() (bool, error)`
 - `LoadOrInit(defaultValue)`
 - `Get() (T, bool)` / `MustGet() T`
 - `Set(value)`
+- `SetDefault(value)`
 - `Save(ctx)`
 - `Sync(ctx)`
 - `Discover()`
@@ -168,6 +174,28 @@ Choose format by consumer:
 - `YAMLFile[T]` for hand-edited operational config
 - `TOMLFile[T]` for settings-style files
 
+Use `SetDefault(value)` inside `Default() error` implementations when you want to seed missing typed content without overwriting existing memory.
+
+## `TextTemplate[C]`
+
+`TextTemplate[C]` is the stateful raw-text counterpart used for fully derived text artifacts.
+
+Useful methods:
+
+- all string-content methods analogous to `Format[string]`
+- `SetContext(ctx)` / `GetContext()` / `MustContext()`
+- `SetDefaultContext(ctx)`
+- `RenderTemplate(tpl)`
+- `SetRendered(value)`
+
+Built-in render contracts:
+
+- `Templatable`: implement `Template() string` and let `RenderDeep` use the built-in `text/template` path
+- `Renderable`: implement `Render() (string, error)` and `SetRendered(string)` for custom rendering
+- if a type implements both, `Renderable` takes precedence over `Templatable`
+
+Use `TextTemplate[C]` when the file is a derived artifact. Keep rendering memory-only until `SyncDeep`.
+
 ## `Slot[T]`
 
 `Slot[T]` models repeated child layouts under one directory.
@@ -192,7 +220,7 @@ Important methods:
 - `Keys()` returns sorted cached keys only
 - `DiscoverDeep(ctx)` discovers child directories from disk and scans them without loading typed files
 - `LoadDeep(ctx)` discovers child directories from disk and loads them
-- `ScanDeep(ctx)` and `SyncDeep(ctx)` recurse only into cached items
+- `DefaultDeep()`, `RenderDeep()`, `ScanDeep(ctx)`, and `SyncDeep(ctx)` recurse only into cached items
 
 Use `Add` for explicit creation. Use `DiscoverDeep` when you want discovery without loading typed content. Use `LoadDeep` when disk is authoritative and you want both discovery and content loading.
 
@@ -218,6 +246,35 @@ if err := app.Config.LoadOrInit(AppConfig{Name: "billing", Port: 8080}); err != 
 	return err
 }
 
+return conduit.SyncDeep(&ws, conduit.DefaultContext)
+```
+
+### Default, render, persist
+
+```go
+type ReadmeContext struct {
+	Name string
+}
+
+type ReadmeFile struct {
+	conduit.TextTemplate[ReadmeContext]
+}
+
+func (f *ReadmeFile) Default() error {
+	f.SetDefaultContext(ReadmeContext{Name: "billing"})
+	return nil
+}
+
+func (f *ReadmeFile) Template() string {
+	return "# {{ .Name }}\n"
+}
+
+if err := conduit.DefaultDeep(&ws); err != nil {
+	return err
+}
+if err := conduit.RenderDeep(&ws); err != nil {
+	return err
+}
 return conduit.SyncDeep(&ws, conduit.DefaultContext)
 ```
 
@@ -253,6 +310,8 @@ Use `Scan` / `ScanDeep` when you need existence information without loading or o
 - expecting `Compose` to create files or directories
 - expecting `EnsureDeep` to discover `Slot[T]` entries from disk
 - expecting `LoadOrInit` to write defaults immediately
+- expecting `DefaultDeep` to read from disk or discover slots
+- expecting `RenderDeep` to write files immediately
 - expecting `SyncDeep` to create uncached slot items automatically
 - assuming `Keys()` reflects the filesystem without a prior `DiscoverDeep` or `LoadDeep`
 - using `MustGet()` before `Load`, `LoadOrInit`, or `Set`
@@ -264,6 +323,6 @@ When modifying code that uses Conduit:
 
 - identify whether disk or memory is authoritative for the current step
 - keep the operation sequence explicit rather than collapsing it into helper magic
-- prefer `DiscoverDeep` for "enumerate existing structure", `LoadDeep` for "read existing state", `EnsureDeep` for "declare structure", and `SyncDeep` for "persist current memory"
+- prefer `EnsureDeep` for "declare structure", `DefaultDeep` for "seed missing memory", `DiscoverDeep` for "enumerate existing structure", `LoadDeep` for "read existing state", `RenderDeep` for "derive text into memory", and `SyncDeep` for "persist current memory"
 - use `Slot[T]` only when children are keyed directories with the same layout shape
-- use plain `File` for bytes and typed files only when state tracking or codec-backed reads/writes are actually needed
+- use plain `File` for bytes, typed files for codec-backed state, and `TextTemplate[C]` for derived text that should participate in the deep phase model
