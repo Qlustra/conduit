@@ -34,6 +34,14 @@ func (f *Format[T, C]) Set(value T) {
 	f.memory = MemoryDirty
 }
 
+func (f *Format[T, C]) SetDefault(value T) bool {
+	if f.content != nil {
+		return false
+	}
+	f.Set(value)
+	return true
+}
+
 func (f *Format[T, C]) Clear() {
 	f.content = nil
 	f.memory = MemoryUnknown

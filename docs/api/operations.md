@@ -49,6 +49,24 @@ Notable behavior:
 
 - when `ExecMode` is zero, `Exec` falls back to `FileMode` and adds execute bits automatically
 
+### `Defaulter`
+
+```go
+type Defaulter interface {
+	Default() error
+}
+```
+
+Description:
+
+- opt-in contract for nodes that can seed missing in-memory state with defaults
+
+Notable behavior:
+
+- `Default()` applies defaults in memory only
+- `DefaultDeep` calls `Default()` on matching nodes
+- concrete implementations decide which values are considered unset and whether to apply defaults
+
 ### `Renderable`
 
 ```go
@@ -253,4 +271,27 @@ Notable behavior:
 - does not discover new slot entries from disk
 - does not write to disk; pair it with `SyncDeep` to persist rendered content
 - `Renderable` takes precedence over `Templatable` when a type implements both
+- returns an error if `target` is nil
+
+### `DefaultDeep`
+
+```go
+func DefaultDeep(target any) error
+```
+
+Description:
+
+- recursively applies defaults to already composed or cached items in memory
+
+Arguments:
+
+- `target`: composed struct or node tree
+
+Notable behavior:
+
+- calls `Default() error` on nodes that implement `Defaulter`
+- only visits cached `Slot[T]` items
+- does not discover new slot entries from disk
+- does not read from disk
+- does not write to disk; pair it with `RenderDeep` or `SyncDeep` as needed
 - returns an error if `target` is nil

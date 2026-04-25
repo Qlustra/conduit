@@ -143,3 +143,18 @@ type Templatable interface {
 type DeepRenderer interface {
 	RenderDeep() error
 }
+
+// Default
+
+var (
+	defaulterType     = reflect.TypeOf((*Defaulter)(nil)).Elem()
+	deepDefaulterType = reflect.TypeOf((*DeepDefaulter)(nil)).Elem()
+)
+
+type Defaulter interface {
+	Default() error
+}
+
+type DeepDefaulter interface {
+	DefaultDeep() error
+}

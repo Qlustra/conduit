@@ -29,6 +29,14 @@ func (f *TextTemplate[C]) SetContext(ctx C) {
 	f.context = &ctx
 }
 
+func (f *TextTemplate[C]) SetDefaultContext(ctx C) bool {
+	if f.context != nil {
+		return false
+	}
+	f.SetContext(ctx)
+	return true
+}
+
 func (f TextTemplate[C]) GetContext() (C, bool) {
 	if f.context == nil {
 		var zero C

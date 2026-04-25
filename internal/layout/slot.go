@@ -315,3 +315,22 @@ func (s *Slot[T]) RenderDeep() error {
 
 	return nil
 }
+
+// Default
+
+func (s *Slot[T]) DefaultDeep() error {
+	s.mu.RLock()
+	items := make(map[string]T, len(s.items))
+	for name, item := range s.items {
+		items[name] = item
+	}
+	s.mu.RUnlock()
+
+	for name, item := range items {
+		if err := DefaultDeep(item); err != nil {
+			return fmt.Errorf("default slot item %q: %w", name, err)
+		}
+	}
+
+	return nil
+}

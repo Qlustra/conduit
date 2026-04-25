@@ -67,6 +67,8 @@ err := service.YAML.LoadOrInit(ServiceConfig{
 
 If the file is missing, the default is stored in memory and marked dirty. It is not written until you call `Save`, `Sync`, or `SyncDeep`.
 
+When you want to apply defaults without touching disk, wrappers can use `SetDefault(...)` inside `Default() error` and then participate in `DefaultDeep(...)`.
+
 ## Mutating content
 
 Use `Set` to replace the in-memory value:
@@ -181,6 +183,7 @@ func (f *ReadmeFile) Template() string {
 `TextTemplate[C]` exposes the same file-state operations as `Format[string]` and adds:
 
 - `SetContext(ctx C)`
+- `SetDefaultContext(ctx C) bool`
 - `GetContext() (C, bool)`
 - `MustContext() C`
 - `HasContext() bool`
@@ -210,3 +213,9 @@ This keeps rendering explicit:
 - `SetContext` prepares render inputs in memory
 - `RenderDeep` derives raw text into cached file content
 - `SyncDeep` persists the rendered text to disk
+
+Defaults fit into the same phase model:
+
+- implement `Default() error` on wrappers that should seed missing typed content or missing render context
+- use `SetDefault(...)` on typed files and `SetDefaultContext(...)` on text templates to avoid overwriting existing memory
+- call `DefaultDeep(&workspace)` before `RenderDeep(&workspace)` when defaults should feed rendering

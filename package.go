@@ -21,6 +21,7 @@ type Codec[T any] = layout.Codec[T]
 type Format[T any] = layout.Format[T, Codec[T]]
 type TextTemplate[C any] = layout.TextTemplate[C]
 type RunOptions = layout.RunOptions
+type Defaulter = layout.Defaulter
 type Renderable = layout.Renderable
 type Templatable = layout.Templatable
 
@@ -30,6 +31,7 @@ var LoadDeep = layout.LoadDeep
 var DiscoverDeep = layout.DiscoverDeep
 var SyncDeep = layout.SyncDeep
 var ScanDeep = layout.ScanDeep
+var DefaultDeep = layout.DefaultDeep
 var RenderDeep = layout.RenderDeep
 
 // Formats

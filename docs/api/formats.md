@@ -47,6 +47,7 @@ Content methods:
 - `Get() (T, bool)`: returns the cached value if present
 - `MustGet() T`: returns the cached value or panics when no value is loaded
 - `Set(value T)`: replaces cached content and marks memory state dirty
+- `SetDefault(value T) bool`: stores a default value only when no content is currently cached
 - `Clear()`: clears cached content and resets memory state to unknown
 - `Delete() error`: removes the file from disk if present, clears cached content, and marks disk state missing
 - `Write(value T, ctx Context) error`: marshals and writes a supplied value directly
@@ -70,6 +71,7 @@ Content methods:
 Notable behavior:
 
 - `Set` does not write to disk
+- `SetDefault` returns `false` and leaves content unchanged when content is already cached
 - `Save` fails when no content is loaded
 - `Sync` is a no-op when no content is loaded
 - `Load` on a missing file clears cached content, sets disk state to missing, and resets memory state to unknown
@@ -179,6 +181,7 @@ Content methods:
 Context methods:
 
 - `SetContext(ctx C)`: replaces cached render context
+- `SetDefaultContext(ctx C) bool`: stores default render context only when no context is currently cached
 - `GetContext() (C, bool)`: returns cached render context if present
 - `MustContext() C`: returns cached render context or panics when unset
 - `HasContext() bool`: reports whether render context is currently cached
@@ -191,5 +194,6 @@ Notable behavior:
 - persists raw text without a structured codec
 - mirrors the same disk/memory state model as `Format[T]`
 - resets cached render context when `Compose` rebinds the file path
+- `SetDefaultContext` returns `false` and leaves context unchanged when context is already cached
 - provides the built-in templated render path used by `Templatable`
 - leaves custom render validation and semantics to the user-defined `Render()` implementation
