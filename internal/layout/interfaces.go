@@ -1,8 +1,6 @@
 package layout
 
-import (
-	"reflect"
-)
+import "reflect"
 
 // Node
 
@@ -121,4 +119,27 @@ type Scannable interface {
 
 type DeepScanner interface {
 	ScanDeep(ctx Context) error
+}
+
+// Render
+
+var (
+	renderableType   = reflect.TypeOf((*Renderable)(nil)).Elem()
+	templatableType  = reflect.TypeOf((*Templatable)(nil)).Elem()
+	deepRendererType = reflect.TypeOf((*DeepRenderer)(nil)).Elem()
+)
+
+type Renderable interface {
+	Render() (string, error)
+	SetRendered(string)
+}
+
+type Templatable interface {
+	Template() string
+	RenderTemplate(string) (string, error)
+	SetRendered(string)
+}
+
+type DeepRenderer interface {
+	RenderDeep() error
 }

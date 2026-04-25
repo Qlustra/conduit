@@ -7,8 +7,9 @@ The public format types are:
 - `conduit.JSONFile[T]`
 - `conduit.YAMLFile[T]`
 - `conduit.TOMLFile[T]`
+- `conduit.TextTemplate[C]`
 
-All three expose the same content API through `Format[T]`.
+The typed formats expose the same content API through `Format[T]`. `TextTemplate[C]` mirrors that state model for raw text and adds cached render context.
 
 ## Declaring typed files
 
@@ -155,3 +156,57 @@ Choose the format based on how the file will be consumed:
 - JSON for machine-oriented artifacts
 - YAML for hand-edited operational config
 - TOML for settings-style files
+
+## Text templates
+
+Use `TextTemplate[C]` for fully derived raw-text artifacts such as README files, scripts, or generated notes.
+
+Example:
+
+```go
+type ReadmeContext struct {
+	Name  string
+	Items []string
+}
+
+type ReadmeFile struct {
+	conduit.TextTemplate[ReadmeContext]
+}
+
+func (f *ReadmeFile) Template() string {
+	return "# {{ .Name }}\n"
+}
+```
+
+`TextTemplate[C]` exposes the same file-state operations as `Format[string]` and adds:
+
+- `SetContext(ctx C)`
+- `GetContext() (C, bool)`
+- `MustContext() C`
+- `HasContext() bool`
+- `ClearContext()`
+- `RenderTemplate(tpl string) (string, error)`
+- `SetRendered(value string)`
+
+You can use it in two ways:
+
+- implement `Template() string` and let `RenderDeep` use the built-in `text/template` path
+- implement `Render() (string, error)` for custom rendering logic; this takes precedence over `Template()`
+
+Typical flow:
+
+```go
+file.SetContext(ReadmeContext{Name: "billing"})
+
+if err := conduit.RenderDeep(&workspace); err != nil {
+	return err
+}
+
+return conduit.SyncDeep(&workspace, conduit.DefaultContext)
+```
+
+This keeps rendering explicit:
+
+- `SetContext` prepares render inputs in memory
+- `RenderDeep` derives raw text into cached file content
+- `SyncDeep` persists the rendered text to disk

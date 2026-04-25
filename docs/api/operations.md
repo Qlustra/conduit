@@ -49,6 +49,47 @@ Notable behavior:
 
 - when `ExecMode` is zero, `Exec` falls back to `FileMode` and adds execute bits automatically
 
+### `Renderable`
+
+```go
+type Renderable interface {
+	Render() (string, error)
+	SetRendered(string)
+}
+```
+
+Description:
+
+- opt-in contract for text-template wrappers that can derive raw text into memory
+
+Notable behavior:
+
+- `Render()` computes text but does not write to disk by itself
+- `SetRendered(string)` stores rendered text into the target's in-memory file state
+- `RenderDeep` calls `Render()` and passes the result into `SetRendered(string)`
+- concrete implementations decide how to handle missing or incomplete render context
+
+### `Templatable`
+
+```go
+type Templatable interface {
+	Template() string
+	RenderTemplate(string) (string, error)
+	SetRendered(string)
+}
+```
+
+Description:
+
+- opt-in contract for the built-in `text/template` render path
+
+Notable behavior:
+
+- `Template()` returns the source template text
+- `RenderTemplate(string)` executes template text against the current cached render context
+- `SetRendered(string)` stores the rendered text into the target's in-memory file state
+- `RenderDeep` uses this path only when the node does not implement `Renderable`
+
 ## Functions
 
 ### `Compose`
@@ -187,4 +228,29 @@ Notable behavior:
 - preserves current in-memory values and memory state
 - only scans cached `Slot[T]` items
 - does not discover new slot entries from disk
+- returns an error if `target` is nil
+
+### `RenderDeep`
+
+```go
+func RenderDeep(target any) error
+```
+
+Description:
+
+- recursively renders text-template wrappers into in-memory file content
+
+Arguments:
+
+- `target`: composed struct or node tree
+
+Notable behavior:
+
+- calls `Render() (string, error)` on nodes that implement `Renderable`
+- otherwise, calls `Template()` and `RenderTemplate(...)` on nodes that implement `Templatable`
+- stores rendered text in memory via `SetRendered(string)`
+- only visits cached `Slot[T]` items
+- does not discover new slot entries from disk
+- does not write to disk; pair it with `SyncDeep` to persist rendered content
+- `Renderable` takes precedence over `Templatable` when a type implements both
 - returns an error if `target` is nil

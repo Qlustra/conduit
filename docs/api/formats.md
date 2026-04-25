@@ -135,3 +135,61 @@ Exposed API:
 Notable behavior:
 
 - uses `github.com/pelletier/go-toml/v2` for marshal and unmarshal
+
+### `TextTemplate[C]`
+
+```go
+type TextTemplate[C any] struct{}
+```
+
+Description:
+
+- stateful raw-text file with cached render context
+
+Exposed API:
+
+- all string-content operations analogous to `Format[string]`
+- all inherited `File` methods from embedded raw-text file state
+
+Content methods:
+
+- `Get() (string, bool)`: returns the cached text if present
+- `MustGet() string`: returns the cached text or panics when no text is loaded
+- `Set(value string)`: replaces cached text and marks memory state dirty
+- `Clear()`: clears cached text and resets memory state to unknown
+- `Delete() error`: removes the file from disk if present, clears cached text, and marks disk state missing
+- `Write(value string, ctx Context) error`: writes a supplied string directly
+- `Read() (string, error)`: reads raw text from disk
+- `ReadIfExists() (string, bool, error)`: reads raw text when the file exists
+- `LoadOrInit(defaultValue string) error`: loads existing text or stores a default value in memory when missing
+- `Save(ctx Context) error`: writes the cached text and marks memory state synced
+- `Load() (bool, error)`: loads text into memory and reports whether the file existed
+- `Discover()`: refreshes disk-state metadata without replacing in-memory content and returns the observed state value
+- `HasContent() bool`: reports whether text is currently cached
+- `Unload()`: clears cached text and resets memory state to unknown
+- `Sync(ctx Context) error`: writes cached text when present, otherwise no-op
+- `DiskState()`: returns current disk-state metadata
+- `MemoryState()`: returns current memory-state metadata
+- `HasKnownDiskState() bool`: reports whether disk state is not unknown
+- `WasObservedOnDisk() bool`: reports whether the last known disk state is present
+- `HasBeenLoaded() bool`: reports whether memory state has reached loaded, synced, or dirty
+- `IsDirty() bool`: reports whether memory state is dirty
+- `Scan()`: refreshes disk-state metadata without replacing in-memory content and returns the observed state value
+
+Context methods:
+
+- `SetContext(ctx C)`: replaces cached render context
+- `GetContext() (C, bool)`: returns cached render context if present
+- `MustContext() C`: returns cached render context or panics when unset
+- `HasContext() bool`: reports whether render context is currently cached
+- `ClearContext()`: clears cached render context
+- `RenderTemplate(tpl string) (string, error)`: executes template text against the current render context using the built-in `text/template` renderer
+- `SetRendered(value string)`: stores rendered text in the file's cached content
+
+Notable behavior:
+
+- persists raw text without a structured codec
+- mirrors the same disk/memory state model as `Format[T]`
+- resets cached render context when `Compose` rebinds the file path
+- provides the built-in templated render path used by `Templatable`
+- leaves custom render validation and semantics to the user-defined `Render()` implementation
