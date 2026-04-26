@@ -83,7 +83,7 @@ This makes `DiscoverDeep` the middle ground between `LoadDeep` and `ScanDeep`: i
 
 ## Sync
 
-`SyncDeep(target, ctx)` writes loaded or dirty in-memory content back to disk:
+`SyncDeep(target, ctx)` writes sync-eligible in-memory typed content back to disk:
 
 ```go
 err := conduit.SyncDeep(&ws, conduit.DefaultContext)
@@ -91,17 +91,18 @@ err := conduit.SyncDeep(&ws, conduit.DefaultContext)
 
 What it does:
 
-- ensures parent structure as needed before writing
-- writes typed files that currently hold content
+- writes typed files that currently hold content and match `ctx.SyncPolicy`
 - syncs already cached slot items recursively
+- allows callers to choose rewrite behavior per sync pass
 
 What it does not do:
 
+- materialize standalone raw `Dir` or `File` fields
 - invent uncached slot entries
 - delete files or directories that are missing from memory
 - merge disk content with memory content
 
-For typed files, `Sync` is a no-op when no content is loaded.
+For typed files, `Sync` is a no-op when no content is loaded or when the current memory state is excluded by `ctx.SyncPolicy`.
 
 ## Scan
 
@@ -131,23 +132,32 @@ Every filesystem operation accepts a `Context`:
 
 ```go
 ctx := conduit.Context{
-	DirMode:  0o755,
-	FileMode: 0o644,
-	ExecMode: 0o755,
+	DirMode:    0o755,
+	FileMode:   0o644,
+	ExecMode:   0o755,
+	SyncPolicy: conduit.SyncRewrite,
 }
 ```
 
 - `DirMode` controls created directories.
 - `FileMode` controls regular files.
 - `ExecMode` controls `Exec` files.
+- `SyncPolicy` controls which typed memory states `Sync` and `SyncDeep` may write.
+
+Available sync policies:
+
+- `conduit.SyncRewrite`: write loaded, dirty, and already-synced typed content
+- `conduit.SyncIfDirty`: write only dirty typed content
+- `conduit.SyncIfUnsynced`: write loaded and dirty typed content, but skip already-synced content
 
 `conduit.DefaultContext` is:
 
 ```go
 conduit.Context{
-	DirMode:  0o755,
-	FileMode: 0o644,
-	ExecMode: 0o755,
+	DirMode:    0o755,
+	FileMode:   0o644,
+	ExecMode:   0o755,
+	SyncPolicy: conduit.SyncRewrite,
 }
 ```
 
@@ -163,6 +173,15 @@ _ = conduit.EnsureDeep(&ws, conduit.DefaultContext)
 svc, _ := ws.Services.Add("billing", conduit.DefaultContext)
 svc.Config.Set(ServiceConfig{Name: "billing", Port: 8080})
 _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
+```
+
+Sync only dirty typed content during a pass:
+
+```go
+ctx := conduit.DefaultContext
+ctx.SyncPolicy = conduit.SyncIfDirty
+
+_ = conduit.SyncDeep(&ws, ctx)
 ```
 
 Load an existing workspace, edit it, then persist:
@@ -196,4 +215,4 @@ svc := ws.Services.MustAt("billing")
 _ = conduit.ScanDeep(svc, conduit.DefaultContext)
 ```
 
-The core rule is simple: Conduit never decides direction for you. You choose whether the next step is ensure, discover, load, sync, or scan.
+The core rule is simple: Conduit never decides direction for you. You choose whether the next step is ensure, discover, load, sync, or scan, and you choose how aggressive sync should be for typed content.

@@ -76,6 +76,7 @@ How memory state changes:
 - `Discover` does not change it
 - `Scan` does not change it
 - `Sync` without content is a no-op, so state stays unchanged
+- `Sync` with excluded policy is also a no-op, so state stays unchanged
 
 ```mermaid
 stateDiagram
@@ -192,6 +193,7 @@ The difference is precondition behavior:
 
 - `Save` returns an error when no content is loaded
 - `Sync` silently does nothing when no content is loaded
+- `Sync` also silently does nothing when the current memory state is excluded by `Context.SyncPolicy`
 
 ### `Clear` and `Unload` only affect memory
 

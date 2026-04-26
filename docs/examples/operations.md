@@ -28,6 +28,23 @@ Why the sequence matters:
 - `Add` creates one explicit dynamic child
 - `SyncDeep` persists the in-memory config
 
+## Sync only dirty content
+
+Goal: avoid rewriting typed files that are already loaded or already synced.
+
+```go
+ctx := conduit.DefaultContext
+ctx.SyncPolicy = conduit.SyncIfDirty
+
+_ = conduit.SyncDeep(&ws, ctx)
+```
+
+Why the policy matters:
+
+- dirty typed files are written
+- loaded-but-unchanged typed files are skipped
+- already-synced typed files are skipped
+
 ## Load, edit, sync
 
 Goal: treat disk as authoritative, change one field, then write it back.

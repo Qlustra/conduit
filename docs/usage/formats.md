@@ -93,8 +93,8 @@ Other write-side methods:
 There are three ways to write typed files:
 
 - `Write(value, ctx)` marshals and writes a supplied value directly
-- `Save(ctx)` writes the currently loaded value
-- `Sync(ctx)` writes the currently loaded value, or does nothing if no value is loaded
+- `Save(ctx)` writes the cached value
+- `Sync(ctx)` writes the cached value when `ctx.SyncPolicy` allows the current memory state, or does nothing otherwise
 
 Example:
 
@@ -111,6 +111,15 @@ Or as part of a larger layout:
 
 ```go
 err := conduit.SyncDeep(&workspace, conduit.DefaultContext)
+```
+
+To avoid rewriting already-synced or freshly-loaded files during a larger pass:
+
+```go
+ctx := conduit.DefaultContext
+ctx.SyncPolicy = conduit.SyncIfDirty
+
+err := conduit.SyncDeep(&workspace, ctx)
 ```
 
 ## State model

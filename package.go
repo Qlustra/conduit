@@ -8,8 +8,19 @@ import (
 // Context
 
 type Context = layout.Context
+type SyncPolicy = layout.SyncPolicy
 
 var DefaultContext = layout.DefaultContext
+
+const (
+	SyncOnLoaded SyncPolicy = layout.SyncOnLoaded
+	SyncOnSynced SyncPolicy = layout.SyncOnSynced
+	SyncOnDirty  SyncPolicy = layout.SyncOnDirty
+
+	SyncRewrite    SyncPolicy = layout.SyncRewrite
+	SyncIfDirty    SyncPolicy = layout.SyncIfDirty
+	SyncIfUnsynced SyncPolicy = layout.SyncIfUnsynced
+)
 
 // Layout
 

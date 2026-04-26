@@ -111,6 +111,10 @@ func (f *Format[T, C]) Save(ctx Context) error {
 	if f.content == nil {
 		return fmt.Errorf("file content is not loaded")
 	}
+	return f.saveLoaded(ctx)
+}
+
+func (f *Format[T, C]) saveLoaded(ctx Context) error {
 	if err := f.Write(*f.content, ctx); err != nil {
 		return err
 	}
@@ -168,7 +172,10 @@ func (f *Format[T, C]) Sync(ctx Context) error {
 	if f.content == nil {
 		return nil
 	}
-	return f.Save(ctx)
+	if !ctx.syncPolicy().allows(f.memory) {
+		return nil
+	}
+	return f.saveLoaded(ctx)
 }
 
 // States

@@ -6,11 +6,11 @@ import (
 )
 
 // SyncDeep
-// Writes cached content back to disk. Projects memory onto filesystem.
+// Writes sync-eligible cached content back to disk. Projects memory onto filesystem.
 // Projective, memory cache -> filesystem content
 // - walks already composed/cached hierarchy
-// - writes loaded/cached typed file contents
-// - ensures parent structure as needed
+// - writes typed file contents when the node's sync policy allows its memory state
+// - does not ensure raw Dir/File fields outside sync-capable wrappers
 // - does not invent missing slot entries unless they are already cached in the slot
 // - does not delete anything absent from memory
 func SyncDeep(target any, ctx Context) error {

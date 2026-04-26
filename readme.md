@@ -9,7 +9,7 @@ It lets you describe a filesystem as semantic Go types, then move state explicit
 - `EnsureDeep` materializes declared structure.
 - `DiscoverDeep` discovers declared structure from disk without loading typed content.
 - `LoadDeep` reads disk content into memory.
-- `SyncDeep` writes loaded or dirty memory state back to disk.
+- `SyncDeep` writes sync-eligible typed memory state back to disk.
 - `ScanDeep` observes disk presence for already composed items.
 
 There is no implicit reconciliation loop, merge policy, or background sync. You decide which side is authoritative and when data moves.

@@ -149,7 +149,7 @@ Methods:
 - `DiscoverDeep(ctx Context) error`: discovers child directories on disk and scans them without loading typed content
 - `LoadDeep(ctx Context) error`: discovers child directories on disk and loads them
 - `ScanDeep(ctx Context) error`: scans only cached items
-- `SyncDeep(ctx Context) error`: ensures and syncs only cached items
+- `SyncDeep(ctx Context) error`: ensures cached items, then syncs typed content within those items
 
 Notable behavior:
 
@@ -159,3 +159,4 @@ Notable behavior:
 - `DiscoverDeep` discovers directory-backed entries from disk without loading typed files
 - `LoadDeep` discovers directory-backed entries from disk
 - `ScanDeep` and `SyncDeep` do not discover uncached entries
+- `Slot.SyncDeep` ensures cached children before syncing them

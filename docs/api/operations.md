@@ -16,9 +16,10 @@ Default value:
 
 ```go
 conduit.Context{
-	DirMode:  0o755,
-	FileMode: 0o644,
-	ExecMode: 0o755,
+	DirMode:    0o755,
+	FileMode:   0o644,
+	ExecMode:   0o755,
+	SyncPolicy: conduit.SyncRewrite,
 }
 ```
 
@@ -26,6 +27,7 @@ Notable behavior:
 
 - used as the default permission set in most examples
 - `ExecMode` is applied by `Exec` operations
+- `SyncPolicy` defaults to `SyncRewrite`
 
 ## Types
 
@@ -33,9 +35,10 @@ Notable behavior:
 
 ```go
 type Context struct {
-	DirMode  os.FileMode
-	FileMode os.FileMode
-	ExecMode os.FileMode
+	DirMode    os.FileMode
+	FileMode   os.FileMode
+	ExecMode   os.FileMode
+	SyncPolicy conduit.SyncPolicy
 }
 ```
 
@@ -44,10 +47,31 @@ Fields:
 - `DirMode`: mode used when creating directories
 - `FileMode`: mode used when creating regular files
 - `ExecMode`: mode used when creating or ensuring `Exec` files
+- `SyncPolicy`: selects which typed memory states `Sync` and `SyncDeep` may write
 
 Notable behavior:
 
 - when `ExecMode` is zero, `Exec` falls back to `FileMode` and adds execute bits automatically
+- when `SyncPolicy` is zero, sync operations fall back to `SyncRewrite`
+
+### `SyncPolicy`
+
+```go
+type SyncPolicy uint8
+```
+
+Description:
+
+- bitmask policy that filters which typed memory states are writable during `Sync` and `SyncDeep`
+
+Constants:
+
+- `SyncOnLoaded`: include `MemoryLoaded`
+- `SyncOnSynced`: include `MemorySynced`
+- `SyncOnDirty`: include `MemoryDirty`
+- `SyncRewrite`: include loaded, synced, and dirty states
+- `SyncIfDirty`: include only dirty state
+- `SyncIfUnsynced`: include loaded and dirty states
 
 ### `Defaulter`
 
@@ -210,7 +234,7 @@ func SyncDeep(target any, ctx Context) error
 
 Description:
 
-- recursively writes loaded or dirty in-memory content back to disk
+- recursively writes sync-eligible typed in-memory content back to disk
 
 Arguments:
 
@@ -219,9 +243,11 @@ Arguments:
 
 Notable behavior:
 
-- ensures parent structure before syncing cached content
 - only writes typed files that currently have content loaded in memory
+- applies `ctx.SyncPolicy` to typed memory state before writing
 - only syncs cached `Slot[T]` items
+- `Slot[T]` ensures cached children before syncing them
+- does not materialize standalone raw `Dir` or `File` nodes
 - does not delete files or directories
 - returns an error if `target` is nil
 
