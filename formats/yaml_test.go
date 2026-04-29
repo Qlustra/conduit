@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/qlustra/conduit/internal/layout"
+	"github.com/qlustra/conduit/layout"
 )
 
 func TestYAMLFileSaveAndLoad(t *testing.T) {

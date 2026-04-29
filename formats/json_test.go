@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/qlustra/conduit/internal/layout"
+	"github.com/qlustra/conduit/layout"
 )
 
 func TestJSONFileSaveAndLoad(t *testing.T) {

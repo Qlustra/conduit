@@ -3,7 +3,7 @@ package formats
 import (
 	"encoding/json"
 
-	"github.com/qlustra/conduit/internal/layout"
+	"github.com/qlustra/conduit/layout"
 )
 
 type JSONCodec[T any] struct{}

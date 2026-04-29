@@ -1,9 +1,8 @@
 package formats
 
 import (
+	"github.com/qlustra/conduit/layout"
 	"gopkg.in/yaml.v3"
-
-	"github.com/qlustra/conduit/internal/layout"
 )
 
 type YAMLCodec[T any] struct{}

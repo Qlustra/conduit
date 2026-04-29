@@ -2,8 +2,7 @@ package formats
 
 import (
 	"github.com/pelletier/go-toml/v2"
-
-	"github.com/qlustra/conduit/internal/layout"
+	"github.com/qlustra/conduit/layout"
 )
 
 type TOMLCodec[T any] struct{}
