@@ -13,15 +13,15 @@ type ServiceConfig struct {
 }
 
 type Service struct {
-	Root    conduit.Dir                     `layout:"."`
-	Config  conduit.YAMLFile[ServiceConfig] `layout:"config.yaml"`
-	Logs    conduit.Dir                     `layout:"logs"`
-	Runner  conduit.Exec                    `layout:"bin/run"`
+	Root    layout.Dir                      `layout:"."`
+	Config  formats.YAMLFile[ServiceConfig] `layout:"config.yaml"`
+	Logs    layout.Dir                      `layout:"logs"`
+	Runner  layout.Exec                     `layout:"bin/run"`
 }
 
 type Workspace struct {
-	Root     conduit.Dir           `layout:"."`
-	Services conduit.Slot[*Service] `layout:"services"`
+	Root     layout.Dir            `layout:"."`
+	Services layout.Slot[*Service] `layout:"services"`
 }
 ```
 
@@ -57,14 +57,14 @@ type AppManifest struct {
 }
 
 type Deployment struct {
-	Root      conduit.Dir                    `layout:"."`
-	Env       conduit.TOMLFile[map[string]string] `layout:"env.toml"`
-	Manifests conduit.Slot[*ManifestDir]     `layout:"manifests"`
+	Root      layout.Dir                     `layout:"."`
+	Env       formats.TOMLFile[map[string]string] `layout:"env.toml"`
+	Manifests layout.Slot[*ManifestDir]      `layout:"manifests"`
 }
 
 type ManifestDir struct {
-	Root    conduit.Dir                 `layout:"."`
-	Current conduit.JSONFile[AppManifest] `layout:"current.json"`
+	Root    layout.Dir                    `layout:"."`
+	Current formats.JSONFile[AppManifest] `layout:"current.json"`
 }
 ```
 
@@ -78,11 +78,11 @@ This gives you:
 
 ```go
 type Toolchain struct {
-	Root    conduit.Dir                   `layout:"."`
-	Settings conduit.YAMLFile[map[string]any] `layout:"settings.yaml"`
+	Root     layout.Dir                    `layout:"."`
+	Settings formats.YAMLFile[map[string]any] `layout:"settings.yaml"`
 	Scripts struct {
-		Build  conduit.Exec `layout:"build"`
-		Deploy conduit.Exec `layout:"deploy"`
+		Build  layout.Exec `layout:"build"`
+		Deploy layout.Exec `layout:"deploy"`
 	} `layout:"bin"`
 }
 ```
@@ -97,12 +97,12 @@ This is useful when the filesystem itself is the contract:
 
 ```go
 type Tenant struct {
-	Profile conduit.YAMLFile[map[string]string] `layout:"profile.yaml"`
+	Profile formats.YAMLFile[map[string]string] `layout:"profile.yaml"`
 }
 
 type Tenants struct {
-	Root  conduit.Dir            `layout:"."`
-	Items conduit.Slot[*Tenant]  `layout:"tenants"`
+	Root  layout.Dir             `layout:"."`
+	Items layout.Slot[*Tenant]   `layout:"tenants"`
 }
 ```
 

@@ -2,6 +2,12 @@
 
 Conduit layouts are plain Go structs with `layout` tags. `Compose` walks the struct, resolves each tagged field relative to a root path, and binds the corresponding filesystem handle or typed file.
 
+In code, that usually means:
+
+- import `github.com/qlustra/conduit` for operations such as `Compose`
+- import `github.com/qlustra/conduit/layout` for `Dir`, `File`, `Exec`, `Slot[T]`, and `TextTemplate[C]`
+- import `github.com/qlustra/conduit/formats` for `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`
+
 ## Defining a layout
 
 Use `layout:"."` for the root and relative paths for children:
@@ -13,14 +19,14 @@ type ServiceConfig struct {
 }
 
 type Service struct {
-	Root   conduit.Dir                     `layout:"."`
-	Config conduit.YAMLFile[ServiceConfig] `layout:"config.yaml"`
-	Logs   conduit.Dir                     `layout:"logs"`
+	Root   layout.Dir                      `layout:"."`
+	Config formats.YAMLFile[ServiceConfig] `layout:"config.yaml"`
+	Logs   layout.Dir                      `layout:"logs"`
 }
 
 type Workspace struct {
-	Root     conduit.Dir            `layout:"."`
-	Services conduit.Slot[*Service] `layout:"services"`
+	Root     layout.Dir             `layout:"."`
+	Services layout.Slot[*Service]  `layout:"services"`
 }
 
 var ws Workspace
@@ -80,13 +86,13 @@ If `Context.ExecMode` is unset, Conduit falls back to `FileMode` and adds execut
 
 ### Typed files
 
-`JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]` are codec-backed files that embed `Format[T]`.
+`formats.JSONFile[T]`, `formats.YAMLFile[T]`, and `formats.TOMLFile[T]` are codec-backed files that embed `layout.Format[T, C]`.
 
 They behave like regular layout nodes, but also keep typed content in memory:
 
 ```go
 type App struct {
-	Config conduit.JSONFile[map[string]any] `layout:"config.json"`
+	Config formats.JSONFile[map[string]any] `layout:"config.json"`
 }
 ```
 
@@ -98,11 +104,11 @@ See [Formats usage](formats.md) for the full content API.
 
 ```go
 type Service struct {
-	Config conduit.YAMLFile[ServiceConfig] `layout:"config.yaml"`
+	Config formats.YAMLFile[ServiceConfig] `layout:"config.yaml"`
 }
 
 type Workspace struct {
-	Services conduit.Slot[*Service] `layout:"services"`
+	Services layout.Slot[*Service] `layout:"services"`
 }
 ```
 
@@ -142,8 +148,8 @@ Nested structs work naturally:
 ```go
 type Tooling struct {
 	Scripts struct {
-		Build conduit.Exec `layout:"build"`
-		Test  conduit.Exec `layout:"test"`
+		Build layout.Exec `layout:"build"`
+		Test  layout.Exec `layout:"test"`
 	} `layout:"bin"`
 }
 ```
@@ -159,9 +165,9 @@ Static structure:
 
 ```go
 type Repo struct {
-	Root   conduit.Dir                `layout:"."`
-	Config conduit.TOMLFile[Settings] `layout:"settings.toml"`
-	Hooks  conduit.Dir                `layout:"hooks"`
+	Root   layout.Dir                 `layout:"."`
+	Config formats.TOMLFile[Settings] `layout:"settings.toml"`
+	Hooks  layout.Dir                 `layout:"hooks"`
 }
 ```
 
@@ -169,12 +175,12 @@ Static structure plus dynamic children:
 
 ```go
 type Project struct {
-	Config conduit.YAMLFile[ProjectConfig] `layout:"project.yaml"`
+	Config formats.YAMLFile[ProjectConfig] `layout:"project.yaml"`
 }
 
 type Monorepo struct {
-	Root     conduit.Dir            `layout:"."`
-	Projects conduit.Slot[*Project] `layout:"projects"`
+	Root     layout.Dir             `layout:"."`
+	Projects layout.Slot[*Project]  `layout:"projects"`
 }
 ```
 
@@ -182,8 +188,8 @@ Managed tools next to data:
 
 ```go
 type Environment struct {
-	Root   conduit.Dir                 `layout:"."`
-	Env    conduit.YAMLFile[EnvConfig] `layout:"env.yaml"`
-	Deploy conduit.Exec                `layout:"bin/deploy"`
+	Root   layout.Dir                  `layout:"."`
+	Env    formats.YAMLFile[EnvConfig] `layout:"env.yaml"`
+	Deploy layout.Exec                 `layout:"bin/deploy"`
 }
 ```

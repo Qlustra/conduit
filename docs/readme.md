@@ -1,5 +1,11 @@
 # Documentation
 
+The module is split by package:
+
+- `github.com/qlustra/conduit`: operations, `Context`, sync policy
+- `github.com/qlustra/conduit/layout`: structural nodes, slots, executable files, text templates
+- `github.com/qlustra/conduit/formats`: JSON, YAML, and TOML typed files
+
 The docs are split by intent:
 
 - [Usage](usage/layout.md) explains the concepts and operational model.

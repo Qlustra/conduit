@@ -4,12 +4,12 @@ Typed files are the stateful part of a Conduit layout. They combine a filesystem
 
 The public format types are:
 
-- `conduit.JSONFile[T]`
-- `conduit.YAMLFile[T]`
-- `conduit.TOMLFile[T]`
-- `conduit.TextTemplate[C]`
+- `formats.JSONFile[T]`
+- `formats.YAMLFile[T]`
+- `formats.TOMLFile[T]`
+- `layout.TextTemplate[C]`
 
-The typed formats expose the same content API through `Format[T]`. `TextTemplate[C]` mirrors that state model for raw text and adds cached render context.
+The typed formats expose the same content API through `layout.Format[T, C]`. `layout.TextTemplate[C]` mirrors that state model for raw text and adds cached render context.
 
 ## Declaring typed files
 
@@ -20,9 +20,9 @@ type ServiceConfig struct {
 }
 
 type Service struct {
-	YAML conduit.YAMLFile[ServiceConfig] `layout:"service.yaml"`
-	JSON conduit.JSONFile[ServiceConfig] `layout:"service.json"`
-	TOML conduit.TOMLFile[ServiceConfig] `layout:"service.toml"`
+	YAML formats.YAMLFile[ServiceConfig] `layout:"service.yaml"`
+	JSON formats.JSONFile[ServiceConfig] `layout:"service.json"`
+	TOML formats.TOMLFile[ServiceConfig] `layout:"service.toml"`
 }
 ```
 
@@ -158,9 +158,9 @@ That makes it safe to ask "is this file present?" without loading or replacing t
 
 Each typed file has a fixed codec:
 
-- `JSONFile[T]` writes indented JSON with a trailing newline
-- `YAMLFile[T]` uses `gopkg.in/yaml.v3`
-- `TOMLFile[T]` uses `github.com/pelletier/go-toml/v2`
+- `formats.JSONFile[T]` writes indented JSON with a trailing newline
+- `formats.YAMLFile[T]` uses `gopkg.in/yaml.v3`
+- `formats.TOMLFile[T]` uses `github.com/pelletier/go-toml/v2`
 
 Choose the format based on how the file will be consumed:
 
@@ -170,7 +170,7 @@ Choose the format based on how the file will be consumed:
 
 ## Text templates
 
-Use `TextTemplate[C]` for fully derived raw-text artifacts such as README files, scripts, or generated notes.
+Use `layout.TextTemplate[C]` for fully derived raw-text artifacts such as README files, scripts, or generated notes.
 
 Example:
 
@@ -181,7 +181,7 @@ type ReadmeContext struct {
 }
 
 type ReadmeFile struct {
-	conduit.TextTemplate[ReadmeContext]
+	layout.TextTemplate[ReadmeContext]
 }
 
 func (f *ReadmeFile) Template() string {
@@ -189,7 +189,7 @@ func (f *ReadmeFile) Template() string {
 }
 ```
 
-`TextTemplate[C]` exposes the same file-state operations as `Format[string]` and adds:
+`layout.TextTemplate[C]` exposes the same file-state lifecycle as the typed formats and adds:
 
 - `SetContext(ctx C)`
 - `SetDefaultContext(ctx C) bool`

@@ -1,6 +1,6 @@
 ---
 name: conduit
-description: Use this skill when working with github.com/qlustra/conduit in Go projects. It teaches the library's contract-based filesystem model, how to declare layouts with `layout` tags, when to use `Compose`, `EnsureDeep`, `DefaultDeep`, `DiscoverDeep`, `LoadDeep`, `RenderDeep`, `SyncDeep`, and `ScanDeep`, and how to work safely with `Dir`, `File`, `Exec`, `Slot[T]`, typed files such as `YAMLFile[T]`, `JSONFile[T]`, and `TOMLFile[T]`, and derived text via `TextTemplate[C]`.
+description: Use this skill when working with github.com/qlustra/conduit in Go projects. It teaches the library's contract-based filesystem model, how to declare layouts with `layout` tags, when to use `Compose`, `EnsureDeep`, `DefaultDeep`, `DiscoverDeep`, `LoadDeep`, `RenderDeep`, `SyncDeep`, and `ScanDeep`, and how to work safely with `layout.Dir`, `layout.File`, `layout.Exec`, `layout.Slot[T]`, typed files such as `formats.YAMLFile[T]`, `formats.JSONFile[T]`, and `formats.TOMLFile[T]`, and derived text via `layout.TextTemplate[C]`.
 ---
 
 # Conduit
@@ -55,15 +55,15 @@ type AppConfig struct {
 }
 
 type App struct {
-	Root   conduit.Dir                 `layout:"."`
-	Config conduit.YAMLFile[AppConfig] `layout:"config.yaml"`
-	Logs   conduit.Dir                 `layout:"logs"`
-	Run    conduit.Exec                `layout:"bin/run"`
+	Root   layout.Dir                  `layout:"."`
+	Config formats.YAMLFile[AppConfig] `layout:"config.yaml"`
+	Logs   layout.Dir                  `layout:"logs"`
+	Run    layout.Exec                 `layout:"bin/run"`
 }
 
 type Workspace struct {
-	Root conduit.Dir        `layout:"."`
-	Apps conduit.Slot[*App] `layout:"apps"`
+	Root layout.Dir         `layout:"."`
+	Apps layout.Slot[*App]  `layout:"apps"`
 }
 
 var ws Workspace
@@ -126,10 +126,10 @@ Use `RunOptions.Interpreter` when the file should be invoked through `sh`, `pyth
 
 The stateful types are:
 
-- `JSONFile[T]`
-- `YAMLFile[T]`
-- `TOMLFile[T]`
-- `TextTemplate[C]`
+- `formats.JSONFile[T]`
+- `formats.YAMLFile[T]`
+- `formats.TOMLFile[T]`
+- `layout.TextTemplate[C]`
 
 The typed files expose the same `Format[T]` behavior:
 
@@ -204,7 +204,7 @@ Example:
 
 ```go
 type Workspace struct {
-	Apps conduit.Slot[*App] `layout:"apps"`
+	Apps layout.Slot[*App] `layout:"apps"`
 }
 ```
 
@@ -257,7 +257,7 @@ type ReadmeContext struct {
 }
 
 type ReadmeFile struct {
-	conduit.TextTemplate[ReadmeContext]
+	layout.TextTemplate[ReadmeContext]
 }
 
 func (f *ReadmeFile) Default() error {

@@ -3,6 +3,12 @@ Conduit
 
 Conduit is a contract-based content manager for Go.
 
+The module is split into three public packages:
+
+- `github.com/qlustra/conduit` for operations, `Context`, and sync policy
+- `github.com/qlustra/conduit/layout` for structural nodes such as `Dir`, `File`, `Exec`, `Slot[T]`, and `TextTemplate[C]`
+- `github.com/qlustra/conduit/formats` for codec-backed typed files such as `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`
+
 It lets you describe a filesystem as semantic Go types, then move state explicitly between disk and memory:
 
 - `Compose` binds paths to a layout.
@@ -25,7 +31,11 @@ go get github.com/qlustra/conduit
 ```go
 package main
 
-import "github.com/qlustra/conduit"
+import (
+	"github.com/qlustra/conduit"
+	"github.com/qlustra/conduit/formats"
+	"github.com/qlustra/conduit/layout"
+)
 
 type AppConfig struct {
 	Name string `yaml:"name"`
@@ -33,8 +43,8 @@ type AppConfig struct {
 }
 
 type App struct {
-	Root   conduit.Dir                 `layout:"."`
-	Config conduit.YAMLFile[AppConfig] `layout:"config.yaml"`
+	Root   layout.Dir                  `layout:"."`
+	Config formats.YAMLFile[AppConfig] `layout:"config.yaml"`
 }
 
 func main() {
@@ -62,8 +72,8 @@ Dynamic collections use `Slot[T]` to model repeated children:
 
 ```go
 type Workspace struct {
-	Root conduit.Dir        `layout:"."`
-	Apps conduit.Slot[*App] `layout:"apps"`
+	Root layout.Dir         `layout:"."`
+	Apps layout.Slot[*App]  `layout:"apps"`
 }
 
 var ws Workspace
@@ -81,17 +91,18 @@ import (
 	"context"
 
 	"github.com/qlustra/conduit"
+	"github.com/qlustra/conduit/layout"
 )
 
 type Tooling struct {
-	Root  conduit.Dir  `layout:"."`
-	Build conduit.Exec `layout:"bin/build"`
+	Root  layout.Dir   `layout:"."`
+	Build layout.Exec  `layout:"bin/build"`
 }
 
 var tools Tooling
 _ = conduit.Compose("/workspace", &tools)
 
-out, _ := tools.Build.Output(context.Background(), conduit.RunOptions{
+out, _ := tools.Build.Output(context.Background(), layout.RunOptions{
 	Args: []string{"--check"},
 	Dir:  tools.Root.Path(),
 })

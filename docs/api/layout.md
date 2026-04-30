@@ -1,6 +1,6 @@
 # Layout API
 
-This page documents the exported layout-oriented types.
+This page documents the exported `github.com/qlustra/conduit/layout` package.
 
 ## Types
 
@@ -119,6 +119,65 @@ Notable behavior:
 - an empty first interpreter element is invalid
 - `Env` is appended to `os.Environ()`, not used as a complete replacement
 
+### `Defaulter`
+
+```go
+type Defaulter interface {
+	Default() error
+}
+```
+
+Description:
+
+- opt-in contract for nodes that can seed missing in-memory state with defaults
+
+Notable behavior:
+
+- `Default()` applies defaults in memory only
+- `conduit.DefaultDeep` calls `Default()` on matching nodes
+- concrete implementations decide which values are considered unset and whether to apply defaults
+
+### `Renderable`
+
+```go
+type Renderable interface {
+	Render() (string, error)
+	SetRendered(string)
+}
+```
+
+Description:
+
+- opt-in contract for text-template wrappers that can derive raw text into memory
+
+Notable behavior:
+
+- `Render()` computes text but does not write to disk by itself
+- `SetRendered(string)` stores rendered text into the target's in-memory file state
+- `conduit.RenderDeep` calls `Render()` and passes the result into `SetRendered(string)`
+- concrete implementations decide how to handle missing or incomplete render context
+
+### `Templatable`
+
+```go
+type Templatable interface {
+	Template() string
+	RenderTemplate(string) (string, error)
+	SetRendered(string)
+}
+```
+
+Description:
+
+- opt-in contract for the built-in `text/template` render path
+
+Notable behavior:
+
+- `Template()` returns the source template text
+- `RenderTemplate(string)` executes template text against the current cached render context
+- `SetRendered(string)` stores rendered text into the target's in-memory file state
+- `conduit.RenderDeep` uses this path only when the node does not implement `Renderable`
+
 ### `Slot[T]`
 
 ```go
@@ -160,3 +219,37 @@ Notable behavior:
 - `LoadDeep` discovers directory-backed entries from disk
 - `ScanDeep` and `SyncDeep` do not discover uncached entries
 - `Slot.SyncDeep` ensures cached children before syncing them
+
+### `TextTemplate[C]`
+
+```go
+type TextTemplate[C any] struct{}
+```
+
+Description:
+
+- stateful raw-text file with cached render context
+
+Exposed API:
+
+- all string-content operations analogous to `Format[string]`
+- all inherited `File` methods from embedded raw-text file state
+
+Context methods:
+
+- `SetContext(ctx C)`: replaces cached render context
+- `SetDefaultContext(ctx C) bool`: stores default render context only when no context is currently cached
+- `GetContext() (C, bool)`: returns cached render context if present
+- `MustContext() C`: returns cached render context or panics when unset
+- `HasContext() bool`: reports whether render context is currently cached
+- `ClearContext()`: clears cached render context
+- `RenderTemplate(tpl string) (string, error)`: executes template text against the current render context using the built-in `text/template` renderer
+- `SetRendered(value string)`: stores rendered text in the file's cached content
+
+Notable behavior:
+
+- mirrors the same disk and memory state model as `Format[string]`
+- resets cached render context when `Compose` rebinds the file path
+- `SetDefaultContext` returns `false` and leaves context unchanged when context is already cached
+- provides the built-in templated render path used by `Templatable`
+- leaves custom render validation and semantics to the user-defined `Render()` implementation

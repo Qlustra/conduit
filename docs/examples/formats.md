@@ -12,7 +12,7 @@ type ServiceConfig struct {
 }
 
 type Service struct {
-	Config conduit.YAMLFile[ServiceConfig] `layout:"config.yaml"`
+	Config formats.YAMLFile[ServiceConfig] `layout:"config.yaml"`
 }
 ```
 
@@ -50,7 +50,7 @@ type Manifest struct {
 }
 
 type ArtifactDir struct {
-	Manifest conduit.JSONFile[Manifest] `layout:"manifest.json"`
+	Manifest formats.JSONFile[Manifest] `layout:"manifest.json"`
 }
 ```
 
@@ -83,7 +83,7 @@ type DevSettings struct {
 }
 
 type Environment struct {
-	Settings conduit.TOMLFile[DevSettings] `layout:"dev.toml"`
+	Settings formats.TOMLFile[DevSettings] `layout:"dev.toml"`
 }
 ```
 
@@ -113,9 +113,9 @@ You can use different file formats in the same tree based on who consumes each f
 
 ```go
 type Project struct {
-	Runtime  conduit.YAMLFile[RuntimeConfig] `layout:"runtime.yaml"`
-	Manifest conduit.JSONFile[Manifest]      `layout:"manifest.json"`
-	Local    conduit.TOMLFile[LocalDev]      `layout:"dev.toml"`
+	Runtime  formats.YAMLFile[RuntimeConfig] `layout:"runtime.yaml"`
+	Manifest formats.JSONFile[Manifest]      `layout:"manifest.json"`
+	Local    formats.TOMLFile[LocalDev]      `layout:"dev.toml"`
 }
 ```
 
