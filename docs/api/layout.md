@@ -184,6 +184,15 @@ Notable behavior:
 type Slot[T any] struct{}
 ```
 
+### `SlotEntry[T]`
+
+```go
+type SlotEntry[T any] struct {
+	Name string
+	Item T
+}
+```
+
 Description:
 
 - keyed container for repeated child layouts rooted under one directory
@@ -193,11 +202,14 @@ Methods:
 - `Path() string`: returns the slot root path
 - `Exists() bool`: reports whether the slot root exists on disk
 - `Root() Dir`: returns the slot root as a `Dir`
+- `Len() int`: returns the number of cached items
 - `Has(name string) bool`: reports whether a named child directory exists on disk
 - `Get(name string) (T, bool)`: returns a cached item only
 - `Put(name string, item T)`: inserts or replaces a cached item
 - `Remove(name string)`: removes a cached item
 - `Clear()`: clears the cache
+- `Entries() []SlotEntry[T]`: returns a sorted snapshot of cached entries
+- `All() iter.Seq2[string, T]`: iterates cached entries in sorted key order
 - `Keys() []string`: returns sorted cached keys
 - `At(name string) (T, error)`: returns a cached item or composes and caches one lazily
 - `MustAt(name string) T`: panicking form of `At`
@@ -214,7 +226,8 @@ Notable behavior:
 
 - `At` composes items relative to `slotRoot/<name>` and caches them
 - `Add` ensures the child root and calls `EnsureDeep` on the new child
-- `Keys` is cache-based; it does not list the filesystem directly
+- `Len`, `Entries`, `All`, and `Keys` are cache-based; they do not list the filesystem directly
+- `Entries` and `All` return cached items as-is, preserving pointer or value semantics chosen by `T`
 - `DiscoverDeep` discovers directory-backed entries from disk without loading typed files
 - `LoadDeep` discovers directory-backed entries from disk
 - `ScanDeep` and `SyncDeep` do not discover uncached entries

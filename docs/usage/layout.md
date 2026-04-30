@@ -128,9 +128,13 @@ Useful methods:
 - `MustAt(name)` is the panicking version of `At`.
 - `Add(name, ctx)` creates the child root on disk, composes the item, and ensures its declared structure.
 - `Get(name)` reads the cache without composing.
-- `Put(name, item)`, `Remove(name)`, `Clear()`, and `Keys()` manage the cache.
+- `Entries()` returns a sorted snapshot of cached `{Name, Item}` pairs.
+- `All()` iterates cached items in sorted key order with `for name, item := range slot.All()`.
+- `Put(name, item)`, `Remove(name)`, `Clear()`, `Len()`, and `Keys()` manage the cache.
 - `Require(name)` fails unless the child directory already exists on disk.
 - `Root()` returns the slot root as a `Dir`.
+
+`Entries()` and `All()` are cache-based only. They do not discover from disk or lazily compose missing items.
 
 ## Composition rules
 

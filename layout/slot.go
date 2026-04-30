@@ -2,10 +2,16 @@ package layout
 
 import (
 	"fmt"
+	"iter"
 	"os"
 	"sort"
 	"sync"
 )
+
+type SlotEntry[T any] struct {
+	Name string
+	Item T
+}
 
 type Slot[T any] struct {
 	root  Dir
@@ -27,6 +33,13 @@ func (s *Slot[T]) Exists() bool {
 
 func (s *Slot[T]) Root() Dir {
 	return s.root
+}
+
+func (s *Slot[T]) Len() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return len(s.items)
 }
 
 func (s *Slot[T]) Has(name string) bool {
@@ -64,6 +77,34 @@ func (s *Slot[T]) Clear() {
 	defer s.mu.Unlock()
 
 	s.items = make(map[string]T)
+}
+
+func (s *Slot[T]) Entries() []SlotEntry[T] {
+	s.mu.RLock()
+	entries := make([]SlotEntry[T], 0, len(s.items))
+	for name, item := range s.items {
+		entries = append(entries, SlotEntry[T]{
+			Name: name,
+			Item: item,
+		})
+	}
+	s.mu.RUnlock()
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name < entries[j].Name
+	})
+
+	return entries
+}
+
+func (s *Slot[T]) All() iter.Seq2[string, T] {
+	return func(yield func(string, T) bool) {
+		for _, entry := range s.Entries() {
+			if !yield(entry.Name, entry.Item) {
+				return
+			}
+		}
+	}
 }
 
 func (s *Slot[T]) Keys() []string {
