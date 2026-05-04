@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type File struct {
@@ -16,6 +17,20 @@ func NewFile(path string) File {
 
 func (f File) Path() string {
 	return f.path
+}
+
+func (f File) Base() string {
+	return filepath.Base(f.path)
+}
+
+func (f File) Ext() string {
+	_, ext := splitBaseExt(f.Base())
+	return ext
+}
+
+func (f File) Stem() string {
+	stem, _ := splitBaseExt(f.Base())
+	return stem
 }
 
 func (f File) Exists() bool {
@@ -72,4 +87,18 @@ func (f File) Ensure(ctx Context) error {
 	}
 
 	return handle.Close()
+}
+
+func splitBaseExt(base string) (stem string, ext string) {
+	switch base {
+	case "", ".", "..":
+		return base, ""
+	}
+
+	if strings.HasPrefix(base, ".") && strings.Count(base, ".") == 1 {
+		return base, ""
+	}
+
+	ext = filepath.Ext(base)
+	return base[:len(base)-len(ext)], ext
 }

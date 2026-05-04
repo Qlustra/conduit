@@ -17,6 +17,15 @@ func (d Dir) Path() string {
 	return d.path
 }
 
+func (d Dir) Base() string {
+	return filepath.Base(d.path)
+}
+
+func (d Dir) Stem() string {
+	stem, _ := splitBaseExt(d.Base())
+	return stem
+}
+
 func (d Dir) Exists() bool {
 	_, err := os.Stat(d.Path())
 	return err == nil

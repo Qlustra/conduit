@@ -17,6 +17,8 @@ Description:
 Methods:
 
 - `Path() string`: returns the bound path
+- `Base() string`: returns the final path element
+- `Stem() string`: returns the final path element without its final extension
 - `Exists() bool`: reports whether the path currently exists
 - `Join(parts ...string) string`: joins descendant path segments onto the directory path
 - `Dir(name string) Dir`: returns a child directory handle
@@ -42,6 +44,9 @@ Description:
 Methods:
 
 - `Path() string`: returns the bound path
+- `Base() string`: returns the final path element
+- `Ext() string`: returns the final extension including the leading dot
+- `Stem() string`: returns the final path element without its final extension
 - `Exists() bool`: reports whether the path currently exists
 - `WriteBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error`: creates parent directories and writes raw bytes
 - `ReadBytes() ([]byte, error)`: reads the file contents
@@ -68,6 +73,9 @@ Description:
 Methods:
 
 - `Path() string`
+- `Base() string`
+- `Ext() string`
+- `Stem() string`
 - `Exists() bool`
 - `ReadBytes() ([]byte, error)`
 - `ReadBytesIfExists() ([]byte, bool, error)`

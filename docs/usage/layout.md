@@ -44,6 +44,8 @@ err := conduit.Compose("/srv/workspace", &ws)
 Useful methods:
 
 - `Path()` returns the absolute or cleaned path bound during composition.
+- `Base()` returns the final path element.
+- `Stem()` returns the final path element without its final extension.
 - `Exists()` reports whether the directory currently exists on disk.
 - `Join(...)` builds a descendant path.
 - `Dir(name)` and `File(name)` derive child handles.
@@ -57,6 +59,7 @@ Useful methods:
 Useful methods:
 
 - `Path()` and `Exists()`
+- `Base()`, `Ext()`, and `Stem()` for path fragments
 - `ReadBytes()` and `ReadBytesIfExists()`
 - `WriteBytes(data, dirMode, fileMode)`
 - `Ensure(ctx)` to create the file and its parent directories
@@ -71,6 +74,7 @@ Use `File` when you want raw bytes and do not need codec-backed state tracking.
 Useful methods:
 
 - `Ensure(ctx)` and `EnsureExecutable(ctx)` create the file with executable permissions.
+- `Base()`, `Ext()`, and `Stem()` are inherited from `File`.
 - `IsExecutable()` reports whether the current target is an executable regular file.
 - `Command(ctx, opts)`, `Run(ctx, opts)`, `Output(ctx, opts)`, and `CombinedOutput(ctx, opts)` run the managed file.
 
