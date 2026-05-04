@@ -9,6 +9,11 @@ import (
 // Compose
 // Builds path-bound semantic objects.
 func Compose(root string, target any) error {
+	root = filepath.Clean(root)
+	return compose(root, root, target)
+}
+
+func compose(root string, composeBase string, target any) error {
 	v := reflect.ValueOf(target)
 	if v.Kind() != reflect.Pointer || v.IsNil() {
 		return fmt.Errorf("target must be a non-nil pointer to struct")
@@ -19,10 +24,10 @@ func Compose(root string, target any) error {
 		return fmt.Errorf("target must point to a struct")
 	}
 
-	return composeInto(filepath.Clean(root), elem)
+	return composeInto(root, composeBase, elem)
 }
 
-func composeInto(base string, dst reflect.Value) error {
+func composeInto(base string, composeBase string, dst reflect.Value) error {
 	t := dst.Type()
 
 	for i := 0; i < dst.NumField(); i++ {
@@ -40,7 +45,7 @@ func composeInto(base string, dst reflect.Value) error {
 
 		path := resolvePath(base, tag)
 
-		if err := assignPath(path, field); err != nil {
+		if err := assignPath(path, composeBase, field); err != nil {
 			return fmt.Errorf("field %q: %w", structField.Name, err)
 		}
 	}
@@ -48,7 +53,7 @@ func composeInto(base string, dst reflect.Value) error {
 	return nil
 }
 
-func assignPath(path string, field reflect.Value) error {
+func assignPath(path string, composeBase string, field reflect.Value) error {
 	if !field.CanSet() {
 		return fmt.Errorf("field is not settable")
 	}
@@ -58,10 +63,13 @@ func assignPath(path string, field reflect.Value) error {
 
 		if ptr.Type().Implements(composableEntryType) {
 			ptr.Interface().(Composable).ComposePath(path)
+			if ptr.Type().Implements(reflect.TypeOf((*composeBaseAware)(nil)).Elem()) {
+				ptr.Interface().(composeBaseAware).setComposeBase(composeBase)
+			}
 			return nil
 		}
 
-		return composeInto(path, field)
+		return composeInto(path, composeBase, field)
 	}
 
 	if field.Kind() == reflect.Pointer {
@@ -77,10 +85,13 @@ func assignPath(path string, field reflect.Value) error {
 
 		if field.Type().Implements(composableEntryType) {
 			field.Interface().(Composable).ComposePath(path)
+			if field.Type().Implements(reflect.TypeOf((*composeBaseAware)(nil)).Elem()) {
+				field.Interface().(composeBaseAware).setComposeBase(composeBase)
+			}
 			return nil
 		}
 
-		return composeInto(path, field.Elem())
+		return composeInto(path, composeBase, field.Elem())
 	}
 
 	return fmt.Errorf("unsupported field type %s", field.Type())
@@ -99,6 +110,10 @@ func ComposeAs[T any](root Dir) (T, error) {
 	var zero T
 
 	typ := reflect.TypeOf((*T)(nil)).Elem()
+	composeBase := root.Path()
+	if base, ok := root.ComposedBaseDir(); ok {
+		composeBase = base.Path()
+	}
 
 	if typ.Kind() == reflect.Pointer {
 		elem := typ.Elem()
@@ -107,7 +122,7 @@ func ComposeAs[T any](root Dir) (T, error) {
 		}
 
 		v := reflect.New(elem)
-		if err := Compose(root.Path(), v.Interface()); err != nil {
+		if err := compose(root.Path(), composeBase, v.Interface()); err != nil {
 			return zero, err
 		}
 
@@ -119,7 +134,7 @@ func ComposeAs[T any](root Dir) (T, error) {
 	}
 
 	v := reflect.New(typ)
-	if err := Compose(root.Path(), v.Interface()); err != nil {
+	if err := compose(root.Path(), composeBase, v.Interface()); err != nil {
 		return zero, err
 	}
 

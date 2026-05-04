@@ -27,6 +27,18 @@ func (s *Slot[T]) Path() string {
 	return s.root.Path()
 }
 
+func (s *Slot[T]) ComposedBaseDir() (Dir, bool) {
+	return s.root.ComposedBaseDir()
+}
+
+func (s *Slot[T]) ComposedRelativePath() (string, bool) {
+	return s.root.ComposedRelativePath()
+}
+
+func (s *Slot[T]) JoinComposedPath(parts ...string) (string, bool) {
+	return s.root.JoinComposedPath(parts...)
+}
+
 func (s *Slot[T]) Exists() bool {
 	return s.root.Exists()
 }
@@ -205,6 +217,10 @@ func (s *Slot[T]) Require(name string) (T, error) {
 func (s *Slot[T]) ComposePath(path string) {
 	s.root = NewDir(path)
 	s.items = make(map[string]T)
+}
+
+func (s *Slot[T]) setComposeBase(path string) {
+	s.root.setComposeBase(path)
 }
 
 // Ensure

@@ -19,6 +19,9 @@ Methods:
 - `Path() string`: returns the bound path
 - `Base() string`: returns the final path element
 - `Stem() string`: returns the final path element without its final extension
+- `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the handle belongs to a composed tree
+- `ComposedRelativePath() (string, bool)`: returns the path relative to the compose base directory
+- `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
 - `Exists() bool`: reports whether the path currently exists
 - `Join(parts ...string) string`: joins descendant path segments onto the directory path
 - `Dir(name string) Dir`: returns a child directory handle
@@ -30,6 +33,8 @@ Notable behavior:
 
 - `DeleteIfExists` uses recursive removal
 - `Exists` only checks current filesystem state; it does not validate that the path is a directory
+- the composed-path helpers return `ok == false` when the handle was not attached through `Compose`
+- for the compose base directory itself, `ComposedRelativePath()` returns `.`
 
 ### `File`
 
@@ -47,6 +52,9 @@ Methods:
 - `Base() string`: returns the final path element
 - `Ext() string`: returns the final extension including the leading dot
 - `Stem() string`: returns the final path element without its final extension
+- `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the handle belongs to a composed tree
+- `ComposedRelativePath() (string, bool)`: returns the path relative to the compose base directory
+- `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
 - `Exists() bool`: reports whether the path currently exists
 - `WriteBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error`: creates parent directories and writes raw bytes
 - `ReadBytes() ([]byte, error)`: reads the file contents
@@ -59,6 +67,8 @@ Notable behavior:
 - `Ensure` uses `os.O_CREATE` and does not truncate existing file contents
 - `WriteBytes` always rewrites the file contents
 - `Exists` only checks that some filesystem entry exists at the path
+- the composed-path helpers return `ok == false` when the handle was not attached through `Compose`
+- dotfiles such as `.env` report an empty extension and keep the full basename as the stem
 
 ### `Exec`
 
@@ -76,6 +86,9 @@ Methods:
 - `Base() string`
 - `Ext() string`
 - `Stem() string`
+- `ComposedBaseDir() (Dir, bool)`
+- `ComposedRelativePath() (string, bool)`
+- `JoinComposedPath(parts ...string) (string, bool)`
 - `Exists() bool`
 - `ReadBytes() ([]byte, error)`
 - `ReadBytesIfExists() ([]byte, bool, error)`
@@ -208,6 +221,9 @@ Description:
 Methods:
 
 - `Path() string`: returns the slot root path
+- `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the slot belongs to a composed tree
+- `ComposedRelativePath() (string, bool)`: returns the slot root path relative to the compose base directory
+- `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the slot's composed-relative path
 - `Exists() bool`: reports whether the slot root exists on disk
 - `Root() Dir`: returns the slot root as a `Dir`
 - `Len() int`: returns the number of cached items
@@ -236,6 +252,7 @@ Notable behavior:
 - `Add` ensures the child root and calls `EnsureDeep` on the new child
 - `Len`, `Entries`, `All`, and `Keys` are cache-based; they do not list the filesystem directly
 - `Entries` and `All` return cached items as-is, preserving pointer or value semantics chosen by `T`
+- the composed-path helpers delegate to the slot root and return `ok == false` until the slot has been attached through `Compose`
 - `DiscoverDeep` discovers directory-backed entries from disk without loading typed files
 - `LoadDeep` discovers directory-backed entries from disk
 - `ScanDeep` and `SyncDeep` do not discover uncached entries

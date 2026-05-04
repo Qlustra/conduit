@@ -43,9 +43,10 @@ err := conduit.Compose("/srv/workspace", &ws)
 
 Useful methods:
 
-- `Path()` returns the absolute or cleaned path bound during composition.
+- `Path()` returns the cleaned path bound during composition.
 - `Base()` returns the final path element.
 - `Stem()` returns the final path element without its final extension.
+- `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` expose compose-base-relative paths when the handle belongs to a composed tree.
 - `Exists()` reports whether the directory currently exists on disk.
 - `Join(...)` builds a descendant path.
 - `Dir(name)` and `File(name)` derive child handles.
@@ -60,6 +61,7 @@ Useful methods:
 
 - `Path()` and `Exists()`
 - `Base()`, `Ext()`, and `Stem()` for path fragments
+- `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` for compose-base-relative path fragments
 - `ReadBytes()` and `ReadBytesIfExists()`
 - `WriteBytes(data, dirMode, fileMode)`
 - `Ensure(ctx)` to create the file and its parent directories
@@ -75,6 +77,7 @@ Useful methods:
 
 - `Ensure(ctx)` and `EnsureExecutable(ctx)` create the file with executable permissions.
 - `Base()`, `Ext()`, and `Stem()` are inherited from `File`.
+- `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` are inherited from `File`.
 - `IsExecutable()` reports whether the current target is an executable regular file.
 - `Command(ctx, opts)`, `Run(ctx, opts)`, `Output(ctx, opts)`, and `CombinedOutput(ctx, opts)` run the managed file.
 
@@ -132,6 +135,7 @@ Useful methods:
 - `MustAt(name)` is the panicking version of `At`.
 - `Add(name, ctx)` creates the child root on disk, composes the item, and ensures its declared structure.
 - `Get(name)` reads the cache without composing.
+- `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` expose the slot root relative to the tree's compose base.
 - `Entries()` returns a sorted snapshot of cached `{Name, Item}` pairs.
 - `All()` iterates cached items in sorted key order with `for name, item := range slot.All()`.
 - `Put(name, item)`, `Remove(name)`, `Clear()`, `Len()`, and `Keys()` manage the cache.
@@ -139,6 +143,8 @@ Useful methods:
 - `Root()` returns the slot root as a `Dir`.
 
 `Entries()` and `All()` are cache-based only. They do not discover from disk or lazily compose missing items.
+
+The composed-path helpers return `ok == false` until a node has been attached through `Compose`. When they are available, the compose base is the same root that anchored the whole composed tree, not the nearest nested struct or slot item.
 
 ## Composition rules
 

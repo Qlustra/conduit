@@ -8,11 +8,22 @@ import (
 )
 
 type File struct {
-	path string
+	path         string
+	composeBase  string
+	composedBase bool
 }
 
 func NewFile(path string) File {
-	return File{path: filepath.Clean(path)}
+	return newFileWithCompose(path, "", false)
+}
+
+func newFileWithCompose(path string, composeBase string, composed bool) File {
+	file := File{path: filepath.Clean(path)}
+	if composed {
+		file.composeBase = filepath.Clean(composeBase)
+		file.composedBase = true
+	}
+	return file
 }
 
 func (f File) Path() string {
@@ -31,6 +42,35 @@ func (f File) Ext() string {
 func (f File) Stem() string {
 	stem, _ := splitBaseExt(f.Base())
 	return stem
+}
+
+func (f File) ComposedBaseDir() (Dir, bool) {
+	if !f.composedBase {
+		return Dir{}, false
+	}
+	return newDirWithCompose(f.composeBase, f.composeBase, true), true
+}
+
+func (f File) ComposedRelativePath() (string, bool) {
+	if !f.composedBase {
+		return "", false
+	}
+	rel, err := filepath.Rel(f.composeBase, f.path)
+	if err != nil {
+		return "", false
+	}
+	return rel, true
+}
+
+func (f File) JoinComposedPath(parts ...string) (string, bool) {
+	rel, ok := f.ComposedRelativePath()
+	if !ok {
+		return "", false
+	}
+	if len(parts) == 0 {
+		return rel, true
+	}
+	return filepath.Join(append([]string{rel}, parts...)...), true
 }
 
 func (f File) Exists() bool {
@@ -72,6 +112,13 @@ func (f File) ReadBytesIfExists() ([]byte, bool, error) {
 
 func (f *File) ComposePath(path string) {
 	f.path = filepath.Clean(path)
+	f.composeBase = ""
+	f.composedBase = false
+}
+
+func (f *File) setComposeBase(path string) {
+	f.composeBase = filepath.Clean(path)
+	f.composedBase = true
 }
 
 // Ensure

@@ -6,11 +6,22 @@ import (
 )
 
 type Dir struct {
-	path string
+	path         string
+	composeBase  string
+	composedBase bool
 }
 
 func NewDir(path string) Dir {
-	return Dir{path: filepath.Clean(path)}
+	return newDirWithCompose(path, "", false)
+}
+
+func newDirWithCompose(path string, composeBase string, composed bool) Dir {
+	dir := Dir{path: filepath.Clean(path)}
+	if composed {
+		dir.composeBase = filepath.Clean(composeBase)
+		dir.composedBase = true
+	}
+	return dir
 }
 
 func (d Dir) Path() string {
@@ -26,6 +37,35 @@ func (d Dir) Stem() string {
 	return stem
 }
 
+func (d Dir) ComposedBaseDir() (Dir, bool) {
+	if !d.composedBase {
+		return Dir{}, false
+	}
+	return newDirWithCompose(d.composeBase, d.composeBase, true), true
+}
+
+func (d Dir) ComposedRelativePath() (string, bool) {
+	if !d.composedBase {
+		return "", false
+	}
+	rel, err := filepath.Rel(d.composeBase, d.path)
+	if err != nil {
+		return "", false
+	}
+	return rel, true
+}
+
+func (d Dir) JoinComposedPath(parts ...string) (string, bool) {
+	rel, ok := d.ComposedRelativePath()
+	if !ok {
+		return "", false
+	}
+	if len(parts) == 0 {
+		return rel, true
+	}
+	return filepath.Join(append([]string{rel}, parts...)...), true
+}
+
 func (d Dir) Exists() bool {
 	_, err := os.Stat(d.Path())
 	return err == nil
@@ -37,11 +77,11 @@ func (d Dir) Join(parts ...string) string {
 }
 
 func (d Dir) Dir(name string) Dir {
-	return NewDir(filepath.Join(d.path, name))
+	return newDirWithCompose(filepath.Join(d.path, name), d.composeBase, d.composedBase)
 }
 
 func (d Dir) File(name string) File {
-	return NewFile(filepath.Join(d.path, name))
+	return newFileWithCompose(filepath.Join(d.path, name), d.composeBase, d.composedBase)
 }
 
 func (d Dir) DeleteIfExists() error {
@@ -56,6 +96,13 @@ func (d Dir) DeleteIfExists() error {
 
 func (d *Dir) ComposePath(path string) {
 	d.path = filepath.Clean(path)
+	d.composeBase = ""
+	d.composedBase = false
+}
+
+func (d *Dir) setComposeBase(path string) {
+	d.composeBase = filepath.Clean(path)
+	d.composedBase = true
 }
 
 // Ensure

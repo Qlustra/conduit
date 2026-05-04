@@ -17,6 +17,10 @@ type Composable interface {
 
 var composableEntryType = reflect.TypeOf((*Composable)(nil)).Elem()
 
+type composeBaseAware interface {
+	setComposeBase(string)
+}
+
 // Ensure
 
 var (
