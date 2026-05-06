@@ -9,6 +9,10 @@ type Node interface {
 	Exists() bool
 }
 
+type Pather interface {
+	Path() string
+}
+
 // Compose
 
 type Composable interface {

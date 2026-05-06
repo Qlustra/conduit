@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -81,6 +82,39 @@ func (d Dir) JoinComposedPath(parts ...string) (string, bool) {
 		return rel, true
 	}
 	return filepath.Join(append([]string{rel}, parts...)...), true
+}
+
+func (d Dir) RelTo(base Pather) (string, error) {
+	if base == nil {
+		return "", fmt.Errorf("base path must not be nil")
+	}
+	return filepath.Rel(base.Path(), d.Path())
+}
+
+func (d Dir) JoinRelTo(base Pather, parts ...string) (string, error) {
+	rel, err := d.RelTo(base)
+	if err != nil {
+		return "", err
+	}
+	if len(parts) == 0 {
+		return rel, nil
+	}
+	return filepath.Join(append([]string{rel}, parts...)...), nil
+}
+
+func (d Dir) RelToPath(base string) (string, error) {
+	return filepath.Rel(filepath.Clean(base), d.Path())
+}
+
+func (d Dir) JoinRelToPath(base string, parts ...string) (string, error) {
+	rel, err := d.RelToPath(base)
+	if err != nil {
+		return "", err
+	}
+	if len(parts) == 0 {
+		return rel, nil
+	}
+	return filepath.Join(append([]string{rel}, parts...)...), nil
 }
 
 func (d Dir) Exists() bool {

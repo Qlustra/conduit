@@ -192,3 +192,51 @@ func TestDeclaredPathsTrackLocalLayoutFragments(t *testing.T) {
 		t.Fatal("derived Dir.JoinDeclaredPath() ok = true, want false")
 	}
 }
+
+func TestRelHelpersUsePatherAndStringBases(t *testing.T) {
+	type workspace struct {
+		Root   Dir  `layout:"."`
+		Config File `layout:"config.yaml"`
+		Logs   Dir  `layout:"logs"`
+	}
+
+	var ws workspace
+	if err := Compose(filepath.Join("workspace", "app"), &ws); err != nil {
+		t.Fatalf("Compose() error = %v", err)
+	}
+
+	if got, err := ws.Config.RelTo(ws.Root); err != nil || got != "config.yaml" {
+		t.Fatalf("Config.RelTo(Root) = (%q, %v), want (%q, nil)", got, err, "config.yaml")
+	}
+	if got, err := ws.Logs.JoinRelTo(ws.Root, "current"); err != nil || got != filepath.Join("logs", "current") {
+		t.Fatalf("Logs.JoinRelTo(Root) = (%q, %v), want (%q, nil)", got, err, filepath.Join("logs", "current"))
+	}
+	if got, err := ws.Config.RelToPath(filepath.Join("workspace")); err != nil || got != filepath.Join("app", "config.yaml") {
+		t.Fatalf("Config.RelToPath() = (%q, %v), want (%q, nil)", got, err, filepath.Join("app", "config.yaml"))
+	}
+	if got, err := ws.Config.JoinRelToPath(filepath.Join("workspace"), "bak"); err != nil || got != filepath.Join("app", "config.yaml", "bak") {
+		t.Fatalf("Config.JoinRelToPath() = (%q, %v), want (%q, nil)", got, err, filepath.Join("app", "config.yaml", "bak"))
+	}
+}
+
+func TestRelHelpersWorkWithSlotAsBase(t *testing.T) {
+	type service struct {
+		Root   Dir  `layout:"."`
+		Config File `layout:"config.yaml"`
+	}
+
+	type workspace struct {
+		Root     Dir            `layout:"."`
+		Services Slot[*service] `layout:"services"`
+	}
+
+	var ws workspace
+	if err := Compose("workspace", &ws); err != nil {
+		t.Fatalf("Compose() error = %v", err)
+	}
+
+	svc := ws.Services.MustAt("api")
+	if got, err := svc.Config.RelTo(&ws.Services); err != nil || got != filepath.Join("api", "config.yaml") {
+		t.Fatalf("Config.RelTo(Services) = (%q, %v), want (%q, nil)", got, err, filepath.Join("api", "config.yaml"))
+	}
+}

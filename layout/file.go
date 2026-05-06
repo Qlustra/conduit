@@ -2,6 +2,7 @@ package layout
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -88,6 +89,39 @@ func (f File) JoinComposedPath(parts ...string) (string, bool) {
 		return rel, true
 	}
 	return filepath.Join(append([]string{rel}, parts...)...), true
+}
+
+func (f File) RelTo(base Pather) (string, error) {
+	if base == nil {
+		return "", fmt.Errorf("base path must not be nil")
+	}
+	return filepath.Rel(base.Path(), f.Path())
+}
+
+func (f File) JoinRelTo(base Pather, parts ...string) (string, error) {
+	rel, err := f.RelTo(base)
+	if err != nil {
+		return "", err
+	}
+	if len(parts) == 0 {
+		return rel, nil
+	}
+	return filepath.Join(append([]string{rel}, parts...)...), nil
+}
+
+func (f File) RelToPath(base string) (string, error) {
+	return filepath.Rel(filepath.Clean(base), f.Path())
+}
+
+func (f File) JoinRelToPath(base string, parts ...string) (string, error) {
+	rel, err := f.RelToPath(base)
+	if err != nil {
+		return "", err
+	}
+	if len(parts) == 0 {
+		return rel, nil
+	}
+	return filepath.Join(append([]string{rel}, parts...)...), nil
 }
 
 func (f File) Exists() bool {

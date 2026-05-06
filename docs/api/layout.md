@@ -19,6 +19,10 @@ Methods:
 - `Path() string`: returns the bound path
 - `Base() string`: returns the final path element
 - `Stem() string`: returns the final path element without its final extension
+- `RelTo(base Pather) (string, error)`: returns the path relative to another node with a `Path()`
+- `JoinRelTo(base Pather, parts ...string) (string, error)`: joins path parts onto the relative path from another node
+- `RelToPath(base string) (string, error)`: returns the path relative to a raw base path
+- `JoinRelToPath(base string, parts ...string) (string, error)`: joins path parts onto the relative path from a raw base path
 - `DeclaredPath() (string, bool)`: returns the node's own declared layout fragment
 - `JoinDeclaredPath(parts ...string) (string, bool)`: joins path parts onto the declared layout fragment
 - `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the handle belongs to a composed tree
@@ -56,6 +60,10 @@ Methods:
 - `Base() string`: returns the final path element
 - `Ext() string`: returns the final extension including the leading dot
 - `Stem() string`: returns the final path element without its final extension
+- `RelTo(base Pather) (string, error)`: returns the path relative to another node with a `Path()`
+- `JoinRelTo(base Pather, parts ...string) (string, error)`: joins path parts onto the relative path from another node
+- `RelToPath(base string) (string, error)`: returns the path relative to a raw base path
+- `JoinRelToPath(base string, parts ...string) (string, error)`: joins path parts onto the relative path from a raw base path
 - `DeclaredPath() (string, bool)`: returns the node's own declared layout fragment
 - `JoinDeclaredPath(parts ...string) (string, bool)`: joins path parts onto the declared layout fragment
 - `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the handle belongs to a composed tree
@@ -93,6 +101,10 @@ Methods:
 - `Base() string`
 - `Ext() string`
 - `Stem() string`
+- `RelTo(base Pather) (string, error)`
+- `JoinRelTo(base Pather, parts ...string) (string, error)`
+- `RelToPath(base string) (string, error)`
+- `JoinRelToPath(base string, parts ...string) (string, error)`
 - `DeclaredPath() (string, bool)`
 - `JoinDeclaredPath(parts ...string) (string, bool)`
 - `ComposedBaseDir() (Dir, bool)`
@@ -148,6 +160,23 @@ Notable behavior:
 - when `Interpreter` is set, the spawned argv is `Interpreter + file path + Args`
 - an empty first interpreter element is invalid
 - `Env` is appended to `os.Environ()`, not used as a complete replacement
+
+### `Pather`
+
+```go
+type Pather interface {
+	Path() string
+}
+```
+
+Description:
+
+- minimal path-bearing contract used by relative path helpers
+
+Notable behavior:
+
+- implemented naturally by `Dir`, `File`, `Exec`, `Slot[T]`, typed files, and text-template wrappers that expose `Path()`
+- used by `RelTo(...)` and `JoinRelTo(...)` without requiring method overloading
 
 ### `Defaulter`
 

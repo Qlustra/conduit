@@ -46,6 +46,8 @@ Useful methods:
 - `Path()` returns the cleaned path bound during composition.
 - `Base()` returns the final path element.
 - `Stem()` returns the final path element without its final extension.
+- `RelTo(...)` and `JoinRelTo(...)` build paths relative to another path-bearing node.
+- `RelToPath(...)` and `JoinRelToPath(...)` do the same against a raw string base.
 - `DeclaredPath()` and `JoinDeclaredPath(...)` expose the node's own declared layout fragment.
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` expose compose-base-relative paths when the handle belongs to a composed tree.
 - `Exists()` reports whether the directory currently exists on disk.
@@ -62,6 +64,7 @@ Useful methods:
 
 - `Path()` and `Exists()`
 - `Base()`, `Ext()`, and `Stem()` for path fragments
+- `RelTo(...)`, `JoinRelTo(...)`, `RelToPath(...)`, and `JoinRelToPath(...)` for ordinary relative path math
 - `DeclaredPath()` and `JoinDeclaredPath(...)` for local declared layout fragments
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` for compose-base-relative path fragments
 - `ReadBytes()` and `ReadBytesIfExists()`
@@ -79,6 +82,7 @@ Useful methods:
 
 - `Ensure(ctx)` and `EnsureExecutable(ctx)` create the file with executable permissions.
 - `Base()`, `Ext()`, and `Stem()` are inherited from `File`.
+- `RelTo(...)`, `JoinRelTo(...)`, `RelToPath(...)`, and `JoinRelToPath(...)` are inherited from `File`.
 - `DeclaredPath()` and `JoinDeclaredPath(...)` are inherited from `File`.
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` are inherited from `File`.
 - `IsExecutable()` reports whether the current target is an executable regular file.
@@ -151,6 +155,8 @@ Useful methods:
 The composed-path helpers return `ok == false` until a node has been attached through `Compose`. When they are available, the compose base is the same root that anchored the whole composed tree, not the nearest nested struct or slot item.
 
 The declared-path helpers are different: they return the node's own declared layout fragment only. They do not reconstruct ancestor fragments. For example, a field declared as `layout:"build"` reports `build`, not `bin/build`, even when it lives inside a nested struct rooted at `layout:"bin"`.
+
+The ordinary relative helpers are different again: they ignore composition metadata and declared layout metadata entirely. They just perform `filepath.Rel` and optional joining against another path-bearing node or a raw base path.
 
 ## Composition rules
 
