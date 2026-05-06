@@ -11,6 +11,8 @@ type File struct {
 	path         string
 	composeBase  string
 	composedBase bool
+	declaredPath string
+	hasDeclared  bool
 }
 
 func NewFile(path string) File {
@@ -49,6 +51,21 @@ func (f File) ComposedBaseDir() (Dir, bool) {
 		return Dir{}, false
 	}
 	return newDirWithCompose(f.composeBase, f.composeBase, true), true
+}
+
+func (f File) DeclaredPath() (string, bool) {
+	if !f.hasDeclared {
+		return "", false
+	}
+	return f.declaredPath, true
+}
+
+func (f File) JoinDeclaredPath(parts ...string) (string, bool) {
+	declared, ok := f.DeclaredPath()
+	if !ok {
+		return "", false
+	}
+	return joinDeclaredPath(declared, parts...), true
 }
 
 func (f File) ComposedRelativePath() (string, bool) {
@@ -121,6 +138,11 @@ func (f *File) setComposeBase(path string) {
 	f.composedBase = true
 }
 
+func (f *File) setDeclaredPath(path string) {
+	f.declaredPath = path
+	f.hasDeclared = true
+}
+
 // Ensure
 
 func (f File) Ensure(ctx Context) error {
@@ -148,4 +170,14 @@ func splitBaseExt(base string) (stem string, ext string) {
 
 	ext = filepath.Ext(base)
 	return base[:len(base)-len(ext)], ext
+}
+
+func joinDeclaredPath(base string, parts ...string) string {
+	if len(parts) == 0 {
+		return base
+	}
+	if base == "." || base == "" {
+		return filepath.Join(parts...)
+	}
+	return filepath.Join(append([]string{base}, parts...)...)
 }

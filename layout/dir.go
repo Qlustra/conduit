@@ -9,6 +9,8 @@ type Dir struct {
 	path         string
 	composeBase  string
 	composedBase bool
+	declaredPath string
+	hasDeclared  bool
 }
 
 func NewDir(path string) Dir {
@@ -42,6 +44,21 @@ func (d Dir) ComposedBaseDir() (Dir, bool) {
 		return Dir{}, false
 	}
 	return newDirWithCompose(d.composeBase, d.composeBase, true), true
+}
+
+func (d Dir) DeclaredPath() (string, bool) {
+	if !d.hasDeclared {
+		return "", false
+	}
+	return d.declaredPath, true
+}
+
+func (d Dir) JoinDeclaredPath(parts ...string) (string, bool) {
+	declared, ok := d.DeclaredPath()
+	if !ok {
+		return "", false
+	}
+	return joinDeclaredPath(declared, parts...), true
 }
 
 func (d Dir) ComposedRelativePath() (string, bool) {
@@ -103,6 +120,11 @@ func (d *Dir) ComposePath(path string) {
 func (d *Dir) setComposeBase(path string) {
 	d.composeBase = filepath.Clean(path)
 	d.composedBase = true
+}
+
+func (d *Dir) setDeclaredPath(path string) {
+	d.declaredPath = path
+	d.hasDeclared = true
 }
 
 // Ensure

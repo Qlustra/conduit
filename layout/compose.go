@@ -29,6 +29,8 @@ func compose(root string, composeBase string, target any) error {
 
 func composeInto(base string, composeBase string, dst reflect.Value) error {
 	t := dst.Type()
+	composeBaseAwareType := reflect.TypeOf((*composeBaseAware)(nil)).Elem()
+	declaredPathAwareType := reflect.TypeOf((*declaredPathAware)(nil)).Elem()
 
 	for i := 0; i < dst.NumField(); i++ {
 		field := dst.Field(i)
@@ -45,7 +47,7 @@ func composeInto(base string, composeBase string, dst reflect.Value) error {
 
 		path := resolvePath(base, tag)
 
-		if err := assignPath(path, composeBase, field); err != nil {
+		if err := assignPath(path, composeBase, tag, field, composeBaseAwareType, declaredPathAwareType); err != nil {
 			return fmt.Errorf("field %q: %w", structField.Name, err)
 		}
 	}
@@ -53,7 +55,7 @@ func composeInto(base string, composeBase string, dst reflect.Value) error {
 	return nil
 }
 
-func assignPath(path string, composeBase string, field reflect.Value) error {
+func assignPath(path string, composeBase string, declaredPath string, field reflect.Value, composeBaseAwareType reflect.Type, declaredPathAwareType reflect.Type) error {
 	if !field.CanSet() {
 		return fmt.Errorf("field is not settable")
 	}
@@ -63,8 +65,11 @@ func assignPath(path string, composeBase string, field reflect.Value) error {
 
 		if ptr.Type().Implements(composableEntryType) {
 			ptr.Interface().(Composable).ComposePath(path)
-			if ptr.Type().Implements(reflect.TypeOf((*composeBaseAware)(nil)).Elem()) {
+			if ptr.Type().Implements(composeBaseAwareType) {
 				ptr.Interface().(composeBaseAware).setComposeBase(composeBase)
+			}
+			if ptr.Type().Implements(declaredPathAwareType) {
+				ptr.Interface().(declaredPathAware).setDeclaredPath(declaredPath)
 			}
 			return nil
 		}
@@ -85,8 +90,11 @@ func assignPath(path string, composeBase string, field reflect.Value) error {
 
 		if field.Type().Implements(composableEntryType) {
 			field.Interface().(Composable).ComposePath(path)
-			if field.Type().Implements(reflect.TypeOf((*composeBaseAware)(nil)).Elem()) {
+			if field.Type().Implements(composeBaseAwareType) {
 				field.Interface().(composeBaseAware).setComposeBase(composeBase)
+			}
+			if field.Type().Implements(declaredPathAwareType) {
+				field.Interface().(declaredPathAware).setDeclaredPath(declaredPath)
 			}
 			return nil
 		}

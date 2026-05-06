@@ -21,6 +21,10 @@ type composeBaseAware interface {
 	setComposeBase(string)
 }
 
+type declaredPathAware interface {
+	setDeclaredPath(string)
+}
+
 // Ensure
 
 var (

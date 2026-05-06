@@ -46,6 +46,7 @@ Useful methods:
 - `Path()` returns the cleaned path bound during composition.
 - `Base()` returns the final path element.
 - `Stem()` returns the final path element without its final extension.
+- `DeclaredPath()` and `JoinDeclaredPath(...)` expose the node's own declared layout fragment.
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` expose compose-base-relative paths when the handle belongs to a composed tree.
 - `Exists()` reports whether the directory currently exists on disk.
 - `Join(...)` builds a descendant path.
@@ -61,6 +62,7 @@ Useful methods:
 
 - `Path()` and `Exists()`
 - `Base()`, `Ext()`, and `Stem()` for path fragments
+- `DeclaredPath()` and `JoinDeclaredPath(...)` for local declared layout fragments
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` for compose-base-relative path fragments
 - `ReadBytes()` and `ReadBytesIfExists()`
 - `WriteBytes(data, dirMode, fileMode)`
@@ -77,6 +79,7 @@ Useful methods:
 
 - `Ensure(ctx)` and `EnsureExecutable(ctx)` create the file with executable permissions.
 - `Base()`, `Ext()`, and `Stem()` are inherited from `File`.
+- `DeclaredPath()` and `JoinDeclaredPath(...)` are inherited from `File`.
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` are inherited from `File`.
 - `IsExecutable()` reports whether the current target is an executable regular file.
 - `Command(ctx, opts)`, `Run(ctx, opts)`, `Output(ctx, opts)`, and `CombinedOutput(ctx, opts)` run the managed file.
@@ -135,6 +138,7 @@ Useful methods:
 - `MustAt(name)` is the panicking version of `At`.
 - `Add(name, ctx)` creates the child root on disk, composes the item, and ensures its declared structure.
 - `Get(name)` reads the cache without composing.
+- `DeclaredPath()` and `JoinDeclaredPath(...)` expose the slot field's own declared layout fragment.
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` expose the slot root relative to the tree's compose base.
 - `Entries()` returns a sorted snapshot of cached `{Name, Item}` pairs.
 - `All()` iterates cached items in sorted key order with `for name, item := range slot.All()`.
@@ -145,6 +149,8 @@ Useful methods:
 `Entries()` and `All()` are cache-based only. They do not discover from disk or lazily compose missing items.
 
 The composed-path helpers return `ok == false` until a node has been attached through `Compose`. When they are available, the compose base is the same root that anchored the whole composed tree, not the nearest nested struct or slot item.
+
+The declared-path helpers are different: they return the node's own declared layout fragment only. They do not reconstruct ancestor fragments. For example, a field declared as `layout:"build"` reports `build`, not `bin/build`, even when it lives inside a nested struct rooted at `layout:"bin"`.
 
 ## Composition rules
 

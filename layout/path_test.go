@@ -137,3 +137,58 @@ func TestComposedPathsAreUnavailableWithoutComposition(t *testing.T) {
 		t.Fatal("Slot.JoinComposedPath() ok = true, want false")
 	}
 }
+
+func TestDeclaredPathsTrackLocalLayoutFragments(t *testing.T) {
+	type service struct {
+		Root   Dir  `layout:"."`
+		Config File `layout:"config.yaml"`
+		Logs   Dir  `layout:"logs"`
+	}
+
+	type workspace struct {
+		Root     Dir            `layout:"."`
+		Services Slot[*service] `layout:"services"`
+	}
+
+	var ws workspace
+	if err := Compose("workspace", &ws); err != nil {
+		t.Fatalf("Compose() error = %v", err)
+	}
+
+	svc := ws.Services.MustAt("api")
+
+	if got, ok := ws.Root.DeclaredPath(); !ok || got != "." {
+		t.Fatalf("Root.DeclaredPath() = (%q, %t), want (%q, true)", got, ok, ".")
+	}
+	if got, ok := ws.Root.JoinDeclaredPath("config.yaml"); !ok || got != "config.yaml" {
+		t.Fatalf("Root.JoinDeclaredPath() = (%q, %t), want (%q, true)", got, ok, "config.yaml")
+	}
+
+	if got, ok := ws.Services.DeclaredPath(); !ok || got != "services" {
+		t.Fatalf("Services.DeclaredPath() = (%q, %t), want (%q, true)", got, ok, "services")
+	}
+	if got, ok := ws.Services.JoinDeclaredPath("api"); !ok || got != filepath.Join("services", "api") {
+		t.Fatalf("Services.JoinDeclaredPath() = (%q, %t), want (%q, true)", got, ok, filepath.Join("services", "api"))
+	}
+
+	if got, ok := svc.Root.DeclaredPath(); !ok || got != "." {
+		t.Fatalf("service.Root.DeclaredPath() = (%q, %t), want (%q, true)", got, ok, ".")
+	}
+	if got, ok := svc.Config.DeclaredPath(); !ok || got != "config.yaml" {
+		t.Fatalf("service.Config.DeclaredPath() = (%q, %t), want (%q, true)", got, ok, "config.yaml")
+	}
+	if got, ok := svc.Config.JoinDeclaredPath("bak"); !ok || got != filepath.Join("config.yaml", "bak") {
+		t.Fatalf("Config.JoinDeclaredPath() = (%q, %t), want (%q, true)", got, ok, filepath.Join("config.yaml", "bak"))
+	}
+	if got, ok := svc.Logs.DeclaredPath(); !ok || got != "logs" {
+		t.Fatalf("service.Logs.DeclaredPath() = (%q, %t), want (%q, true)", got, ok, "logs")
+	}
+
+	derived := svc.Root.Dir("logs")
+	if _, ok := derived.DeclaredPath(); ok {
+		t.Fatal("derived Dir.DeclaredPath() ok = true, want false")
+	}
+	if _, ok := derived.JoinDeclaredPath("child"); ok {
+		t.Fatal("derived Dir.JoinDeclaredPath() ok = true, want false")
+	}
+}

@@ -31,6 +31,14 @@ func (s *Slot[T]) ComposedBaseDir() (Dir, bool) {
 	return s.root.ComposedBaseDir()
 }
 
+func (s *Slot[T]) DeclaredPath() (string, bool) {
+	return s.root.DeclaredPath()
+}
+
+func (s *Slot[T]) JoinDeclaredPath(parts ...string) (string, bool) {
+	return s.root.JoinDeclaredPath(parts...)
+}
+
 func (s *Slot[T]) ComposedRelativePath() (string, bool) {
 	return s.root.ComposedRelativePath()
 }
@@ -221,6 +229,10 @@ func (s *Slot[T]) ComposePath(path string) {
 
 func (s *Slot[T]) setComposeBase(path string) {
 	s.root.setComposeBase(path)
+}
+
+func (s *Slot[T]) setDeclaredPath(path string) {
+	s.root.setDeclaredPath(path)
 }
 
 // Ensure

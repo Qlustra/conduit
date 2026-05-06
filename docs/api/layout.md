@@ -19,6 +19,8 @@ Methods:
 - `Path() string`: returns the bound path
 - `Base() string`: returns the final path element
 - `Stem() string`: returns the final path element without its final extension
+- `DeclaredPath() (string, bool)`: returns the node's own declared layout fragment
+- `JoinDeclaredPath(parts ...string) (string, bool)`: joins path parts onto the declared layout fragment
 - `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the handle belongs to a composed tree
 - `ComposedRelativePath() (string, bool)`: returns the path relative to the compose base directory
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
@@ -33,6 +35,8 @@ Notable behavior:
 
 - `DeleteIfExists` uses recursive removal
 - `Exists` only checks current filesystem state; it does not validate that the path is a directory
+- the declared-path helpers return `ok == false` when the handle was not attached through `Compose`
+- for a root field declared as `layout:"."`, `DeclaredPath()` returns `.`
 - the composed-path helpers return `ok == false` when the handle was not attached through `Compose`
 - for the compose base directory itself, `ComposedRelativePath()` returns `.`
 
@@ -52,6 +56,8 @@ Methods:
 - `Base() string`: returns the final path element
 - `Ext() string`: returns the final extension including the leading dot
 - `Stem() string`: returns the final path element without its final extension
+- `DeclaredPath() (string, bool)`: returns the node's own declared layout fragment
+- `JoinDeclaredPath(parts ...string) (string, bool)`: joins path parts onto the declared layout fragment
 - `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the handle belongs to a composed tree
 - `ComposedRelativePath() (string, bool)`: returns the path relative to the compose base directory
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
@@ -67,6 +73,7 @@ Notable behavior:
 - `Ensure` uses `os.O_CREATE` and does not truncate existing file contents
 - `WriteBytes` always rewrites the file contents
 - `Exists` only checks that some filesystem entry exists at the path
+- the declared-path helpers return `ok == false` when the handle was not attached through `Compose`
 - the composed-path helpers return `ok == false` when the handle was not attached through `Compose`
 - dotfiles such as `.env` report an empty extension and keep the full basename as the stem
 
@@ -86,6 +93,8 @@ Methods:
 - `Base() string`
 - `Ext() string`
 - `Stem() string`
+- `DeclaredPath() (string, bool)`
+- `JoinDeclaredPath(parts ...string) (string, bool)`
 - `ComposedBaseDir() (Dir, bool)`
 - `ComposedRelativePath() (string, bool)`
 - `JoinComposedPath(parts ...string) (string, bool)`
@@ -221,6 +230,8 @@ Description:
 Methods:
 
 - `Path() string`: returns the slot root path
+- `DeclaredPath() (string, bool)`: returns the slot field's declared layout fragment
+- `JoinDeclaredPath(parts ...string) (string, bool)`: joins path parts onto the slot's declared layout fragment
 - `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the slot belongs to a composed tree
 - `ComposedRelativePath() (string, bool)`: returns the slot root path relative to the compose base directory
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the slot's composed-relative path
@@ -252,6 +263,7 @@ Notable behavior:
 - `Add` ensures the child root and calls `EnsureDeep` on the new child
 - `Len`, `Entries`, `All`, and `Keys` are cache-based; they do not list the filesystem directly
 - `Entries` and `All` return cached items as-is, preserving pointer or value semantics chosen by `T`
+- the declared-path helpers delegate to the slot root and expose the slot field's own declared fragment
 - the composed-path helpers delegate to the slot root and return `ok == false` until the slot has been attached through `Compose`
 - `DiscoverDeep` discovers directory-backed entries from disk without loading typed files
 - `LoadDeep` discovers directory-backed entries from disk
