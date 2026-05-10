@@ -271,6 +271,7 @@ Methods:
 - `Get(name string) (T, bool)`: returns a cached item only
 - `Put(name string, item T)`: inserts or replaces a cached item
 - `Remove(name string)`: removes a cached item
+- `Delete(name string) error`: removes the child tree from disk if present and evicts the cached item
 - `Clear()`: clears the cache
 - `Entries() []SlotEntry[T]`: returns a sorted snapshot of cached entries
 - `All() iter.Seq2[string, T]`: iterates cached entries in sorted key order
@@ -290,6 +291,7 @@ Notable behavior:
 
 - `At` composes items relative to `slotRoot/<name>` and caches them
 - `Add` ensures the child root and calls `EnsureDeep` on the new child
+- `Delete` removes both the on-disk child tree and the cached entry
 - `Len`, `Entries`, `All`, and `Keys` are cache-based; they do not list the filesystem directly
 - `Entries` and `All` return cached items as-is, preserving pointer or value semantics chosen by `T`
 - the declared-path helpers delegate to the slot root and expose the slot field's own declared fragment

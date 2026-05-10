@@ -58,6 +58,68 @@ func TestSlotAddEnsuresItemRootAndDeclaredFiles(t *testing.T) {
 	}
 }
 
+func TestSlotAddCachedItemOnlyRecreatesItemDir(t *testing.T) {
+	type item struct {
+		Config testMapFile `layout:"config.json"`
+	}
+
+	var slot Slot[*item]
+	slot.ComposePath(filepath.Join(t.TempDir(), "services"))
+
+	added, err := slot.Add("api", DefaultContext)
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+
+	itemDir := filepath.Join(slot.Path(), "api")
+	if err := os.RemoveAll(itemDir); err != nil {
+		t.Fatalf("RemoveAll(itemDir) error = %v", err)
+	}
+
+	again, err := slot.Add("api", DefaultContext)
+	if err != nil {
+		t.Fatalf("second Add() error = %v", err)
+	}
+
+	if again != added {
+		t.Fatalf("second Add() returned a different cached item")
+	}
+	if _, err := os.Stat(itemDir); err != nil {
+		t.Fatalf("os.Stat(item root) error = %v", err)
+	}
+	if _, err := os.Stat(added.Config.Path()); !os.IsNotExist(err) {
+		t.Fatalf("os.Stat(config file) error = %v, want not-exist", err)
+	}
+}
+
+func TestSlotDeleteRemovesDiskAndCache(t *testing.T) {
+	type item struct {
+		Config testMapFile `layout:"config.json"`
+	}
+
+	var slot Slot[*item]
+	slot.ComposePath(filepath.Join(t.TempDir(), "services"))
+
+	added, err := slot.Add("api", DefaultContext)
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+
+	if err := slot.Delete("api"); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(slot.Path(), "api")); !os.IsNotExist(err) {
+		t.Fatalf("os.Stat(item root) error = %v, want not-exist", err)
+	}
+	if _, ok := slot.Get("api"); ok {
+		t.Fatalf("Get(\"api\") ok = true after Delete(), want false")
+	}
+	if _, err := os.Stat(added.Config.Path()); !os.IsNotExist(err) {
+		t.Fatalf("os.Stat(config file) error = %v, want not-exist", err)
+	}
+}
+
 func TestSlotEntriesReturnSortedSnapshot(t *testing.T) {
 	type item struct {
 		Name string

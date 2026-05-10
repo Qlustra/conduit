@@ -141,12 +141,13 @@ Useful methods:
 - `At(name)` composes and caches an item lazily.
 - `MustAt(name)` is the panicking version of `At`.
 - `Add(name, ctx)` creates the child root on disk, composes the item, and ensures its declared structure.
+- `Delete(name)` removes the child tree from disk when it exists and evicts the cached item.
 - `Get(name)` reads the cache without composing.
 - `DeclaredPath()` and `JoinDeclaredPath(...)` expose the slot field's own declared layout fragment.
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` expose the slot root relative to the tree's compose base.
 - `Entries()` returns a sorted snapshot of cached `{Name, Item}` pairs.
 - `All()` iterates cached items in sorted key order with `for name, item := range slot.All()`.
-- `Put(name, item)`, `Remove(name)`, `Clear()`, `Len()`, and `Keys()` manage the cache.
+- `Put(name, item)`, `Remove(name)`, `Clear()`, `Len()`, and `Keys()` manage the cache. `Remove(name)` is cache-only.
 - `Require(name)` fails unless the child directory already exists on disk.
 - `Root()` returns the slot root as a `Dir`.
 

@@ -92,6 +92,18 @@ func (s *Slot[T]) Remove(name string) {
 	delete(s.items, name)
 }
 
+func (s *Slot[T]) Delete(name string) error {
+	if err := s.root.Dir(name).DeleteIfExists(); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.items, name)
+	return nil
+}
+
 func (s *Slot[T]) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -141,12 +153,15 @@ func (s *Slot[T]) Keys() []string {
 
 func (s *Slot[T]) At(name string) (T, error) {
 	s.mu.RLock()
+	// Fast path under RLock. On a miss, compose outside the mutex and
+	// re-check under Lock so concurrent callers converge on one cached item.
 	if item, ok := s.items[name]; ok {
 		s.mu.RUnlock()
 		return item, nil
 	}
 	s.mu.RUnlock()
 
+	// Compose outside the lock, then check again under the write lock.
 	item, err := ComposeAs[T](s.root.Dir(name))
 	if err != nil {
 		var zero T
@@ -160,6 +175,7 @@ func (s *Slot[T]) At(name string) (T, error) {
 		s.items = make(map[string]T)
 	}
 
+	// Another goroutine may have populated s.items[name] while we were composing.
 	if existing, ok := s.items[name]; ok {
 		return existing, nil
 	}
@@ -183,6 +199,13 @@ func (s *Slot[T]) Add(name string, ctx Context) (T, error) {
 		var zero T
 		return zero, err
 	}
+
+	s.mu.RLock()
+	if existing, ok := s.items[name]; ok {
+		s.mu.RUnlock()
+		return existing, nil
+	}
+	s.mu.RUnlock()
 
 	item, err := ComposeAs[T](childRoot)
 	if err != nil {
