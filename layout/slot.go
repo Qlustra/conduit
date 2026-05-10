@@ -242,6 +242,10 @@ func (s *Slot[T]) Ensure(ctx Context) error {
 }
 
 func (s *Slot[T]) EnsureDeep(ctx Context) error {
+	return s.ensureDeep(ctx)
+}
+
+func (s *Slot[T]) ensureDeep(ctx Context) error {
 	if err := s.root.Ensure(ctx); err != nil {
 		return err
 	}
@@ -265,9 +269,19 @@ func (s *Slot[T]) EnsureDeep(ctx Context) error {
 	return nil
 }
 
+func (s *Slot[T]) ensureDeepReport(ctx Context) error {
+	return reportEnsure(ctx, s.Path(), func() error {
+		return s.ensureDeep(ctx)
+	})
+}
+
 // Load
 
 func (s *Slot[T]) LoadDeep(ctx Context) error {
+	return s.loadDeep(ctx)
+}
+
+func (s *Slot[T]) loadDeep(ctx Context) error {
 	entries, err := os.ReadDir(s.root.Path())
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -295,9 +309,43 @@ func (s *Slot[T]) LoadDeep(ctx Context) error {
 	return nil
 }
 
+func (s *Slot[T]) loadDeepReport(ctx Context) error {
+	return reportLoad(ctx, s.Path(), func() (ResultCode, error) {
+		entries, err := os.ReadDir(s.root.Path())
+		if err != nil {
+			if os.IsNotExist(err) {
+				return LoadMissing, nil
+			}
+			return LoadFailed, err
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+
+			name := entry.Name()
+			item, err := s.At(name)
+			if err != nil {
+				return LoadFailed, fmt.Errorf("compose slot item %q: %w", name, err)
+			}
+
+			if err := LoadDeep(item, ctx); err != nil {
+				return LoadFailed, fmt.Errorf("load slot item %q: %w", name, err)
+			}
+		}
+
+		return LoadTraversed, nil
+	})
+}
+
 // Scan
 
 func (s *Slot[T]) ScanDeep(ctx Context) error {
+	return s.scanDeep(ctx)
+}
+
+func (s *Slot[T]) scanDeep(ctx Context) error {
 	s.mu.RLock()
 	items := make(map[string]T, len(s.items))
 	for name, item := range s.items {
@@ -314,9 +362,32 @@ func (s *Slot[T]) ScanDeep(ctx Context) error {
 	return nil
 }
 
+func (s *Slot[T]) scanDeepReport(ctx Context) error {
+	return reportScan(ctx, s.Path(), func() (ResultCode, error) {
+		s.mu.RLock()
+		items := make(map[string]T, len(s.items))
+		for name, item := range s.items {
+			items[name] = item
+		}
+		s.mu.RUnlock()
+
+		for name, item := range items {
+			if err := ScanDeep(item, ctx); err != nil {
+				return ScanFailed, fmt.Errorf("scan slot item %q: %w", name, err)
+			}
+		}
+
+		return ScanTraversed, nil
+	})
+}
+
 // Discover
 
 func (s *Slot[T]) DiscoverDeep(ctx Context) error {
+	return s.discoverDeep(ctx)
+}
+
+func (s *Slot[T]) discoverDeep(ctx Context) error {
 	entries, err := os.ReadDir(s.root.Path())
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -344,9 +415,43 @@ func (s *Slot[T]) DiscoverDeep(ctx Context) error {
 	return nil
 }
 
+func (s *Slot[T]) discoverDeepReport(ctx Context) error {
+	return reportDiscover(ctx, s.Path(), func() (ResultCode, error) {
+		entries, err := os.ReadDir(s.root.Path())
+		if err != nil {
+			if os.IsNotExist(err) {
+				return DiscoverMissing, nil
+			}
+			return DiscoverFailed, err
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+
+			name := entry.Name()
+			item, err := s.At(name)
+			if err != nil {
+				return DiscoverFailed, fmt.Errorf("compose slot item %q: %w", name, err)
+			}
+
+			if err := DiscoverDeep(item, ctx); err != nil {
+				return DiscoverFailed, fmt.Errorf("discover slot item %q: %w", name, err)
+			}
+		}
+
+		return DiscoverTraversed, nil
+	})
+}
+
 // Sync
 
 func (s *Slot[T]) SyncDeep(ctx Context) error {
+	return s.syncDeep(ctx)
+}
+
+func (s *Slot[T]) syncDeep(ctx Context) error {
 	s.mu.RLock()
 	items := make(map[string]T, len(s.items))
 	for name, item := range s.items {
@@ -364,6 +469,28 @@ func (s *Slot[T]) SyncDeep(ctx Context) error {
 	}
 
 	return nil
+}
+
+func (s *Slot[T]) syncDeepReport(ctx Context) error {
+	return reportSync(ctx, s.Path(), func() (ResultCode, error) {
+		s.mu.RLock()
+		items := make(map[string]T, len(s.items))
+		for name, item := range s.items {
+			items[name] = item
+		}
+		s.mu.RUnlock()
+
+		for name, item := range items {
+			if err := EnsureDeep(item, ctx); err != nil {
+				return SyncFailed, fmt.Errorf("ensure slot item %q: %w", name, err)
+			}
+			if err := SyncDeep(item, ctx); err != nil {
+				return SyncFailed, fmt.Errorf("sync slot item %q: %w", name, err)
+			}
+		}
+
+		return SyncTraversed, nil
+	})
 }
 
 // Render

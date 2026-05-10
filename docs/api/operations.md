@@ -39,6 +39,7 @@ type Context struct {
 	FileMode   os.FileMode
 	ExecMode   os.FileMode
 	SyncPolicy conduit.SyncPolicy
+	Reporter   conduit.Reporter
 }
 ```
 
@@ -48,11 +49,67 @@ Fields:
 - `FileMode`: mode used when creating regular files
 - `ExecMode`: mode used when creating or ensuring `Exec` files
 - `SyncPolicy`: selects which typed memory states `Sync` and `SyncDeep` may write
+- `Reporter`: optional sink for per-path deep-operation results
 
 Notable behavior:
 
 - when `ExecMode` is zero, `Exec` falls back to `FileMode` and adds execute bits automatically
 - when `SyncPolicy` is zero, sync operations fall back to `SyncRewrite`
+- when `Reporter` is nil, deep operations do not collect traversal reports
+
+### `Reporter`
+
+```go
+type Reporter interface {
+	Record(conduit.Entry)
+}
+```
+
+Description:
+
+- optional sink carried on `Context` for deep-operation reporting
+- built-in `conduit.Report` implements this interface
+
+### `Report`
+
+```go
+type Report struct { ... }
+```
+
+Description:
+
+- in-memory collector for operation entries recorded during deep traversal
+
+Notable methods:
+
+- `Record(Entry)`
+- `Entries() []Entry`
+- `Len() int`
+- `HasErrors() bool`
+- `Filter(func(Entry) bool) []Entry`
+- `Sort(func(Entry, Entry) bool)`
+- `SortByPath()`
+- `RenderTree() string`
+
+### `Entry`
+
+```go
+type Entry struct {
+	Op     conduit.Operation
+	Path   string
+	Result conduit.ResultCode
+	Err    error
+}
+```
+
+Description:
+
+- one reported path-level outcome for a deep operation
+
+Notable behavior:
+
+- `Result` is interpreted relative to `Op`
+- `Err` is populated on failures
 
 ### `SyncPolicy`
 

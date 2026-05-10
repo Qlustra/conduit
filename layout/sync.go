@@ -30,11 +30,37 @@ func syncDeepValue(v reflect.Value, ctx Context) error {
 			return nil
 		}
 
+		if v.Type().Implements(reflect.TypeOf((*reportDeepSyncer)(nil)).Elem()) {
+			return v.Interface().(reportDeepSyncer).syncDeepReport(ctx)
+		}
+
 		if v.Type().Implements(deepSyncerType) {
+			if path, ok := pathOf(v.Interface()); ok {
+				return reportSync(ctx, path, func() (ResultCode, error) {
+					err := v.Interface().(DeepSyncer).SyncDeep(ctx)
+					if err != nil {
+						return SyncFailed, err
+					}
+					return SyncTraversed, nil
+				})
+			}
 			return v.Interface().(DeepSyncer).SyncDeep(ctx)
 		}
 
+		if v.Type().Implements(reflect.TypeOf((*reportSyncer)(nil)).Elem()) {
+			return v.Interface().(reportSyncer).syncReport(ctx)
+		}
+
 		if v.Type().Implements(syncerType) {
+			if path, ok := pathOf(v.Interface()); ok {
+				return reportSync(ctx, path, func() (ResultCode, error) {
+					err := v.Interface().(Syncer).Sync(ctx)
+					if err != nil {
+						return SyncFailed, err
+					}
+					return SyncTraversed, nil
+				})
+			}
 			return v.Interface().(Syncer).Sync(ctx)
 		}
 
@@ -44,11 +70,37 @@ func syncDeepValue(v reflect.Value, ctx Context) error {
 	if v.CanAddr() {
 		ptr := v.Addr()
 
+		if ptr.Type().Implements(reflect.TypeOf((*reportDeepSyncer)(nil)).Elem()) {
+			return ptr.Interface().(reportDeepSyncer).syncDeepReport(ctx)
+		}
+
 		if ptr.Type().Implements(deepSyncerType) {
+			if path, ok := pathOf(ptr.Interface()); ok {
+				return reportSync(ctx, path, func() (ResultCode, error) {
+					err := ptr.Interface().(DeepSyncer).SyncDeep(ctx)
+					if err != nil {
+						return SyncFailed, err
+					}
+					return SyncTraversed, nil
+				})
+			}
 			return ptr.Interface().(DeepSyncer).SyncDeep(ctx)
 		}
 
+		if ptr.Type().Implements(reflect.TypeOf((*reportSyncer)(nil)).Elem()) {
+			return ptr.Interface().(reportSyncer).syncReport(ctx)
+		}
+
 		if ptr.Type().Implements(syncerType) {
+			if path, ok := pathOf(ptr.Interface()); ok {
+				return reportSync(ctx, path, func() (ResultCode, error) {
+					err := ptr.Interface().(Syncer).Sync(ctx)
+					if err != nil {
+						return SyncFailed, err
+					}
+					return SyncTraversed, nil
+				})
+			}
 			return ptr.Interface().(Syncer).Sync(ctx)
 		}
 	}

@@ -30,20 +30,64 @@ func discoverDeepValue(v reflect.Value, ctx Context) error {
 			return nil
 		}
 
+		if v.Type().Implements(reflect.TypeOf((*reportDeepDiscoverer)(nil)).Elem()) {
+			return v.Interface().(reportDeepDiscoverer).discoverDeepReport(ctx)
+		}
+
 		if v.Type().Implements(deepDiscovererType) {
+			if path, ok := pathOf(v.Interface()); ok {
+				return reportDiscover(ctx, path, func() (ResultCode, error) {
+					err := v.Interface().(DeepDiscoverer).DiscoverDeep(ctx)
+					if err != nil {
+						return DiscoverFailed, err
+					}
+					return DiscoverTraversed, nil
+				})
+			}
 			return v.Interface().(DeepDiscoverer).DiscoverDeep(ctx)
 		}
 
+		if v.Type().Implements(reflect.TypeOf((*reportDiscoverer)(nil)).Elem()) {
+			return v.Interface().(reportDiscoverer).discoverReport(ctx)
+		}
+
 		if v.Type().Implements(discovererType) {
+			if path, ok := pathOf(v.Interface()); ok {
+				return reportDiscover(ctx, path, func() (ResultCode, error) {
+					state, err := v.Interface().(Discoverable).Discover()
+					if err != nil {
+						return DiscoverFailed, err
+					}
+					return resultFromDiskState(DiscoverPresent, DiscoverMissing, DiscoverTraversed, state), nil
+				})
+			}
 			_, err := v.Interface().(Discoverable).Discover()
 			return err
 		}
 
 		if v.Type().Implements(deepScannerType) {
+			if path, ok := pathOf(v.Interface()); ok {
+				return reportDiscover(ctx, path, func() (ResultCode, error) {
+					err := v.Interface().(DeepScanner).ScanDeep(ctx)
+					if err != nil {
+						return DiscoverFailed, err
+					}
+					return DiscoverTraversed, nil
+				})
+			}
 			return v.Interface().(DeepScanner).ScanDeep(ctx)
 		}
 
 		if v.Type().Implements(scannerType) {
+			if path, ok := pathOf(v.Interface()); ok {
+				return reportDiscover(ctx, path, func() (ResultCode, error) {
+					state, err := v.Interface().(Scannable).Scan()
+					if err != nil {
+						return DiscoverFailed, err
+					}
+					return resultFromDiskState(DiscoverPresent, DiscoverMissing, DiscoverTraversed, state), nil
+				})
+			}
 			_, err := v.Interface().(Scannable).Scan()
 			return err
 		}
@@ -54,20 +98,64 @@ func discoverDeepValue(v reflect.Value, ctx Context) error {
 	if v.CanAddr() {
 		ptr := v.Addr()
 
+		if ptr.Type().Implements(reflect.TypeOf((*reportDeepDiscoverer)(nil)).Elem()) {
+			return ptr.Interface().(reportDeepDiscoverer).discoverDeepReport(ctx)
+		}
+
 		if ptr.Type().Implements(deepDiscovererType) {
+			if path, ok := pathOf(ptr.Interface()); ok {
+				return reportDiscover(ctx, path, func() (ResultCode, error) {
+					err := ptr.Interface().(DeepDiscoverer).DiscoverDeep(ctx)
+					if err != nil {
+						return DiscoverFailed, err
+					}
+					return DiscoverTraversed, nil
+				})
+			}
 			return ptr.Interface().(DeepDiscoverer).DiscoverDeep(ctx)
 		}
 
+		if ptr.Type().Implements(reflect.TypeOf((*reportDiscoverer)(nil)).Elem()) {
+			return ptr.Interface().(reportDiscoverer).discoverReport(ctx)
+		}
+
 		if ptr.Type().Implements(discovererType) {
+			if path, ok := pathOf(ptr.Interface()); ok {
+				return reportDiscover(ctx, path, func() (ResultCode, error) {
+					state, err := ptr.Interface().(Discoverable).Discover()
+					if err != nil {
+						return DiscoverFailed, err
+					}
+					return resultFromDiskState(DiscoverPresent, DiscoverMissing, DiscoverTraversed, state), nil
+				})
+			}
 			_, err := ptr.Interface().(Discoverable).Discover()
 			return err
 		}
 
 		if ptr.Type().Implements(deepScannerType) {
+			if path, ok := pathOf(ptr.Interface()); ok {
+				return reportDiscover(ctx, path, func() (ResultCode, error) {
+					err := ptr.Interface().(DeepScanner).ScanDeep(ctx)
+					if err != nil {
+						return DiscoverFailed, err
+					}
+					return DiscoverTraversed, nil
+				})
+			}
 			return ptr.Interface().(DeepScanner).ScanDeep(ctx)
 		}
 
 		if ptr.Type().Implements(scannerType) {
+			if path, ok := pathOf(ptr.Interface()); ok {
+				return reportDiscover(ctx, path, func() (ResultCode, error) {
+					state, err := ptr.Interface().(Scannable).Scan()
+					if err != nil {
+						return DiscoverFailed, err
+					}
+					return resultFromDiskState(DiscoverPresent, DiscoverMissing, DiscoverTraversed, state), nil
+				})
+			}
 			_, err := ptr.Interface().(Scannable).Scan()
 			return err
 		}

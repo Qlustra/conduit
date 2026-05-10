@@ -25,7 +25,15 @@ func ensureDeepValue(v reflect.Value, ctx Context) error {
 		if v.IsNil() {
 			return nil
 		}
+		if v.Type().Implements(reflect.TypeOf((*reportDeepEnsurer)(nil)).Elem()) {
+			return v.Interface().(reportDeepEnsurer).ensureDeepReport(ctx)
+		}
 		if v.Type().Implements(deepEnsurerType) {
+			if path, ok := pathOf(v.Interface()); ok {
+				return reportEnsure(ctx, path, func() error {
+					return v.Interface().(DeepEnsurer).EnsureDeep(ctx)
+				})
+			}
 			return v.Interface().(DeepEnsurer).EnsureDeep(ctx)
 		}
 		v = v.Elem()
@@ -33,17 +41,29 @@ func ensureDeepValue(v reflect.Value, ctx Context) error {
 
 	if v.CanAddr() {
 		ptr := v.Addr()
+		if ptr.Type().Implements(reflect.TypeOf((*reportDeepEnsurer)(nil)).Elem()) {
+			return ptr.Interface().(reportDeepEnsurer).ensureDeepReport(ctx)
+		}
 		if ptr.Type().Implements(deepEnsurerType) {
+			if path, ok := pathOf(ptr.Interface()); ok {
+				return reportEnsure(ctx, path, func() error {
+					return ptr.Interface().(DeepEnsurer).EnsureDeep(ctx)
+				})
+			}
 			return ptr.Interface().(DeepEnsurer).EnsureDeep(ctx)
 		}
 	}
 
 	switch v.Type() {
 	case dirType:
-		return v.Interface().(Dir).Ensure(ctx)
+		return reportEnsure(ctx, v.Interface().(Dir).Path(), func() error {
+			return v.Interface().(Dir).Ensure(ctx)
+		})
 
 	case fileType:
-		return v.Interface().(File).Ensure(ctx)
+		return reportEnsure(ctx, v.Interface().(File).Path(), func() error {
+			return v.Interface().(File).Ensure(ctx)
+		})
 	}
 
 	// If this is a struct that embeds Dir/File or wraps them, recurse into fields.

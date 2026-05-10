@@ -27,11 +27,37 @@ func scanDeepValue(v reflect.Value, ctx Context) error {
 			return nil
 		}
 
+		if v.Type().Implements(reflect.TypeOf((*reportDeepScanner)(nil)).Elem()) {
+			return v.Interface().(reportDeepScanner).scanDeepReport(ctx)
+		}
+
 		if v.Type().Implements(deepScannerType) {
+			if path, ok := pathOf(v.Interface()); ok {
+				return reportScan(ctx, path, func() (ResultCode, error) {
+					err := v.Interface().(DeepScanner).ScanDeep(ctx)
+					if err != nil {
+						return ScanFailed, err
+					}
+					return ScanTraversed, nil
+				})
+			}
 			return v.Interface().(DeepScanner).ScanDeep(ctx)
 		}
 
+		if v.Type().Implements(reflect.TypeOf((*reportScanner)(nil)).Elem()) {
+			return v.Interface().(reportScanner).scanReport(ctx)
+		}
+
 		if v.Type().Implements(scannerType) {
+			if path, ok := pathOf(v.Interface()); ok {
+				return reportScan(ctx, path, func() (ResultCode, error) {
+					state, err := v.Interface().(Scannable).Scan()
+					if err != nil {
+						return ScanFailed, err
+					}
+					return resultFromDiskState(ScanPresent, ScanMissing, ScanTraversed, state), nil
+				})
+			}
 			_, err := v.Interface().(Scannable).Scan()
 			return err
 		}
@@ -42,11 +68,37 @@ func scanDeepValue(v reflect.Value, ctx Context) error {
 	if v.CanAddr() {
 		ptr := v.Addr()
 
+		if ptr.Type().Implements(reflect.TypeOf((*reportDeepScanner)(nil)).Elem()) {
+			return ptr.Interface().(reportDeepScanner).scanDeepReport(ctx)
+		}
+
 		if ptr.Type().Implements(deepScannerType) {
+			if path, ok := pathOf(ptr.Interface()); ok {
+				return reportScan(ctx, path, func() (ResultCode, error) {
+					err := ptr.Interface().(DeepScanner).ScanDeep(ctx)
+					if err != nil {
+						return ScanFailed, err
+					}
+					return ScanTraversed, nil
+				})
+			}
 			return ptr.Interface().(DeepScanner).ScanDeep(ctx)
 		}
 
+		if ptr.Type().Implements(reflect.TypeOf((*reportScanner)(nil)).Elem()) {
+			return ptr.Interface().(reportScanner).scanReport(ctx)
+		}
+
 		if ptr.Type().Implements(scannerType) {
+			if path, ok := pathOf(ptr.Interface()); ok {
+				return reportScan(ctx, path, func() (ResultCode, error) {
+					state, err := ptr.Interface().(Scannable).Scan()
+					if err != nil {
+						return ScanFailed, err
+					}
+					return resultFromDiskState(ScanPresent, ScanMissing, ScanTraversed, state), nil
+				})
+			}
 			_, err := ptr.Interface().(Scannable).Scan()
 			return err
 		}

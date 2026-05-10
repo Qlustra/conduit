@@ -136,6 +136,7 @@ ctx := conduit.Context{
 	FileMode:   0o644,
 	ExecMode:   0o755,
 	SyncPolicy: conduit.SyncRewrite,
+	Reporter:   &conduit.Report{},
 }
 ```
 
@@ -143,6 +144,7 @@ ctx := conduit.Context{
 - `FileMode` controls regular files.
 - `ExecMode` controls `Exec` files.
 - `SyncPolicy` controls which typed memory states `Sync` and `SyncDeep` may write.
+- `Reporter` optionally collects per-path operation results during deep traversal.
 
 Available sync policies:
 
@@ -158,6 +160,21 @@ conduit.Context{
 	FileMode:   0o644,
 	ExecMode:   0o755,
 	SyncPolicy: conduit.SyncRewrite,
+}
+```
+
+Collect a report during a deep operation:
+
+```go
+var report conduit.Report
+
+ctx := conduit.DefaultContext
+ctx.Reporter = &report
+
+_ = conduit.LoadDeep(&ws, ctx)
+
+if report.HasErrors() {
+	// inspect report.Entries()
 }
 ```
 

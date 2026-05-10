@@ -29,11 +29,40 @@ func loadDeepValue(v reflect.Value, ctx Context) error {
 			return nil
 		}
 
+		if v.Type().Implements(reflect.TypeOf((*reportDeepLoader)(nil)).Elem()) {
+			return v.Interface().(reportDeepLoader).loadDeepReport(ctx)
+		}
+
 		if v.Type().Implements(deepLoaderType) {
+			if path, ok := pathOf(v.Interface()); ok {
+				return reportLoad(ctx, path, func() (ResultCode, error) {
+					err := v.Interface().(DeepLoader).LoadDeep(ctx)
+					if err != nil {
+						return LoadFailed, err
+					}
+					return LoadTraversed, nil
+				})
+			}
 			return v.Interface().(DeepLoader).LoadDeep(ctx)
 		}
 
+		if v.Type().Implements(reflect.TypeOf((*reportLoader)(nil)).Elem()) {
+			return v.Interface().(reportLoader).loadReport(ctx)
+		}
+
 		if v.Type().Implements(loaderType) {
+			if path, ok := pathOf(v.Interface()); ok {
+				return reportLoad(ctx, path, func() (ResultCode, error) {
+					loaded, err := v.Interface().(Loadable).Load()
+					if err != nil {
+						return LoadFailed, err
+					}
+					if loaded {
+						return LoadLoaded, nil
+					}
+					return LoadMissing, nil
+				})
+			}
 			_, err := v.Interface().(Loadable).Load()
 			return err
 		}
@@ -43,11 +72,40 @@ func loadDeepValue(v reflect.Value, ctx Context) error {
 	if v.CanAddr() {
 		ptr := v.Addr()
 
+		if ptr.Type().Implements(reflect.TypeOf((*reportDeepLoader)(nil)).Elem()) {
+			return ptr.Interface().(reportDeepLoader).loadDeepReport(ctx)
+		}
+
 		if ptr.Type().Implements(deepLoaderType) {
+			if path, ok := pathOf(ptr.Interface()); ok {
+				return reportLoad(ctx, path, func() (ResultCode, error) {
+					err := ptr.Interface().(DeepLoader).LoadDeep(ctx)
+					if err != nil {
+						return LoadFailed, err
+					}
+					return LoadTraversed, nil
+				})
+			}
 			return ptr.Interface().(DeepLoader).LoadDeep(ctx)
 		}
 
+		if ptr.Type().Implements(reflect.TypeOf((*reportLoader)(nil)).Elem()) {
+			return ptr.Interface().(reportLoader).loadReport(ctx)
+		}
+
 		if ptr.Type().Implements(loaderType) {
+			if path, ok := pathOf(ptr.Interface()); ok {
+				return reportLoad(ctx, path, func() (ResultCode, error) {
+					loaded, err := ptr.Interface().(Loadable).Load()
+					if err != nil {
+						return LoadFailed, err
+					}
+					if loaded {
+						return LoadLoaded, nil
+					}
+					return LoadMissing, nil
+				})
+			}
 			_, err := ptr.Interface().(Loadable).Load()
 			return err
 		}

@@ -21,6 +21,7 @@ type Context struct {
 	FileMode   os.FileMode
 	ExecMode   os.FileMode
 	SyncPolicy SyncPolicy
+	Reporter   Reporter
 }
 
 var DefaultContext = Context{
