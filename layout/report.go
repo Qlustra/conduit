@@ -7,76 +7,7 @@ import (
 	"sync"
 )
 
-type Reporter interface {
-	Record(Entry)
-}
-
-type Operation uint8
-
-const (
-	OpEnsure Operation = iota + 1
-	OpLoad
-	OpDiscover
-	OpScan
-	OpSync
-)
-
-func (op Operation) String() string {
-	switch op {
-	case OpEnsure:
-		return "ensure"
-	case OpLoad:
-		return "load"
-	case OpDiscover:
-		return "discover"
-	case OpScan:
-		return "scan"
-	case OpSync:
-		return "sync"
-	default:
-		return "unknown"
-	}
-}
-
-type ResultCode uint8
-
-const (
-	EnsureEnsured ResultCode = iota + 1
-	EnsureFailed
-)
-
-const (
-	LoadLoaded ResultCode = iota + 16
-	LoadMissing
-	LoadTraversed
-	LoadNotApplicable
-	LoadFailed
-)
-
-const (
-	DiscoverPresent ResultCode = iota + 32
-	DiscoverMissing
-	DiscoverTraversed
-	DiscoverNotApplicable
-	DiscoverFailed
-)
-
-const (
-	ScanPresent ResultCode = iota + 48
-	ScanMissing
-	ScanTraversed
-	ScanNotApplicable
-	ScanFailed
-)
-
-const (
-	SyncWritten ResultCode = iota + 64
-	SyncTraversed
-	SyncNotApplicable
-	SyncSkippedNoContent
-	SyncSkippedPolicy
-	SyncFailed
-)
+// Entry
 
 type Entry struct {
 	Op     Operation
@@ -169,6 +100,8 @@ func (e Entry) ResultName() string {
 
 	return "unknown"
 }
+
+// Report
 
 type Report struct {
 	mu      sync.RWMutex
@@ -320,41 +253,7 @@ func (r *Report) RenderTree() string {
 	return strings.Join(lines, "\n")
 }
 
-type reportDeepEnsurer interface {
-	ensureDeepReport(Context) error
-}
-
-type reportDeepLoader interface {
-	loadDeepReport(Context) error
-}
-
-type reportLoader interface {
-	loadReport(Context) error
-}
-
-type reportDeepDiscoverer interface {
-	discoverDeepReport(Context) error
-}
-
-type reportDiscoverer interface {
-	discoverReport(Context) error
-}
-
-type reportDeepScanner interface {
-	scanDeepReport(Context) error
-}
-
-type reportScanner interface {
-	scanReport(Context) error
-}
-
-type reportDeepSyncer interface {
-	syncDeepReport(Context) error
-}
-
-type reportSyncer interface {
-	syncReport(Context) error
-}
+// Helpers
 
 func reportEnsure(ctx Context, path string, fn func() error) error {
 	err := fn()
@@ -480,148 +379,4 @@ func renderReportNode(n *reportTreeNode, prefix string, lines *[]string) {
 		*lines = append(*lines, line)
 		renderReportNode(child, nextPrefix, lines)
 	}
-}
-
-func (d Dir) ensureDeepReport(ctx Context) error {
-	return reportEnsure(ctx, d.Path(), func() error {
-		return d.Ensure(ctx)
-	})
-}
-
-func (d Dir) loadReport(ctx Context) error {
-	return reportLoad(ctx, d.Path(), func() (ResultCode, error) {
-		return LoadNotApplicable, nil
-	})
-}
-
-func (d Dir) discoverReport(ctx Context) error {
-	return reportDiscover(ctx, d.Path(), func() (ResultCode, error) {
-		return DiscoverNotApplicable, nil
-	})
-}
-
-func (d Dir) scanReport(ctx Context) error {
-	return reportScan(ctx, d.Path(), func() (ResultCode, error) {
-		return ScanNotApplicable, nil
-	})
-}
-
-func (d Dir) syncReport(ctx Context) error {
-	return reportSync(ctx, d.Path(), func() (ResultCode, error) {
-		return SyncNotApplicable, nil
-	})
-}
-
-func (f File) ensureDeepReport(ctx Context) error {
-	return reportEnsure(ctx, f.Path(), func() error {
-		return f.Ensure(ctx)
-	})
-}
-
-func (f File) loadReport(ctx Context) error {
-	return reportLoad(ctx, f.Path(), func() (ResultCode, error) {
-		return LoadNotApplicable, nil
-	})
-}
-
-func (f File) discoverReport(ctx Context) error {
-	return reportDiscover(ctx, f.Path(), func() (ResultCode, error) {
-		return DiscoverNotApplicable, nil
-	})
-}
-
-func (f File) scanReport(ctx Context) error {
-	return reportScan(ctx, f.Path(), func() (ResultCode, error) {
-		return ScanNotApplicable, nil
-	})
-}
-
-func (f File) syncReport(ctx Context) error {
-	return reportSync(ctx, f.Path(), func() (ResultCode, error) {
-		return SyncNotApplicable, nil
-	})
-}
-
-func (e Exec) ensureDeepReport(ctx Context) error {
-	return reportEnsure(ctx, e.Path(), func() error {
-		return e.Ensure(ctx)
-	})
-}
-
-func (e Exec) loadReport(ctx Context) error {
-	return reportLoad(ctx, e.Path(), func() (ResultCode, error) {
-		return LoadNotApplicable, nil
-	})
-}
-
-func (e Exec) discoverReport(ctx Context) error {
-	return reportDiscover(ctx, e.Path(), func() (ResultCode, error) {
-		return DiscoverNotApplicable, nil
-	})
-}
-
-func (e Exec) scanReport(ctx Context) error {
-	return reportScan(ctx, e.Path(), func() (ResultCode, error) {
-		return ScanNotApplicable, nil
-	})
-}
-
-func (e Exec) syncReport(ctx Context) error {
-	return reportSync(ctx, e.Path(), func() (ResultCode, error) {
-		return SyncNotApplicable, nil
-	})
-}
-
-func (f *Format[T, C]) ensureDeepReport(ctx Context) error {
-	return reportEnsure(ctx, f.Path(), func() error {
-		return f.File.Ensure(ctx)
-	})
-}
-
-func (f *Format[T, C]) loadReport(ctx Context) error {
-	return reportLoad(ctx, f.Path(), func() (ResultCode, error) {
-		loaded, err := f.Load()
-		if err != nil {
-			return LoadFailed, err
-		}
-		if loaded {
-			return LoadLoaded, nil
-		}
-		return LoadMissing, nil
-	})
-}
-
-func (f *Format[T, C]) discoverReport(ctx Context) error {
-	return reportDiscover(ctx, f.Path(), func() (ResultCode, error) {
-		state, err := f.Discover()
-		if err != nil {
-			return DiscoverFailed, err
-		}
-		return resultFromDiskState(DiscoverPresent, DiscoverMissing, DiscoverTraversed, state), nil
-	})
-}
-
-func (f *Format[T, C]) scanReport(ctx Context) error {
-	return reportScan(ctx, f.Path(), func() (ResultCode, error) {
-		state, err := f.Scan()
-		if err != nil {
-			return ScanFailed, err
-		}
-		return resultFromDiskState(ScanPresent, ScanMissing, ScanTraversed, state), nil
-	})
-}
-
-func (f *Format[T, C]) syncReport(ctx Context) error {
-	return reportSync(ctx, f.Path(), func() (ResultCode, error) {
-		if f.content == nil {
-			return SyncSkippedNoContent, nil
-		}
-		if !ctx.syncPolicy().allows(f.memory) {
-			return SyncSkippedPolicy, nil
-		}
-		if err := f.saveLoaded(ctx); err != nil {
-			return SyncFailed, err
-		}
-		return SyncWritten, nil
-	})
 }

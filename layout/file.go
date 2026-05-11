@@ -215,3 +215,35 @@ func joinDeclaredPath(base string, parts ...string) string {
 	}
 	return filepath.Join(append([]string{base}, parts...)...)
 }
+
+// Report
+
+func (f File) ensureDeepReport(ctx Context) error {
+	return reportEnsure(ctx, f.Path(), func() error {
+		return f.Ensure(ctx)
+	})
+}
+
+func (f File) loadReport(ctx Context) error {
+	return reportLoad(ctx, f.Path(), func() (ResultCode, error) {
+		return LoadNotApplicable, nil
+	})
+}
+
+func (f File) discoverReport(ctx Context) error {
+	return reportDiscover(ctx, f.Path(), func() (ResultCode, error) {
+		return DiscoverNotApplicable, nil
+	})
+}
+
+func (f File) scanReport(ctx Context) error {
+	return reportScan(ctx, f.Path(), func() (ResultCode, error) {
+		return ScanNotApplicable, nil
+	})
+}
+
+func (f File) syncReport(ctx Context) error {
+	return reportSync(ctx, f.Path(), func() (ResultCode, error) {
+		return SyncNotApplicable, nil
+	})
+}

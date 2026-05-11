@@ -170,3 +170,112 @@ type Defaulter interface {
 type DeepDefaulter interface {
 	DefaultDeep() error
 }
+
+// Report
+
+type Reporter interface {
+	Record(Entry)
+}
+
+type Operation uint8
+
+const (
+	OpEnsure Operation = iota + 1
+	OpLoad
+	OpDiscover
+	OpScan
+	OpSync
+)
+
+func (op Operation) String() string {
+	switch op {
+	case OpEnsure:
+		return "ensure"
+	case OpLoad:
+		return "load"
+	case OpDiscover:
+		return "discover"
+	case OpScan:
+		return "scan"
+	case OpSync:
+		return "sync"
+	default:
+		return "unknown"
+	}
+}
+
+type ResultCode uint8
+
+const (
+	EnsureEnsured ResultCode = iota + 1
+	EnsureFailed
+)
+
+const (
+	LoadLoaded ResultCode = iota + 16
+	LoadMissing
+	LoadTraversed
+	LoadNotApplicable
+	LoadFailed
+)
+
+const (
+	DiscoverPresent ResultCode = iota + 32
+	DiscoverMissing
+	DiscoverTraversed
+	DiscoverNotApplicable
+	DiscoverFailed
+)
+
+const (
+	ScanPresent ResultCode = iota + 48
+	ScanMissing
+	ScanTraversed
+	ScanNotApplicable
+	ScanFailed
+)
+
+const (
+	SyncWritten ResultCode = iota + 64
+	SyncTraversed
+	SyncNotApplicable
+	SyncSkippedNoContent
+	SyncSkippedPolicy
+	SyncFailed
+)
+
+type reportDeepEnsurer interface {
+	ensureDeepReport(Context) error
+}
+
+type reportDeepLoader interface {
+	loadDeepReport(Context) error
+}
+
+type reportLoader interface {
+	loadReport(Context) error
+}
+
+type reportDeepDiscoverer interface {
+	discoverDeepReport(Context) error
+}
+
+type reportDiscoverer interface {
+	discoverReport(Context) error
+}
+
+type reportDeepScanner interface {
+	scanDeepReport(Context) error
+}
+
+type reportScanner interface {
+	scanReport(Context) error
+}
+
+type reportDeepSyncer interface {
+	syncDeepReport(Context) error
+}
+
+type reportSyncer interface {
+	syncReport(Context) error
+}

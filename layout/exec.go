@@ -136,3 +136,35 @@ func (e Exec) executableMode(ctx Context) os.FileMode {
 	}
 	return mode
 }
+
+// Report
+
+func (e Exec) ensureDeepReport(ctx Context) error {
+	return reportEnsure(ctx, e.Path(), func() error {
+		return e.Ensure(ctx)
+	})
+}
+
+func (e Exec) loadReport(ctx Context) error {
+	return reportLoad(ctx, e.Path(), func() (ResultCode, error) {
+		return LoadNotApplicable, nil
+	})
+}
+
+func (e Exec) discoverReport(ctx Context) error {
+	return reportDiscover(ctx, e.Path(), func() (ResultCode, error) {
+		return DiscoverNotApplicable, nil
+	})
+}
+
+func (e Exec) scanReport(ctx Context) error {
+	return reportScan(ctx, e.Path(), func() (ResultCode, error) {
+		return ScanNotApplicable, nil
+	})
+}
+
+func (e Exec) syncReport(ctx Context) error {
+	return reportSync(ctx, e.Path(), func() (ResultCode, error) {
+		return SyncNotApplicable, nil
+	})
+}

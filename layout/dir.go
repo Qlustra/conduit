@@ -166,3 +166,35 @@ func (d *Dir) setDeclaredPath(path string) {
 func (d Dir) Ensure(ctx Context) error {
 	return os.MkdirAll(d.path, ctx.DirMode)
 }
+
+// Report
+
+func (d Dir) ensureDeepReport(ctx Context) error {
+	return reportEnsure(ctx, d.Path(), func() error {
+		return d.Ensure(ctx)
+	})
+}
+
+func (d Dir) loadReport(ctx Context) error {
+	return reportLoad(ctx, d.Path(), func() (ResultCode, error) {
+		return LoadNotApplicable, nil
+	})
+}
+
+func (d Dir) discoverReport(ctx Context) error {
+	return reportDiscover(ctx, d.Path(), func() (ResultCode, error) {
+		return DiscoverNotApplicable, nil
+	})
+}
+
+func (d Dir) scanReport(ctx Context) error {
+	return reportScan(ctx, d.Path(), func() (ResultCode, error) {
+		return ScanNotApplicable, nil
+	})
+}
+
+func (d Dir) syncReport(ctx Context) error {
+	return reportSync(ctx, d.Path(), func() (ResultCode, error) {
+		return SyncNotApplicable, nil
+	})
+}
