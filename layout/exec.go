@@ -122,8 +122,13 @@ func (e Exec) CombinedOutput(ctx context.Context, opts RunOptions) ([]byte, erro
 
 // Ensure
 
-func (e Exec) EnsureDeep(ctx Context) error {
-	return e.Ensure(ctx)
+func (e Exec) EnsureDeep(ctx Context) (ResultCode, error) {
+	err := e.Ensure(ctx)
+	result := EnsureEnsured
+	if err != nil {
+		result = EnsureFailed
+	}
+	return result, err
 }
 
 func (e Exec) executableMode(ctx Context) os.FileMode {
@@ -135,36 +140,4 @@ func (e Exec) executableMode(ctx Context) os.FileMode {
 		mode |= 0o111
 	}
 	return mode
-}
-
-// Report
-
-func (e Exec) ensureDeepReport(ctx Context) error {
-	return reportEnsure(ctx, e.Path(), func() error {
-		return e.Ensure(ctx)
-	})
-}
-
-func (e Exec) loadReport(ctx Context) error {
-	return reportLoad(ctx, e.Path(), func() (ResultCode, error) {
-		return LoadNotApplicable, nil
-	})
-}
-
-func (e Exec) discoverReport(ctx Context) error {
-	return reportDiscover(ctx, e.Path(), func() (ResultCode, error) {
-		return DiscoverNotApplicable, nil
-	})
-}
-
-func (e Exec) scanReport(ctx Context) error {
-	return reportScan(ctx, e.Path(), func() (ResultCode, error) {
-		return ScanNotApplicable, nil
-	})
-}
-
-func (e Exec) syncReport(ctx Context) error {
-	return reportSync(ctx, e.Path(), func() (ResultCode, error) {
-		return SyncNotApplicable, nil
-	})
 }

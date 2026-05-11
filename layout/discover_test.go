@@ -71,7 +71,7 @@ func TestDiscoverDeepDiscoversSlotEntriesWithoutLoadingContent(t *testing.T) {
 		t.Fatalf("os.WriteFile() error = %v", err)
 	}
 
-	if err := DiscoverDeep(&layout, DefaultContext); err != nil {
+	if _, err := DiscoverDeep(&layout, DefaultContext); err != nil {
 		t.Fatalf("DiscoverDeep() error = %v", err)
 	}
 

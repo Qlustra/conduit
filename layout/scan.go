@@ -9,57 +9,42 @@ import (
 // Scans filesystem according to in-memory semantic structures and compares observed state.
 // Observes both sides without mutating either.
 // Observational, filesystem presence -> handler state/cache metadata
-func ScanDeep(target any, ctx Context) error {
+func ScanDeep(target any, ctx Context) (ResultCode, error) {
 	if target == nil {
-		return fmt.Errorf("target must not be nil")
+		return ScanFailed, fmt.Errorf("target must not be nil")
 	}
 
 	return scanDeepValue(reflect.ValueOf(target), ctx)
 }
 
-func scanDeepValue(v reflect.Value, ctx Context) error {
+func scanDeepValue(v reflect.Value, ctx Context) (ResultCode, error) {
 	if !v.IsValid() {
-		return nil
+		return 0, nil
 	}
 
 	for v.Kind() == reflect.Interface || v.Kind() == reflect.Pointer {
 		if v.IsNil() {
-			return nil
-		}
-
-		if v.Type().Implements(reflect.TypeOf((*reportDeepScanner)(nil)).Elem()) {
-			return v.Interface().(reportDeepScanner).scanDeepReport(ctx)
+			return 0, nil
 		}
 
 		if v.Type().Implements(deepScannerType) {
+			result, err := v.Interface().(DeepScanner).ScanDeep(ctx)
 			if path, ok := pathOf(v.Interface()); ok {
-				return reportScan(ctx, path, func() (ResultCode, error) {
-					err := v.Interface().(DeepScanner).ScanDeep(ctx)
-					if err != nil {
-						return ScanFailed, err
-					}
-					return ScanTraversed, nil
-				})
+				return recordResult(ctx, OpScan, path, result, err)
 			}
-			return v.Interface().(DeepScanner).ScanDeep(ctx)
-		}
-
-		if v.Type().Implements(reflect.TypeOf((*reportScanner)(nil)).Elem()) {
-			return v.Interface().(reportScanner).scanReport(ctx)
+			return result, err
 		}
 
 		if v.Type().Implements(scannerType) {
-			if path, ok := pathOf(v.Interface()); ok {
-				return reportScan(ctx, path, func() (ResultCode, error) {
-					state, err := v.Interface().(Scannable).Scan()
-					if err != nil {
-						return ScanFailed, err
-					}
-					return resultFromDiskState(ScanPresent, ScanMissing, ScanTraversed, state), nil
-				})
+			state, err := v.Interface().(Scannable).Scan()
+			result := resultFromDiskState(ScanPresent, ScanMissing, ScanTraversed, state)
+			if err != nil {
+				result = ScanFailed
 			}
-			_, err := v.Interface().(Scannable).Scan()
-			return err
+			if path, ok := pathOf(v.Interface()); ok {
+				return recordResult(ctx, OpScan, path, result, err)
+			}
+			return result, err
 		}
 
 		v = v.Elem()
@@ -68,44 +53,34 @@ func scanDeepValue(v reflect.Value, ctx Context) error {
 	if v.CanAddr() {
 		ptr := v.Addr()
 
-		if ptr.Type().Implements(reflect.TypeOf((*reportDeepScanner)(nil)).Elem()) {
-			return ptr.Interface().(reportDeepScanner).scanDeepReport(ctx)
-		}
-
 		if ptr.Type().Implements(deepScannerType) {
+			result, err := ptr.Interface().(DeepScanner).ScanDeep(ctx)
 			if path, ok := pathOf(ptr.Interface()); ok {
-				return reportScan(ctx, path, func() (ResultCode, error) {
-					err := ptr.Interface().(DeepScanner).ScanDeep(ctx)
-					if err != nil {
-						return ScanFailed, err
-					}
-					return ScanTraversed, nil
-				})
+				return recordResult(ctx, OpScan, path, result, err)
 			}
-			return ptr.Interface().(DeepScanner).ScanDeep(ctx)
-		}
-
-		if ptr.Type().Implements(reflect.TypeOf((*reportScanner)(nil)).Elem()) {
-			return ptr.Interface().(reportScanner).scanReport(ctx)
+			return result, err
 		}
 
 		if ptr.Type().Implements(scannerType) {
-			if path, ok := pathOf(ptr.Interface()); ok {
-				return reportScan(ctx, path, func() (ResultCode, error) {
-					state, err := ptr.Interface().(Scannable).Scan()
-					if err != nil {
-						return ScanFailed, err
-					}
-					return resultFromDiskState(ScanPresent, ScanMissing, ScanTraversed, state), nil
-				})
+			state, err := ptr.Interface().(Scannable).Scan()
+			result := resultFromDiskState(ScanPresent, ScanMissing, ScanTraversed, state)
+			if err != nil {
+				result = ScanFailed
 			}
-			_, err := ptr.Interface().(Scannable).Scan()
-			return err
+			if path, ok := pathOf(ptr.Interface()); ok {
+				return recordResult(ctx, OpScan, path, result, err)
+			}
+			return result, err
 		}
 	}
 
+	switch v.Type() {
+	case dirType, fileType:
+		return recordResult(ctx, OpScan, v.Interface().(Pather).Path(), ScanNotApplicable, nil)
+	}
+
 	if v.Kind() != reflect.Struct {
-		return nil
+		return 0, nil
 	}
 
 	t := v.Type()
@@ -121,10 +96,10 @@ func scanDeepValue(v reflect.Value, ctx Context) error {
 			continue
 		}
 
-		if err := scanDeepValue(field, ctx); err != nil {
-			return fmt.Errorf("field %q: %w", sf.Name, err)
+		if _, err := scanDeepValue(field, ctx); err != nil {
+			return ScanFailed, fmt.Errorf("field %q: %w", sf.Name, err)
 		}
 	}
 
-	return nil
+	return ScanTraversed, nil
 }

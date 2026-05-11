@@ -111,6 +111,31 @@ Notable behavior:
 - `Result` is interpreted relative to `Op`
 - `Err` is populated on failures
 
+### `Operation`
+
+```go
+type Operation uint8
+```
+
+Constants:
+
+- `OpEnsure`
+- `OpLoad`
+- `OpDiscover`
+- `OpScan`
+- `OpSync`
+
+### `ResultCode`
+
+```go
+type ResultCode uint8
+```
+
+Description:
+
+- operation-specific outcome code returned by deep operations and recorded in reports
+- interpret values relative to the operation that produced them
+
 ### `SyncPolicy`
 
 ```go
@@ -157,7 +182,7 @@ Notable behavior:
 ### `EnsureDeep`
 
 ```go
-func EnsureDeep(target any, ctx Context) error
+func EnsureDeep(target any, ctx Context) (conduit.ResultCode, error)
 ```
 
 Description:
@@ -168,6 +193,11 @@ Arguments:
 
 - `target`: composed struct or node tree
 - `ctx`: directory and file permission settings
+
+Returns:
+
+- `ResultCode`: semantic ensure outcome for the visited root
+- `error`: first failure encountered during traversal
 
 Notable behavior:
 
@@ -180,7 +210,7 @@ Notable behavior:
 ### `LoadDeep`
 
 ```go
-func LoadDeep(target any, ctx Context) error
+func LoadDeep(target any, ctx Context) (conduit.ResultCode, error)
 ```
 
 Description:
@@ -191,6 +221,11 @@ Arguments:
 
 - `target`: composed struct or node tree
 - `ctx`: passed through to deep loaders
+
+Returns:
+
+- `ResultCode`: semantic load outcome for the visited root
+- `error`: first failure encountered during traversal
 
 Notable behavior:
 
@@ -203,7 +238,7 @@ Notable behavior:
 ### `DiscoverDeep`
 
 ```go
-func DiscoverDeep(target any, ctx Context) error
+func DiscoverDeep(target any, ctx Context) (conduit.ResultCode, error)
 ```
 
 Description:
@@ -214,6 +249,11 @@ Arguments:
 
 - `target`: composed struct or node tree
 - `ctx`: passed through to deep discoverers
+
+Returns:
+
+- `ResultCode`: semantic discover outcome for the visited root
+- `error`: first failure encountered during traversal
 
 Notable behavior:
 
@@ -227,7 +267,7 @@ Notable behavior:
 ### `SyncDeep`
 
 ```go
-func SyncDeep(target any, ctx Context) error
+func SyncDeep(target any, ctx Context) (conduit.ResultCode, error)
 ```
 
 Description:
@@ -238,6 +278,11 @@ Arguments:
 
 - `target`: composed struct or node tree
 - `ctx`: directory and file permission settings
+
+Returns:
+
+- `ResultCode`: semantic sync outcome for the visited root
+- `error`: first failure encountered during traversal
 
 Notable behavior:
 
@@ -252,7 +297,7 @@ Notable behavior:
 ### `ScanDeep`
 
 ```go
-func ScanDeep(target any, ctx Context) error
+func ScanDeep(target any, ctx Context) (conduit.ResultCode, error)
 ```
 
 Description:
@@ -263,6 +308,11 @@ Arguments:
 
 - `target`: composed struct or node tree
 - `ctx`: passed through to deep scanners
+
+Returns:
+
+- `ResultCode`: semantic scan outcome for the visited root
+- `error`: first failure encountered during traversal
 
 Notable behavior:
 

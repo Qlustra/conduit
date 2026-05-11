@@ -255,50 +255,14 @@ func (r *Report) RenderTree() string {
 
 // Helpers
 
-func reportEnsure(ctx Context, path string, fn func() error) error {
-	err := fn()
-	result := EnsureEnsured
-	if err != nil {
-		result = EnsureFailed
-	}
-	recordEntry(ctx, Entry{Op: OpEnsure, Path: path, Result: result, Err: err})
-	return err
-}
-
-func reportLoad(ctx Context, path string, fn func() (ResultCode, error)) error {
-	result, err := fn()
-	if err != nil && result == 0 {
-		result = LoadFailed
-	}
-	recordEntry(ctx, Entry{Op: OpLoad, Path: path, Result: result, Err: err})
-	return err
-}
-
-func reportDiscover(ctx Context, path string, fn func() (ResultCode, error)) error {
-	result, err := fn()
-	if err != nil && result == 0 {
-		result = DiscoverFailed
-	}
-	recordEntry(ctx, Entry{Op: OpDiscover, Path: path, Result: result, Err: err})
-	return err
-}
-
-func reportScan(ctx Context, path string, fn func() (ResultCode, error)) error {
-	result, err := fn()
-	if err != nil && result == 0 {
-		result = ScanFailed
-	}
-	recordEntry(ctx, Entry{Op: OpScan, Path: path, Result: result, Err: err})
-	return err
-}
-
-func reportSync(ctx Context, path string, fn func() (ResultCode, error)) error {
-	result, err := fn()
-	if err != nil && result == 0 {
-		result = SyncFailed
-	}
-	recordEntry(ctx, Entry{Op: OpSync, Path: path, Result: result, Err: err})
-	return err
+func recordResult(ctx Context, op Operation, path string, result ResultCode, err error) (ResultCode, error) {
+	recordEntry(ctx, Entry{
+		Op:     op,
+		Path:   path,
+		Result: result,
+		Err:    err,
+	})
+	return result, err
 }
 
 func recordEntry(ctx Context, entry Entry) {
@@ -324,6 +288,25 @@ func resultFromDiskState(present ResultCode, missing ResultCode, fallback Result
 		return missing
 	default:
 		return fallback
+	}
+}
+
+func resultForDiscoverFromScanResult(result ResultCode, err error) ResultCode {
+	if err != nil {
+		return DiscoverFailed
+	}
+
+	switch result {
+	case ScanPresent:
+		return DiscoverPresent
+	case ScanMissing:
+		return DiscoverMissing
+	case ScanTraversed:
+		return DiscoverTraversed
+	case ScanNotApplicable:
+		return DiscoverNotApplicable
+	default:
+		return DiscoverTraversed
 	}
 }
 

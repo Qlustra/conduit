@@ -94,7 +94,7 @@ There are three ways to write typed files:
 
 - `Write(value, ctx)` marshals and writes a supplied value directly
 - `Save(ctx)` writes the cached value
-- `Sync(ctx)` writes the cached value when `ctx.SyncPolicy` allows the current memory state, or does nothing otherwise
+- `Sync(ctx)` writes the cached value when `ctx.SyncPolicy` allows the current memory state, or returns a skip result otherwise
 
 Example:
 
@@ -110,7 +110,7 @@ err := service.YAML.Save(conduit.DefaultContext)
 Or as part of a larger layout:
 
 ```go
-err := conduit.SyncDeep(&workspace, conduit.DefaultContext)
+_, err := conduit.SyncDeep(&workspace, conduit.DefaultContext)
 ```
 
 To avoid rewriting already-synced or freshly-loaded files during a larger pass:
@@ -119,7 +119,7 @@ To avoid rewriting already-synced or freshly-loaded files during a larger pass:
 ctx := conduit.DefaultContext
 ctx.SyncPolicy = conduit.SyncIfDirty
 
-err := conduit.SyncDeep(&workspace, ctx)
+_, err := conduit.SyncDeep(&workspace, ctx)
 ```
 
 ## State model
@@ -214,7 +214,8 @@ if err := conduit.RenderDeep(&workspace); err != nil {
 	return err
 }
 
-return conduit.SyncDeep(&workspace, conduit.DefaultContext)
+_, err := conduit.SyncDeep(&workspace, conduit.DefaultContext)
+return err
 ```
 
 This keeps rendering explicit:

@@ -10,7 +10,7 @@ Goal: create the filesystem contract first, then write initial config.
 var ws Workspace
 
 _ = conduit.Compose("/srv/workspace", &ws)
-_ = conduit.EnsureDeep(&ws, conduit.DefaultContext)
+_, _ = conduit.EnsureDeep(&ws, conduit.DefaultContext)
 
 svc, _ := ws.Services.Add("api", conduit.DefaultContext)
 svc.Config.Set(ServiceConfig{
@@ -18,7 +18,7 @@ svc.Config.Set(ServiceConfig{
 	Port: 8080,
 })
 
-_ = conduit.SyncDeep(&ws, conduit.DefaultContext)
+_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
 ```
 
 Why the sequence matters:
@@ -36,7 +36,7 @@ Goal: avoid rewriting typed files that are already loaded or already synced.
 ctx := conduit.DefaultContext
 ctx.SyncPolicy = conduit.SyncIfDirty
 
-_ = conduit.SyncDeep(&ws, ctx)
+_, _ = conduit.SyncDeep(&ws, ctx)
 ```
 
 Why the policy matters:
@@ -53,14 +53,14 @@ Goal: treat disk as authoritative, change one field, then write it back.
 var ws Workspace
 
 _ = conduit.Compose("/srv/workspace", &ws)
-_ = conduit.LoadDeep(&ws, conduit.DefaultContext)
+_, _ = conduit.LoadDeep(&ws, conduit.DefaultContext)
 
 svc := ws.Services.MustAt("api")
 cfg := svc.Config.MustGet()
 cfg.Port = 9090
 svc.Config.Set(cfg)
 
-_ = conduit.SyncDeep(&ws, conduit.DefaultContext)
+_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
 ```
 
 This is the main "edit existing content" path.
@@ -73,7 +73,7 @@ Goal: check whether known files exist without replacing in-memory content.
 svc := ws.Services.MustAt("api")
 svc.Config.Set(ServiceConfig{Name: "preview", Port: 3000})
 
-_ = conduit.ScanDeep(svc, conduit.DefaultContext)
+_, _ = conduit.ScanDeep(svc, conduit.DefaultContext)
 ```
 
 After `ScanDeep`:
@@ -92,7 +92,7 @@ Goal: find existing service directories without loading their typed files.
 var ws Workspace
 
 _ = conduit.Compose("/srv/workspace", &ws)
-_ = conduit.DiscoverDeep(&ws, conduit.DefaultContext)
+_, _ = conduit.DiscoverDeep(&ws, conduit.DefaultContext)
 
 for _, name := range ws.Services.Keys() {
 	svc := ws.Services.MustAt(name)
@@ -110,8 +110,8 @@ Goal: enumerate existing services first, then load only when you choose to.
 var ws Workspace
 
 _ = conduit.Compose("/srv/workspace", &ws)
-_ = conduit.DiscoverDeep(&ws, conduit.DefaultContext)
-_ = conduit.LoadDeep(&ws, conduit.DefaultContext)
+_, _ = conduit.DiscoverDeep(&ws, conduit.DefaultContext)
+_, _ = conduit.LoadDeep(&ws, conduit.DefaultContext)
 
 for _, name := range ws.Services.Keys() {
 	svc := ws.Services.MustAt(name)
@@ -134,7 +134,7 @@ _ = svc.Config.LoadOrInit(ServiceConfig{
 	Port: 7000,
 })
 
-_ = svc.Config.Sync(conduit.DefaultContext)
+_, _ = svc.Config.Sync(conduit.DefaultContext)
 ```
 
 This avoids writing a file unless you choose to persist the default.

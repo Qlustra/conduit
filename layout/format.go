@@ -168,14 +168,17 @@ func (f *Format[T, C]) Discover() (DiskState, error) {
 
 // Sync
 
-func (f *Format[T, C]) Sync(ctx Context) error {
+func (f *Format[T, C]) Sync(ctx Context) (ResultCode, error) {
 	if f.content == nil {
-		return nil
+		return SyncSkippedNoContent, nil
 	}
 	if !ctx.syncPolicy().allows(f.memory) {
-		return nil
+		return SyncSkippedPolicy, nil
 	}
-	return f.saveLoaded(ctx)
+	if err := f.saveLoaded(ctx); err != nil {
+		return SyncFailed, err
+	}
+	return SyncWritten, nil
 }
 
 // States
@@ -217,60 +220,4 @@ func (f *Format[T, C]) Scan() (DiskState, error) {
 		return f.disk, nil
 	}
 	return f.disk, err
-}
-
-// Report
-
-func (f *Format[T, C]) ensureDeepReport(ctx Context) error {
-	return reportEnsure(ctx, f.Path(), func() error {
-		return f.File.Ensure(ctx)
-	})
-}
-
-func (f *Format[T, C]) loadReport(ctx Context) error {
-	return reportLoad(ctx, f.Path(), func() (ResultCode, error) {
-		loaded, err := f.Load()
-		if err != nil {
-			return LoadFailed, err
-		}
-		if loaded {
-			return LoadLoaded, nil
-		}
-		return LoadMissing, nil
-	})
-}
-
-func (f *Format[T, C]) discoverReport(ctx Context) error {
-	return reportDiscover(ctx, f.Path(), func() (ResultCode, error) {
-		state, err := f.Discover()
-		if err != nil {
-			return DiscoverFailed, err
-		}
-		return resultFromDiskState(DiscoverPresent, DiscoverMissing, DiscoverTraversed, state), nil
-	})
-}
-
-func (f *Format[T, C]) scanReport(ctx Context) error {
-	return reportScan(ctx, f.Path(), func() (ResultCode, error) {
-		state, err := f.Scan()
-		if err != nil {
-			return ScanFailed, err
-		}
-		return resultFromDiskState(ScanPresent, ScanMissing, ScanTraversed, state), nil
-	})
-}
-
-func (f *Format[T, C]) syncReport(ctx Context) error {
-	return reportSync(ctx, f.Path(), func() (ResultCode, error) {
-		if f.content == nil {
-			return SyncSkippedNoContent, nil
-		}
-		if !ctx.syncPolicy().allows(f.memory) {
-			return SyncSkippedPolicy, nil
-		}
-		if err := f.saveLoaded(ctx); err != nil {
-			return SyncFailed, err
-		}
-		return SyncWritten, nil
-	})
 }

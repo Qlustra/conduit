@@ -97,7 +97,7 @@ func TestTextTemplateLoadAndSyncMirrorFormatBehavior(t *testing.T) {
 	}
 
 	f.Set("memory")
-	if err := f.Sync(DefaultContext); err != nil {
+	if _, err := f.Sync(DefaultContext); err != nil {
 		t.Fatalf("Sync() error = %v", err)
 	}
 	if got := f.MemoryState(); got != MemorySynced {

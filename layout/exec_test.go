@@ -55,7 +55,7 @@ func TestExecEnsureDeepUsesExecModeForExistingFiles(t *testing.T) {
 	}
 
 	ctx := Context{DirMode: 0o755, FileMode: 0o644, ExecMode: 0o751}
-	if err := EnsureDeep(&layout, ctx); err != nil {
+	if _, err := EnsureDeep(&layout, ctx); err != nil {
 		t.Fatalf("EnsureDeep() error = %v", err)
 	}
 

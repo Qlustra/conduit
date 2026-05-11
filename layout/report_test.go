@@ -52,7 +52,7 @@ func TestEnsureDeepReportsVisitedNodes(t *testing.T) {
 	ctx := DefaultContext
 	ctx.Reporter = &report
 
-	if err := EnsureDeep(&layout, ctx); err != nil {
+	if _, err := EnsureDeep(&layout, ctx); err != nil {
 		t.Fatalf("EnsureDeep() error = %v", err)
 	}
 
@@ -72,10 +72,10 @@ func TestEnsureDeepHandlesBareDirAndFileValues(t *testing.T) {
 	ctx := DefaultContext
 	ctx.Reporter = &report
 
-	if err := EnsureDeep(dir, ctx); err != nil {
+	if _, err := EnsureDeep(dir, ctx); err != nil {
 		t.Fatalf("EnsureDeep(dir) error = %v", err)
 	}
-	if err := EnsureDeep(file, ctx); err != nil {
+	if _, err := EnsureDeep(file, ctx); err != nil {
 		t.Fatalf("EnsureDeep(file) error = %v", err)
 	}
 
@@ -129,7 +129,7 @@ func TestLoadDeepReportsTypedRawAndSlotNodes(t *testing.T) {
 	ctx := DefaultContext
 	ctx.Reporter = &report
 
-	if err := LoadDeep(&layout, ctx); err != nil {
+	if _, err := LoadDeep(&layout, ctx); err != nil {
 		t.Fatalf("LoadDeep() error = %v", err)
 	}
 
@@ -154,7 +154,7 @@ func TestDiscoverAndScanReportStates(t *testing.T) {
 		ctx := DefaultContext
 		ctx.Reporter = &report
 
-		if err := DiscoverDeep(&f, ctx); err != nil {
+		if _, err := DiscoverDeep(&f, ctx); err != nil {
 			t.Fatalf("DiscoverDeep() error = %v", err)
 		}
 
@@ -171,7 +171,7 @@ func TestDiscoverAndScanReportStates(t *testing.T) {
 		ctx := DefaultContext
 		ctx.Reporter = &report
 
-		if err := ScanDeep(&f, ctx); err != nil {
+		if _, err := ScanDeep(&f, ctx); err != nil {
 			t.Fatalf("ScanDeep() error = %v", err)
 		}
 
@@ -191,7 +191,7 @@ func TestSyncDeepReportsWrittenAndSkippedStates(t *testing.T) {
 		ctx := DefaultContext
 		ctx.Reporter = &report
 
-		if err := SyncDeep(&f, ctx); err != nil {
+		if _, err := SyncDeep(&f, ctx); err != nil {
 			t.Fatalf("SyncDeep() error = %v", err)
 		}
 
@@ -208,7 +208,7 @@ func TestSyncDeepReportsWrittenAndSkippedStates(t *testing.T) {
 		ctx := DefaultContext
 		ctx.Reporter = &report
 
-		if err := SyncDeep(&f, ctx); err != nil {
+		if _, err := SyncDeep(&f, ctx); err != nil {
 			t.Fatalf("SyncDeep() error = %v", err)
 		}
 
@@ -233,7 +233,7 @@ func TestSyncDeepReportsWrittenAndSkippedStates(t *testing.T) {
 		ctx.SyncPolicy = SyncIfDirty
 		ctx.Reporter = &report
 
-		if err := SyncDeep(&f, ctx); err != nil {
+		if _, err := SyncDeep(&f, ctx); err != nil {
 			t.Fatalf("SyncDeep() error = %v", err)
 		}
 
@@ -268,7 +268,7 @@ func TestLoadDeepReportStopsOnFirstError(t *testing.T) {
 	ctx := DefaultContext
 	ctx.Reporter = &report
 
-	err := LoadDeep(&layout, ctx)
+	_, err := LoadDeep(&layout, ctx)
 	if err == nil {
 		t.Fatal("LoadDeep() error = nil, want non-nil")
 	}

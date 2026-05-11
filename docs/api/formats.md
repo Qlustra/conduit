@@ -61,7 +61,7 @@ Content methods:
 - `Discover()`: refreshes disk-state metadata without replacing in-memory content and returns the observed state value
 - `HasContent() bool`: reports whether a value is currently cached
 - `Unload()`: clears cached content and resets memory state to unknown
-- `Sync(ctx Context) error`: writes cached content when present and allowed by `ctx.SyncPolicy`, otherwise no-op
+- `Sync(ctx Context) (ResultCode, error)`: writes cached content when present and allowed by `ctx.SyncPolicy`, otherwise reports why it skipped
 - `DiskState()`: returns current disk-state metadata
 - `MemoryState()`: returns current memory-state metadata
 - `HasKnownDiskState() bool`: reports whether disk state is not unknown
@@ -75,8 +75,8 @@ Notable behavior:
 - `Set` does not write to disk
 - `SetDefault` returns `false` and leaves content unchanged when content is already cached
 - `Save` fails when no content is loaded
-- `Sync` is a no-op when no content is loaded
-- `Sync` also skips writes when `ctx.SyncPolicy` excludes the current memory state
+- `Sync` returns `SyncSkippedNoContent` when no content is loaded
+- `Sync` returns `SyncSkippedPolicy` when `ctx.SyncPolicy` excludes the current memory state
 - `Load` on a missing file clears cached content, sets disk state to missing, and resets memory state to unknown
 - `Discover` updates disk state but preserves current cached content and memory state
 - `Scan` only updates disk state; it preserves current cached content and memory state

@@ -8,67 +8,65 @@ import (
 // EnsureDeep
 // Materializes declared structure.
 // Constructive, memory shape -> filesystem structure
-func EnsureDeep(target any, ctx Context) error {
+func EnsureDeep(target any, ctx Context) (ResultCode, error) {
 	if target == nil {
-		return fmt.Errorf("target must not be nil")
+		return EnsureFailed, fmt.Errorf("target must not be nil")
 	}
 
 	return ensureDeepValue(reflect.ValueOf(target), ctx)
 }
 
-func ensureDeepValue(v reflect.Value, ctx Context) error {
+func ensureDeepValue(v reflect.Value, ctx Context) (ResultCode, error) {
 	if !v.IsValid() {
-		return nil
+		return 0, nil
 	}
 
 	for v.Kind() == reflect.Interface || v.Kind() == reflect.Pointer {
 		if v.IsNil() {
-			return nil
-		}
-		if v.Type().Implements(reflect.TypeOf((*reportDeepEnsurer)(nil)).Elem()) {
-			return v.Interface().(reportDeepEnsurer).ensureDeepReport(ctx)
+			return 0, nil
 		}
 		if v.Type().Implements(deepEnsurerType) {
+			result, err := v.Interface().(DeepEnsurer).EnsureDeep(ctx)
 			if path, ok := pathOf(v.Interface()); ok {
-				return reportEnsure(ctx, path, func() error {
-					return v.Interface().(DeepEnsurer).EnsureDeep(ctx)
-				})
+				return recordResult(ctx, OpEnsure, path, result, err)
 			}
-			return v.Interface().(DeepEnsurer).EnsureDeep(ctx)
+			return result, err
 		}
 		v = v.Elem()
 	}
 
 	if v.CanAddr() {
 		ptr := v.Addr()
-		if ptr.Type().Implements(reflect.TypeOf((*reportDeepEnsurer)(nil)).Elem()) {
-			return ptr.Interface().(reportDeepEnsurer).ensureDeepReport(ctx)
-		}
 		if ptr.Type().Implements(deepEnsurerType) {
+			result, err := ptr.Interface().(DeepEnsurer).EnsureDeep(ctx)
 			if path, ok := pathOf(ptr.Interface()); ok {
-				return reportEnsure(ctx, path, func() error {
-					return ptr.Interface().(DeepEnsurer).EnsureDeep(ctx)
-				})
+				return recordResult(ctx, OpEnsure, path, result, err)
 			}
-			return ptr.Interface().(DeepEnsurer).EnsureDeep(ctx)
+			return result, err
 		}
 	}
 
 	switch v.Type() {
 	case dirType:
-		return reportEnsure(ctx, v.Interface().(Dir).Path(), func() error {
-			return v.Interface().(Dir).Ensure(ctx)
-		})
+		err := v.Interface().(Dir).Ensure(ctx)
+		result := EnsureEnsured
+		if err != nil {
+			result = EnsureFailed
+		}
+		return recordResult(ctx, OpEnsure, v.Interface().(Dir).Path(), result, err)
 
 	case fileType:
-		return reportEnsure(ctx, v.Interface().(File).Path(), func() error {
-			return v.Interface().(File).Ensure(ctx)
-		})
+		err := v.Interface().(File).Ensure(ctx)
+		result := EnsureEnsured
+		if err != nil {
+			result = EnsureFailed
+		}
+		return recordResult(ctx, OpEnsure, v.Interface().(File).Path(), result, err)
 	}
 
 	// If this is a struct that embeds Dir/File or wraps them, recurse into fields.
 	if v.Kind() != reflect.Struct {
-		return nil
+		return 0, nil
 	}
 
 	t := v.Type()
@@ -88,10 +86,10 @@ func ensureDeepValue(v reflect.Value, ctx Context) error {
 			continue
 		}
 
-		if err := ensureDeepValue(field, ctx); err != nil {
-			return fmt.Errorf("field %q: %w", sf.Name, err)
+		if _, err := ensureDeepValue(field, ctx); err != nil {
+			return EnsureFailed, fmt.Errorf("field %q: %w", sf.Name, err)
 		}
 	}
 
-	return nil
+	return EnsureEnsured, nil
 }

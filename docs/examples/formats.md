@@ -98,7 +98,7 @@ if !loaded {
 	})
 }
 
-_ = env.Settings.Sync(conduit.DefaultContext)
+_, _ = env.Settings.Sync(conduit.DefaultContext)
 ```
 
 Why TOML here:

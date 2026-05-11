@@ -281,11 +281,11 @@ Methods:
 - `Add(name string, ctx Context) (T, error)`: creates the child root on disk, composes the item, ensures its structure, and caches it
 - `Require(name string) (T, error)`: returns an item only when the child root already exists on disk
 - `Ensure(ctx Context) error`: ensures the slot root directory
-- `EnsureDeep(ctx Context) error`: ensures the slot root and all cached items
-- `DiscoverDeep(ctx Context) error`: discovers child directories on disk and scans them without loading typed content
-- `LoadDeep(ctx Context) error`: discovers child directories on disk and loads them
-- `ScanDeep(ctx Context) error`: scans only cached items
-- `SyncDeep(ctx Context) error`: ensures cached items, then syncs typed content within those items
+- `EnsureDeep(ctx Context) (ResultCode, error)`: ensures the slot root and all cached items
+- `DiscoverDeep(ctx Context) (ResultCode, error)`: discovers child directories on disk and scans them without loading typed content
+- `LoadDeep(ctx Context) (ResultCode, error)`: discovers child directories on disk and loads them
+- `ScanDeep(ctx Context) (ResultCode, error)`: scans only cached items
+- `SyncDeep(ctx Context) (ResultCode, error)`: ensures cached items, then syncs typed content within those items
 
 Notable behavior:
 

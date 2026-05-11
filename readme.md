@@ -51,7 +51,7 @@ func main() {
 	var app App
 
 	_ = conduit.Compose("/workspace/app", &app)
-	_ = conduit.EnsureDeep(&app, conduit.DefaultContext)
+	_, _ = conduit.EnsureDeep(&app, conduit.DefaultContext)
 
 	_ = app.Config.LoadOrInit(AppConfig{
 		Name: "billing",
@@ -62,7 +62,7 @@ func main() {
 	cfg.Port = 9000
 	app.Config.Set(cfg)
 
-	_ = conduit.SyncDeep(&app, conduit.DefaultContext)
+	_, _ = conduit.SyncDeep(&app, conduit.DefaultContext)
 }
 ```
 
@@ -81,7 +81,7 @@ _ = conduit.Compose("/workspace", &ws)
 
 app, _ := ws.Apps.Add("billing", conduit.DefaultContext)
 _ = app.Config.LoadOrInit(AppConfig{Name: "billing", Port: 8080})
-_ = conduit.SyncDeep(&ws, conduit.DefaultContext)
+_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
 ```
 
 Managed executables stay part of the layout and can be run through `Exec`:

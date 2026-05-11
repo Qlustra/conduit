@@ -18,7 +18,7 @@ Composition does not touch the filesystem. It only assigns paths to the declared
 `EnsureDeep(target, ctx)` materializes the declared structure on disk:
 
 ```go
-err := conduit.EnsureDeep(&ws, conduit.DefaultContext)
+_, err := conduit.EnsureDeep(&ws, conduit.DefaultContext)
 ```
 
 What it does:
@@ -41,7 +41,7 @@ For `Slot[T]`, only cached items are ensured. Use `slot.Add(name, ctx)` when you
 `LoadDeep(target, ctx)` reads filesystem content into the in-memory model:
 
 ```go
-err := conduit.LoadDeep(&ws, conduit.DefaultContext)
+_, err := conduit.LoadDeep(&ws, conduit.DefaultContext)
 ```
 
 What it does:
@@ -63,7 +63,7 @@ For a typed file, loading a missing file clears in-memory content and marks the 
 `DiscoverDeep(target, ctx)` discovers the declared layout from disk without loading typed file content:
 
 ```go
-err := conduit.DiscoverDeep(&ws, conduit.DefaultContext)
+_, err := conduit.DiscoverDeep(&ws, conduit.DefaultContext)
 ```
 
 What it does:
@@ -86,7 +86,7 @@ This makes `DiscoverDeep` the middle ground between `LoadDeep` and `ScanDeep`: i
 `SyncDeep(target, ctx)` writes sync-eligible in-memory typed content back to disk:
 
 ```go
-err := conduit.SyncDeep(&ws, conduit.DefaultContext)
+_, err := conduit.SyncDeep(&ws, conduit.DefaultContext)
 ```
 
 What it does:
@@ -102,14 +102,14 @@ What it does not do:
 - delete files or directories that are missing from memory
 - merge disk content with memory content
 
-For typed files, `Sync` is a no-op when no content is loaded or when the current memory state is excluded by `ctx.SyncPolicy`.
+For typed files, `Sync` returns a skipped result when no content is loaded or when the current memory state is excluded by `ctx.SyncPolicy`.
 
 ## Scan
 
 `ScanDeep(target, ctx)` refreshes disk-presence metadata for already composed items:
 
 ```go
-err := conduit.ScanDeep(&ws, conduit.DefaultContext)
+_, err := conduit.ScanDeep(&ws, conduit.DefaultContext)
 ```
 
 What it does:
@@ -125,6 +125,24 @@ What it does not do:
 - modify files on disk
 
 This makes `ScanDeep` useful for "is it there?" checks, not discovery.
+
+Every deep operation returns `(ResultCode, error)`.
+
+- `ResultCode` summarizes what happened at the visited root.
+- `error` preserves the existing fail-fast traversal behavior.
+- when `Context.Reporter` is set, per-path details are still collected into the report.
+
+Inspect a root-level result when you need it:
+
+```go
+result, err := conduit.SyncDeep(&ws, conduit.DefaultContext)
+if err != nil {
+	return err
+}
+if result == conduit.SyncSkippedPolicy {
+	// the root was visited, but nothing was written
+}
+```
 
 ## Context
 
@@ -171,7 +189,7 @@ var report conduit.Report
 ctx := conduit.DefaultContext
 ctx.Reporter = &report
 
-_ = conduit.LoadDeep(&ws, ctx)
+_, _ = conduit.LoadDeep(&ws, ctx)
 
 if report.HasErrors() {
 	// inspect report.Entries()
@@ -185,11 +203,11 @@ Bootstrap a new workspace:
 ```go
 var ws Workspace
 _ = conduit.Compose("/srv/workspace", &ws)
-_ = conduit.EnsureDeep(&ws, conduit.DefaultContext)
+_, _ = conduit.EnsureDeep(&ws, conduit.DefaultContext)
 
 svc, _ := ws.Services.Add("billing", conduit.DefaultContext)
 svc.Config.Set(ServiceConfig{Name: "billing", Port: 8080})
-_ = conduit.SyncDeep(&ws, conduit.DefaultContext)
+_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
 ```
 
 Sync only dirty typed content during a pass:
@@ -198,7 +216,7 @@ Sync only dirty typed content during a pass:
 ctx := conduit.DefaultContext
 ctx.SyncPolicy = conduit.SyncIfDirty
 
-_ = conduit.SyncDeep(&ws, ctx)
+_, _ = conduit.SyncDeep(&ws, ctx)
 ```
 
 Load an existing workspace, edit it, then persist:
@@ -206,7 +224,7 @@ Load an existing workspace, edit it, then persist:
 ```go
 var ws Workspace
 _ = conduit.Compose("/srv/workspace", &ws)
-_ = conduit.DiscoverDeep(&ws, conduit.DefaultContext)
+_, _ = conduit.DiscoverDeep(&ws, conduit.DefaultContext)
 ```
 
 Load discovered content into memory:
@@ -215,21 +233,21 @@ Load discovered content into memory:
 var ws Workspace
 
 _ = conduit.Compose("/srv/workspace", &ws)
-_ = conduit.LoadDeep(&ws, conduit.DefaultContext)
+_, _ = conduit.LoadDeep(&ws, conduit.DefaultContext)
 
 svc := ws.Services.MustAt("billing")
 cfg := svc.Config.MustGet()
 cfg.Port = 9000
 svc.Config.Set(cfg)
 
-_ = conduit.SyncDeep(&ws, conduit.DefaultContext)
+_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
 ```
 
 Check disk presence without loading content:
 
 ```go
 svc := ws.Services.MustAt("billing")
-_ = conduit.ScanDeep(svc, conduit.DefaultContext)
+_, _ = conduit.ScanDeep(svc, conduit.DefaultContext)
 ```
 
 The core rule is simple: Conduit never decides direction for you. You choose whether the next step is ensure, discover, load, sync, or scan, and you choose how aggressive sync should be for typed content.

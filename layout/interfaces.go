@@ -38,7 +38,7 @@ var (
 )
 
 type DeepEnsurer interface {
-	EnsureDeep(ctx Context) error
+	EnsureDeep(ctx Context) (ResultCode, error)
 }
 
 // Load
@@ -55,7 +55,7 @@ var (
 )
 
 type DeepLoader interface {
-	LoadDeep(ctx Context) error
+	LoadDeep(ctx Context) (ResultCode, error)
 }
 
 // Discover
@@ -70,7 +70,7 @@ type Discoverable interface {
 }
 
 type DeepDiscoverer interface {
-	DiscoverDeep(ctx Context) error
+	DiscoverDeep(ctx Context) (ResultCode, error)
 }
 
 // Sync
@@ -81,11 +81,11 @@ var (
 )
 
 type Syncer interface {
-	Sync(ctx Context) error
+	Sync(ctx Context) (ResultCode, error)
 }
 
 type DeepSyncer interface {
-	SyncDeep(ctx Context) error
+	SyncDeep(ctx Context) (ResultCode, error)
 }
 
 // Scan
@@ -130,7 +130,7 @@ type Scannable interface {
 }
 
 type DeepScanner interface {
-	ScanDeep(ctx Context) error
+	ScanDeep(ctx Context) (ResultCode, error)
 }
 
 // Render
@@ -243,39 +243,3 @@ const (
 	SyncSkippedPolicy
 	SyncFailed
 )
-
-type reportDeepEnsurer interface {
-	ensureDeepReport(Context) error
-}
-
-type reportDeepLoader interface {
-	loadDeepReport(Context) error
-}
-
-type reportLoader interface {
-	loadReport(Context) error
-}
-
-type reportDeepDiscoverer interface {
-	discoverDeepReport(Context) error
-}
-
-type reportDiscoverer interface {
-	discoverReport(Context) error
-}
-
-type reportDeepScanner interface {
-	scanDeepReport(Context) error
-}
-
-type reportScanner interface {
-	scanReport(Context) error
-}
-
-type reportDeepSyncer interface {
-	syncDeepReport(Context) error
-}
-
-type reportSyncer interface {
-	syncReport(Context) error
-}

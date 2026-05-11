@@ -71,7 +71,7 @@ func TestScanDeepScansCachedFieldsAndDoesNotDiscoverSlotEntries(t *testing.T) {
 		t.Fatalf("os.WriteFile() error = %v", err)
 	}
 
-	if err := ScanDeep(&layout, DefaultContext); err != nil {
+	if _, err := ScanDeep(&layout, DefaultContext); err != nil {
 		t.Fatalf("ScanDeep() error = %v", err)
 	}
 

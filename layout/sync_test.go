@@ -26,7 +26,7 @@ func TestFormatSaveAndSyncMarkSynced(t *testing.T) {
 		t.Fatalf("MemoryState() after Set = %v, want %v", got, MemoryDirty)
 	}
 
-	if err := f.Sync(DefaultContext); err != nil {
+	if _, err := f.Sync(DefaultContext); err != nil {
 		t.Fatalf("Sync() error = %v", err)
 	}
 	if got := f.MemoryState(); got != MemorySynced {
@@ -46,7 +46,7 @@ func TestFormatSyncWithoutContentIsNoop(t *testing.T) {
 	var f testMapFile
 	f.ComposePath(filepath.Join(t.TempDir(), "state.json"))
 
-	if err := f.Sync(DefaultContext); err != nil {
+	if _, err := f.Sync(DefaultContext); err != nil {
 		t.Fatalf("Sync() error = %v", err)
 	}
 	if _, err := os.Stat(f.Path()); !os.IsNotExist(err) {
@@ -70,7 +70,7 @@ func TestFormatSyncIfDirtySkipsLoadedState(t *testing.T) {
 	ctx := DefaultContext
 	ctx.SyncPolicy = SyncIfDirty
 
-	if err := f.Sync(ctx); err != nil {
+	if _, err := f.Sync(ctx); err != nil {
 		t.Fatalf("Sync() error = %v", err)
 	}
 	if got := f.MemoryState(); got != MemoryLoaded {
@@ -102,7 +102,7 @@ func TestFormatSyncIfUnsyncedWritesLoadedAndSkipsSynced(t *testing.T) {
 	ctx := DefaultContext
 	ctx.SyncPolicy = SyncIfUnsynced
 
-	if err := f.Sync(ctx); err != nil {
+	if _, err := f.Sync(ctx); err != nil {
 		t.Fatalf("Sync() error = %v", err)
 	}
 	if got := f.MemoryState(); got != MemorySynced {
@@ -110,7 +110,7 @@ func TestFormatSyncIfUnsyncedWritesLoadedAndSkipsSynced(t *testing.T) {
 	}
 
 	f.Set(map[string]string{"a": "dirty"})
-	if err := f.Sync(ctx); err != nil {
+	if _, err := f.Sync(ctx); err != nil {
 		t.Fatalf("Sync() after Set() error = %v", err)
 	}
 	if got := f.MemoryState(); got != MemorySynced {
@@ -125,7 +125,7 @@ func TestFormatSyncIfUnsyncedWritesLoadedAndSkipsSynced(t *testing.T) {
 		t.Fatalf("file contents after dirty Sync = %q, want %q", got, `{"a":"dirty"}`)
 	}
 
-	if err := f.Sync(ctx); err != nil {
+	if _, err := f.Sync(ctx); err != nil {
 		t.Fatalf("Sync() for synced state error = %v", err)
 	}
 	if got := f.MemoryState(); got != MemorySynced {
@@ -151,7 +151,7 @@ func TestFormatSyncDefaultsToRewriteWhenPolicyUnset(t *testing.T) {
 		FileMode: 0o644,
 	}
 
-	if err := f.Sync(ctx); err != nil {
+	if _, err := f.Sync(ctx); err != nil {
 		t.Fatalf("Sync() error = %v", err)
 	}
 	if got := f.MemoryState(); got != MemorySynced {

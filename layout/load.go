@@ -12,59 +12,44 @@ import (
 // - loads discovered typed files
 // - populates caches
 // - does not create missing files
-func LoadDeep(target any, ctx Context) error {
+func LoadDeep(target any, ctx Context) (ResultCode, error) {
 	if target == nil {
-		return fmt.Errorf("target must not be nil")
+		return LoadFailed, fmt.Errorf("target must not be nil")
 	}
 	return loadDeepValue(reflect.ValueOf(target), ctx)
 }
 
-func loadDeepValue(v reflect.Value, ctx Context) error {
+func loadDeepValue(v reflect.Value, ctx Context) (ResultCode, error) {
 	if !v.IsValid() {
-		return nil
+		return 0, nil
 	}
 
 	for v.Kind() == reflect.Interface || v.Kind() == reflect.Pointer {
 		if v.IsNil() {
-			return nil
-		}
-
-		if v.Type().Implements(reflect.TypeOf((*reportDeepLoader)(nil)).Elem()) {
-			return v.Interface().(reportDeepLoader).loadDeepReport(ctx)
+			return 0, nil
 		}
 
 		if v.Type().Implements(deepLoaderType) {
+			result, err := v.Interface().(DeepLoader).LoadDeep(ctx)
 			if path, ok := pathOf(v.Interface()); ok {
-				return reportLoad(ctx, path, func() (ResultCode, error) {
-					err := v.Interface().(DeepLoader).LoadDeep(ctx)
-					if err != nil {
-						return LoadFailed, err
-					}
-					return LoadTraversed, nil
-				})
+				return recordResult(ctx, OpLoad, path, result, err)
 			}
-			return v.Interface().(DeepLoader).LoadDeep(ctx)
-		}
-
-		if v.Type().Implements(reflect.TypeOf((*reportLoader)(nil)).Elem()) {
-			return v.Interface().(reportLoader).loadReport(ctx)
+			return result, err
 		}
 
 		if v.Type().Implements(loaderType) {
-			if path, ok := pathOf(v.Interface()); ok {
-				return reportLoad(ctx, path, func() (ResultCode, error) {
-					loaded, err := v.Interface().(Loadable).Load()
-					if err != nil {
-						return LoadFailed, err
-					}
-					if loaded {
-						return LoadLoaded, nil
-					}
-					return LoadMissing, nil
-				})
+			loaded, err := v.Interface().(Loadable).Load()
+			result := LoadMissing
+			if loaded {
+				result = LoadLoaded
 			}
-			_, err := v.Interface().(Loadable).Load()
-			return err
+			if err != nil {
+				result = LoadFailed
+			}
+			if path, ok := pathOf(v.Interface()); ok {
+				return recordResult(ctx, OpLoad, path, result, err)
+			}
+			return result, err
 		}
 		v = v.Elem()
 	}
@@ -72,47 +57,37 @@ func loadDeepValue(v reflect.Value, ctx Context) error {
 	if v.CanAddr() {
 		ptr := v.Addr()
 
-		if ptr.Type().Implements(reflect.TypeOf((*reportDeepLoader)(nil)).Elem()) {
-			return ptr.Interface().(reportDeepLoader).loadDeepReport(ctx)
-		}
-
 		if ptr.Type().Implements(deepLoaderType) {
+			result, err := ptr.Interface().(DeepLoader).LoadDeep(ctx)
 			if path, ok := pathOf(ptr.Interface()); ok {
-				return reportLoad(ctx, path, func() (ResultCode, error) {
-					err := ptr.Interface().(DeepLoader).LoadDeep(ctx)
-					if err != nil {
-						return LoadFailed, err
-					}
-					return LoadTraversed, nil
-				})
+				return recordResult(ctx, OpLoad, path, result, err)
 			}
-			return ptr.Interface().(DeepLoader).LoadDeep(ctx)
-		}
-
-		if ptr.Type().Implements(reflect.TypeOf((*reportLoader)(nil)).Elem()) {
-			return ptr.Interface().(reportLoader).loadReport(ctx)
+			return result, err
 		}
 
 		if ptr.Type().Implements(loaderType) {
-			if path, ok := pathOf(ptr.Interface()); ok {
-				return reportLoad(ctx, path, func() (ResultCode, error) {
-					loaded, err := ptr.Interface().(Loadable).Load()
-					if err != nil {
-						return LoadFailed, err
-					}
-					if loaded {
-						return LoadLoaded, nil
-					}
-					return LoadMissing, nil
-				})
+			loaded, err := ptr.Interface().(Loadable).Load()
+			result := LoadMissing
+			if loaded {
+				result = LoadLoaded
 			}
-			_, err := ptr.Interface().(Loadable).Load()
-			return err
+			if err != nil {
+				result = LoadFailed
+			}
+			if path, ok := pathOf(ptr.Interface()); ok {
+				return recordResult(ctx, OpLoad, path, result, err)
+			}
+			return result, err
 		}
 	}
 
+	switch v.Type() {
+	case dirType, fileType:
+		return recordResult(ctx, OpLoad, v.Interface().(Pather).Path(), LoadNotApplicable, nil)
+	}
+
 	if v.Kind() != reflect.Struct {
-		return nil
+		return 0, nil
 	}
 
 	t := v.Type()
@@ -128,10 +103,10 @@ func loadDeepValue(v reflect.Value, ctx Context) error {
 			continue
 		}
 
-		if err := loadDeepValue(field, ctx); err != nil {
-			return fmt.Errorf("field %q: %w", sf.Name, err)
+		if _, err := loadDeepValue(field, ctx); err != nil {
+			return LoadFailed, fmt.Errorf("field %q: %w", sf.Name, err)
 		}
 	}
 
-	return nil
+	return LoadTraversed, nil
 }

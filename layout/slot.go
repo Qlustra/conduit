@@ -213,7 +213,7 @@ func (s *Slot[T]) Add(name string, ctx Context) (T, error) {
 		return zero, err
 	}
 
-	if err := EnsureDeep(item, ctx); err != nil {
+	if _, err := EnsureDeep(item, ctx); err != nil {
 		var zero T
 		return zero, err
 	}
@@ -264,13 +264,9 @@ func (s *Slot[T]) Ensure(ctx Context) error {
 	return s.root.Ensure(ctx)
 }
 
-func (s *Slot[T]) EnsureDeep(ctx Context) error {
-	return s.ensureDeep(ctx)
-}
-
-func (s *Slot[T]) ensureDeep(ctx Context) error {
+func (s *Slot[T]) EnsureDeep(ctx Context) (ResultCode, error) {
 	if err := s.root.Ensure(ctx); err != nil {
-		return err
+		return EnsureFailed, err
 	}
 
 	s.mu.RLock()
@@ -282,35 +278,25 @@ func (s *Slot[T]) ensureDeep(ctx Context) error {
 
 	for name, item := range items {
 		if err := s.root.Dir(name).Ensure(ctx); err != nil {
-			return fmt.Errorf("slot item root %q: %w", name, err)
+			return EnsureFailed, fmt.Errorf("slot item root %q: %w", name, err)
 		}
-		if err := EnsureDeep(item, ctx); err != nil {
-			return fmt.Errorf("slot item %q: %w", name, err)
+		if _, err := EnsureDeep(item, ctx); err != nil {
+			return EnsureFailed, fmt.Errorf("slot item %q: %w", name, err)
 		}
 	}
 
-	return nil
-}
-
-func (s *Slot[T]) ensureDeepReport(ctx Context) error {
-	return reportEnsure(ctx, s.Path(), func() error {
-		return s.ensureDeep(ctx)
-	})
+	return EnsureEnsured, nil
 }
 
 // Load
 
-func (s *Slot[T]) LoadDeep(ctx Context) error {
-	return s.loadDeep(ctx)
-}
-
-func (s *Slot[T]) loadDeep(ctx Context) error {
+func (s *Slot[T]) LoadDeep(ctx Context) (ResultCode, error) {
 	entries, err := os.ReadDir(s.root.Path())
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil
+			return LoadMissing, nil
 		}
-		return err
+		return LoadFailed, err
 	}
 
 	for _, entry := range entries {
@@ -321,54 +307,20 @@ func (s *Slot[T]) loadDeep(ctx Context) error {
 		name := entry.Name()
 		item, err := s.At(name)
 		if err != nil {
-			return fmt.Errorf("compose slot item %q: %w", name, err)
+			return LoadFailed, fmt.Errorf("compose slot item %q: %w", name, err)
 		}
 
-		if err := LoadDeep(item, ctx); err != nil {
-			return fmt.Errorf("load slot item %q: %w", name, err)
+		if _, err := LoadDeep(item, ctx); err != nil {
+			return LoadFailed, fmt.Errorf("load slot item %q: %w", name, err)
 		}
 	}
 
-	return nil
-}
-
-func (s *Slot[T]) loadDeepReport(ctx Context) error {
-	return reportLoad(ctx, s.Path(), func() (ResultCode, error) {
-		entries, err := os.ReadDir(s.root.Path())
-		if err != nil {
-			if os.IsNotExist(err) {
-				return LoadMissing, nil
-			}
-			return LoadFailed, err
-		}
-
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				continue
-			}
-
-			name := entry.Name()
-			item, err := s.At(name)
-			if err != nil {
-				return LoadFailed, fmt.Errorf("compose slot item %q: %w", name, err)
-			}
-
-			if err := LoadDeep(item, ctx); err != nil {
-				return LoadFailed, fmt.Errorf("load slot item %q: %w", name, err)
-			}
-		}
-
-		return LoadTraversed, nil
-	})
+	return LoadTraversed, nil
 }
 
 // Scan
 
-func (s *Slot[T]) ScanDeep(ctx Context) error {
-	return s.scanDeep(ctx)
-}
-
-func (s *Slot[T]) scanDeep(ctx Context) error {
+func (s *Slot[T]) ScanDeep(ctx Context) (ResultCode, error) {
 	s.mu.RLock()
 	items := make(map[string]T, len(s.items))
 	for name, item := range s.items {
@@ -377,46 +329,23 @@ func (s *Slot[T]) scanDeep(ctx Context) error {
 	s.mu.RUnlock()
 
 	for name, item := range items {
-		if err := ScanDeep(item, ctx); err != nil {
-			return fmt.Errorf("scan slot item %q: %w", name, err)
+		if _, err := ScanDeep(item, ctx); err != nil {
+			return ScanFailed, fmt.Errorf("scan slot item %q: %w", name, err)
 		}
 	}
 
-	return nil
-}
-
-func (s *Slot[T]) scanDeepReport(ctx Context) error {
-	return reportScan(ctx, s.Path(), func() (ResultCode, error) {
-		s.mu.RLock()
-		items := make(map[string]T, len(s.items))
-		for name, item := range s.items {
-			items[name] = item
-		}
-		s.mu.RUnlock()
-
-		for name, item := range items {
-			if err := ScanDeep(item, ctx); err != nil {
-				return ScanFailed, fmt.Errorf("scan slot item %q: %w", name, err)
-			}
-		}
-
-		return ScanTraversed, nil
-	})
+	return ScanTraversed, nil
 }
 
 // Discover
 
-func (s *Slot[T]) DiscoverDeep(ctx Context) error {
-	return s.discoverDeep(ctx)
-}
-
-func (s *Slot[T]) discoverDeep(ctx Context) error {
+func (s *Slot[T]) DiscoverDeep(ctx Context) (ResultCode, error) {
 	entries, err := os.ReadDir(s.root.Path())
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil
+			return DiscoverMissing, nil
 		}
-		return err
+		return DiscoverFailed, err
 	}
 
 	for _, entry := range entries {
@@ -427,54 +356,20 @@ func (s *Slot[T]) discoverDeep(ctx Context) error {
 		name := entry.Name()
 		item, err := s.At(name)
 		if err != nil {
-			return fmt.Errorf("compose slot item %q: %w", name, err)
+			return DiscoverFailed, fmt.Errorf("compose slot item %q: %w", name, err)
 		}
 
-		if err := DiscoverDeep(item, ctx); err != nil {
-			return fmt.Errorf("discover slot item %q: %w", name, err)
+		if _, err := DiscoverDeep(item, ctx); err != nil {
+			return DiscoverFailed, fmt.Errorf("discover slot item %q: %w", name, err)
 		}
 	}
 
-	return nil
-}
-
-func (s *Slot[T]) discoverDeepReport(ctx Context) error {
-	return reportDiscover(ctx, s.Path(), func() (ResultCode, error) {
-		entries, err := os.ReadDir(s.root.Path())
-		if err != nil {
-			if os.IsNotExist(err) {
-				return DiscoverMissing, nil
-			}
-			return DiscoverFailed, err
-		}
-
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				continue
-			}
-
-			name := entry.Name()
-			item, err := s.At(name)
-			if err != nil {
-				return DiscoverFailed, fmt.Errorf("compose slot item %q: %w", name, err)
-			}
-
-			if err := DiscoverDeep(item, ctx); err != nil {
-				return DiscoverFailed, fmt.Errorf("discover slot item %q: %w", name, err)
-			}
-		}
-
-		return DiscoverTraversed, nil
-	})
+	return DiscoverTraversed, nil
 }
 
 // Sync
 
-func (s *Slot[T]) SyncDeep(ctx Context) error {
-	return s.syncDeep(ctx)
-}
-
-func (s *Slot[T]) syncDeep(ctx Context) error {
+func (s *Slot[T]) SyncDeep(ctx Context) (ResultCode, error) {
 	s.mu.RLock()
 	items := make(map[string]T, len(s.items))
 	for name, item := range s.items {
@@ -483,37 +378,15 @@ func (s *Slot[T]) syncDeep(ctx Context) error {
 	s.mu.RUnlock()
 
 	for name, item := range items {
-		if err := EnsureDeep(item, ctx); err != nil {
-			return fmt.Errorf("ensure slot item %q: %w", name, err)
+		if _, err := EnsureDeep(item, ctx); err != nil {
+			return SyncFailed, fmt.Errorf("ensure slot item %q: %w", name, err)
 		}
-		if err := SyncDeep(item, ctx); err != nil {
-			return fmt.Errorf("sync slot item %q: %w", name, err)
+		if _, err := SyncDeep(item, ctx); err != nil {
+			return SyncFailed, fmt.Errorf("sync slot item %q: %w", name, err)
 		}
 	}
 
-	return nil
-}
-
-func (s *Slot[T]) syncDeepReport(ctx Context) error {
-	return reportSync(ctx, s.Path(), func() (ResultCode, error) {
-		s.mu.RLock()
-		items := make(map[string]T, len(s.items))
-		for name, item := range s.items {
-			items[name] = item
-		}
-		s.mu.RUnlock()
-
-		for name, item := range items {
-			if err := EnsureDeep(item, ctx); err != nil {
-				return SyncFailed, fmt.Errorf("ensure slot item %q: %w", name, err)
-			}
-			if err := SyncDeep(item, ctx); err != nil {
-				return SyncFailed, fmt.Errorf("sync slot item %q: %w", name, err)
-			}
-		}
-
-		return SyncTraversed, nil
-	})
+	return SyncTraversed, nil
 }
 
 // Render
