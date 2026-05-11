@@ -19,9 +19,9 @@ tasks:
   validate:
     desc: Validate all Go modules
     cmds:
-      - gofmt -w -s ./internal
-      - go test ./internal/...
-      - go vet ./internal/...
+      - gofmt -w -s ./layout ./formats
+      - go test ./layout ./formats
+      - go vet ./layout ./formats
 
   # =======
   # TOOLING
