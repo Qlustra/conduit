@@ -8,11 +8,12 @@ import (
 // SyncDeep
 // Writes sync-eligible cached content back to disk. Projects memory onto filesystem.
 // Projective, memory cache -> filesystem content
-// - walks already composed/cached hierarchy
-// - writes typed file contents when the node's sync policy allows its memory state
-// - does not ensure raw Dir/File fields outside sync-capable wrappers
-// - does not invent missing slot entries unless they are already cached in the slot
-// - does not delete anything absent from memory
+//   - walks already composed/cached hierarchy
+//   - writes typed file contents when the node's sync policy allows its current memory state
+//     and optional disk-state filters
+//   - does not ensure raw Dir/File fields outside sync-capable wrappers
+//   - does not invent missing slot entries unless they are already cached in the slot
+//   - does not delete anything absent from memory
 func SyncDeep(target any, ctx Context) (ResultCode, error) {
 	if target == nil {
 		return SyncFailed, fmt.Errorf("target must not be nil")

@@ -81,7 +81,11 @@ _ = conduit.Compose("/workspace", &ws)
 
 app, _ := ws.Apps.Add("billing", conduit.DefaultContext)
 _ = app.Config.LoadOrInit(AppConfig{Name: "billing", Port: 8080})
-_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
+
+ctx := conduit.DefaultContext
+ctx.SyncPolicy = conduit.SyncIfMissing
+
+_, _ = conduit.SyncDeep(&ws, ctx)
 ```
 
 Managed executables stay part of the layout and can be run through `Exec`:

@@ -8,12 +8,21 @@ const (
 	SyncOnLoaded SyncPolicy = 1 << iota
 	SyncOnSynced
 	SyncOnDirty
+	SyncOnDiskUnknown
+	SyncOnDiskMissing
+	SyncOnDiskPresent
 )
 
 const (
 	SyncRewrite    SyncPolicy = SyncOnLoaded | SyncOnSynced | SyncOnDirty
 	SyncIfDirty    SyncPolicy = SyncOnDirty
 	SyncIfUnsynced SyncPolicy = SyncOnLoaded | SyncOnDirty
+	SyncIfMissing  SyncPolicy = SyncOnDiskMissing
+)
+
+const (
+	syncPolicyMemoryMask = SyncOnLoaded | SyncOnSynced | SyncOnDirty
+	syncPolicyDiskMask   = SyncOnDiskUnknown | SyncOnDiskMissing | SyncOnDiskPresent
 )
 
 type Context struct {
@@ -32,13 +41,18 @@ var DefaultContext = Context{
 }
 
 func (ctx Context) syncPolicy() SyncPolicy {
-	if ctx.SyncPolicy == 0 {
-		return SyncRewrite
-	}
 	return ctx.SyncPolicy
 }
 
-func (p SyncPolicy) allows(state MemoryState) bool {
+func (p SyncPolicy) normalizedMemory() SyncPolicy {
+	p &= syncPolicyMemoryMask
+	if p == 0 {
+		return SyncRewrite
+	}
+	return p
+}
+
+func (p SyncPolicy) allowsMemory(state MemoryState) bool {
 	switch state {
 	case MemoryLoaded:
 		return p&SyncOnLoaded != 0
@@ -49,4 +63,26 @@ func (p SyncPolicy) allows(state MemoryState) bool {
 	default:
 		return false
 	}
+}
+
+func (p SyncPolicy) allowsDisk(state DiskState) bool {
+	p &= syncPolicyDiskMask
+	if p == 0 {
+		return true
+	}
+
+	switch state {
+	case DiskUnknown:
+		return p&SyncOnDiskUnknown != 0
+	case DiskMissing:
+		return p&SyncOnDiskMissing != 0
+	case DiskPresent:
+		return p&SyncOnDiskPresent != 0
+	default:
+		return false
+	}
+}
+
+func (p SyncPolicy) allows(memory MemoryState, disk DiskState) bool {
+	return p.normalizedMemory().allowsMemory(memory) && p.allowsDisk(disk)
 }

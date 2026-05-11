@@ -161,7 +161,7 @@ ctx := conduit.Context{
 - `DirMode` controls created directories.
 - `FileMode` controls regular files.
 - `ExecMode` controls `Exec` files.
-- `SyncPolicy` controls which typed memory states `Sync` and `SyncDeep` may write.
+- `SyncPolicy` controls which typed memory states `Sync` and `SyncDeep` may write, with optional extra disk-state filters.
 - `Reporter` optionally collects per-path operation results during deep traversal.
 
 Available sync policies:
@@ -169,6 +169,18 @@ Available sync policies:
 - `conduit.SyncRewrite`: write loaded, dirty, and already-synced typed content
 - `conduit.SyncIfDirty`: write only dirty typed content
 - `conduit.SyncIfUnsynced`: write loaded and dirty typed content, but skip already-synced content
+- `conduit.SyncIfMissing`: write only when the file was last observed missing
+
+Available sync filter bits:
+
+- memory-state filters: `conduit.SyncOnLoaded`, `conduit.SyncOnSynced`, `conduit.SyncOnDirty`
+- disk-state filters: `conduit.SyncOnDiskUnknown`, `conduit.SyncOnDiskMissing`, `conduit.SyncOnDiskPresent`
+
+Behavior notes:
+
+- if no memory-state bits are set, sync defaults to `conduit.SyncRewrite`
+- if no disk-state bits are set, sync does not restrict by disk state
+- combine memory and disk bits with `|` when you need both gates
 
 `conduit.DefaultContext` is:
 
@@ -215,6 +227,15 @@ Sync only dirty typed content during a pass:
 ```go
 ctx := conduit.DefaultContext
 ctx.SyncPolicy = conduit.SyncIfDirty
+
+_, _ = conduit.SyncDeep(&ws, ctx)
+```
+
+Write only when the file was observed missing:
+
+```go
+ctx := conduit.DefaultContext
+ctx.SyncPolicy = conduit.SyncIfDirty | conduit.SyncOnDiskMissing
 
 _, _ = conduit.SyncDeep(&ws, ctx)
 ```

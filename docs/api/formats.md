@@ -76,7 +76,7 @@ Notable behavior:
 - `SetDefault` returns `false` and leaves content unchanged when content is already cached
 - `Save` fails when no content is loaded
 - `Sync` returns `SyncSkippedNoContent` when no content is loaded
-- `Sync` returns `SyncSkippedPolicy` when `ctx.SyncPolicy` excludes the current memory state
+- `Sync` returns `SyncSkippedPolicy` when `ctx.SyncPolicy` excludes the current memory state or last known disk state
 - `Load` on a missing file clears cached content, sets disk state to missing, and resets memory state to unknown
 - `Discover` updates disk state but preserves current cached content and memory state
 - `Scan` only updates disk state; it preserves current cached content and memory state

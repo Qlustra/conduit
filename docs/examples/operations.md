@@ -134,7 +134,10 @@ _ = svc.Config.LoadOrInit(ServiceConfig{
 	Port: 7000,
 })
 
-_, _ = svc.Config.Sync(conduit.DefaultContext)
+ctx := conduit.DefaultContext
+ctx.SyncPolicy = conduit.SyncIfMissing
+
+_, _ = svc.Config.Sync(ctx)
 ```
 
-This avoids writing a file unless you choose to persist the default.
+This writes the default only after the file has been observed missing, and it skips later sync passes once the file exists.

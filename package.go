@@ -17,13 +17,17 @@ type ResultCode = layout.ResultCode
 var DefaultContext = layout.DefaultContext
 
 const (
-	SyncOnLoaded SyncPolicy = layout.SyncOnLoaded
-	SyncOnSynced SyncPolicy = layout.SyncOnSynced
-	SyncOnDirty  SyncPolicy = layout.SyncOnDirty
+	SyncOnLoaded      SyncPolicy = layout.SyncOnLoaded
+	SyncOnSynced      SyncPolicy = layout.SyncOnSynced
+	SyncOnDirty       SyncPolicy = layout.SyncOnDirty
+	SyncOnDiskUnknown SyncPolicy = layout.SyncOnDiskUnknown
+	SyncOnDiskMissing SyncPolicy = layout.SyncOnDiskMissing
+	SyncOnDiskPresent SyncPolicy = layout.SyncOnDiskPresent
 
 	SyncRewrite    SyncPolicy = layout.SyncRewrite
 	SyncIfDirty    SyncPolicy = layout.SyncIfDirty
 	SyncIfUnsynced SyncPolicy = layout.SyncIfUnsynced
+	SyncIfMissing  SyncPolicy = layout.SyncIfMissing
 )
 
 const (

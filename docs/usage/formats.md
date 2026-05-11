@@ -94,7 +94,7 @@ There are three ways to write typed files:
 
 - `Write(value, ctx)` marshals and writes a supplied value directly
 - `Save(ctx)` writes the cached value
-- `Sync(ctx)` writes the cached value when `ctx.SyncPolicy` allows the current memory state, or returns a skip result otherwise
+- `Sync(ctx)` writes the cached value when `ctx.SyncPolicy` allows the current memory and disk state, or returns a skip result otherwise
 
 Example:
 
@@ -121,6 +121,17 @@ ctx.SyncPolicy = conduit.SyncIfDirty
 
 _, err := conduit.SyncDeep(&workspace, ctx)
 ```
+
+To persist initialization defaults only after the file has been observed missing:
+
+```go
+ctx := conduit.DefaultContext
+ctx.SyncPolicy = conduit.SyncOnDiskMissing
+
+_, err := service.YAML.Sync(ctx)
+```
+
+When a sync policy does not include memory-state bits, Conduit defaults that side to `conduit.SyncRewrite`. Disk-state bits remain optional.
 
 ## State model
 

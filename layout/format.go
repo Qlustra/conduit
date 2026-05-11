@@ -172,7 +172,7 @@ func (f *Format[T, C]) Sync(ctx Context) (ResultCode, error) {
 	if f.content == nil {
 		return SyncSkippedNoContent, nil
 	}
-	if !ctx.syncPolicy().allows(f.memory) {
+	if !ctx.syncPolicy().allows(f.memory, f.disk) {
 		return SyncSkippedPolicy, nil
 	}
 	if err := f.saveLoaded(ctx); err != nil {

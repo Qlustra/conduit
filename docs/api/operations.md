@@ -48,13 +48,14 @@ Fields:
 - `DirMode`: mode used when creating directories
 - `FileMode`: mode used when creating regular files
 - `ExecMode`: mode used when creating or ensuring `Exec` files
-- `SyncPolicy`: selects which typed memory states `Sync` and `SyncDeep` may write
+- `SyncPolicy`: selects which typed memory states `Sync` and `SyncDeep` may write, with optional disk-state filters
 - `Reporter`: optional sink for per-path deep-operation results
 
 Notable behavior:
 
 - when `ExecMode` is zero, `Exec` falls back to `FileMode` and adds execute bits automatically
-- when `SyncPolicy` is zero, sync operations fall back to `SyncRewrite`
+- when `SyncPolicy` has no memory-state bits, sync operations fall back to `SyncRewrite`
+- when `SyncPolicy` has no disk-state bits, sync operations do not restrict by disk state
 - when `Reporter` is nil, deep operations do not collect traversal reports
 
 ### `Reporter`
@@ -144,16 +145,20 @@ type SyncPolicy uint8
 
 Description:
 
-- bitmask policy that filters which typed memory states are writable during `Sync` and `SyncDeep`
+- bitmask policy that filters which typed memory states are writable during `Sync` and `SyncDeep`, with optional disk-state gates
 
 Constants:
 
 - `SyncOnLoaded`: include `MemoryLoaded`
 - `SyncOnSynced`: include `MemorySynced`
 - `SyncOnDirty`: include `MemoryDirty`
+- `SyncOnDiskUnknown`: include `DiskUnknown`
+- `SyncOnDiskMissing`: include `DiskMissing`
+- `SyncOnDiskPresent`: include `DiskPresent`
 - `SyncRewrite`: include loaded, synced, and dirty states
 - `SyncIfDirty`: include only dirty state
 - `SyncIfUnsynced`: include loaded and dirty states
+- `SyncIfMissing`: include any writable memory state, but only when the last known disk state is missing
 
 ## Functions
 
@@ -287,7 +292,7 @@ Returns:
 Notable behavior:
 
 - only writes typed files that currently have content loaded in memory
-- applies `ctx.SyncPolicy` to typed memory state before writing
+- applies `ctx.SyncPolicy` to typed memory state and optional disk-state filters before writing
 - only syncs cached `layout.Slot[T]` items
 - `layout.Slot[T]` ensures cached children before syncing them
 - does not materialize standalone raw `layout.Dir` or `layout.File` nodes

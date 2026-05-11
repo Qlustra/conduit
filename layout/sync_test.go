@@ -158,3 +158,130 @@ func TestFormatSyncDefaultsToRewriteWhenPolicyUnset(t *testing.T) {
 		t.Fatalf("MemoryState() after Sync = %v, want %v", got, MemorySynced)
 	}
 }
+
+func TestFormatSyncIfMissingSupportsInitializationFlow(t *testing.T) {
+	var f testMapFile
+	f.ComposePath(filepath.Join(t.TempDir(), "state.json"))
+
+	if err := f.LoadOrInit(map[string]string{"name": "default"}); err != nil {
+		t.Fatalf("LoadOrInit() error = %v", err)
+	}
+	if got := f.DiskState(); got != DiskMissing {
+		t.Fatalf("DiskState() after missing LoadOrInit = %v, want %v", got, DiskMissing)
+	}
+	if got := f.MemoryState(); got != MemoryDirty {
+		t.Fatalf("MemoryState() after missing LoadOrInit = %v, want %v", got, MemoryDirty)
+	}
+
+	ctx := DefaultContext
+	ctx.SyncPolicy = SyncIfMissing
+
+	result, err := f.Sync(ctx)
+	if err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if result != SyncWritten {
+		t.Fatalf("Sync() result = %v, want %v", result, SyncWritten)
+	}
+	if got := f.MemoryState(); got != MemorySynced {
+		t.Fatalf("MemoryState() after Sync = %v, want %v", got, MemorySynced)
+	}
+	if got := f.DiskState(); got != DiskPresent {
+		t.Fatalf("DiskState() after Sync = %v, want %v", got, DiskPresent)
+	}
+
+	result, err = f.Sync(ctx)
+	if err != nil {
+		t.Fatalf("second Sync() error = %v", err)
+	}
+	if result != SyncSkippedPolicy {
+		t.Fatalf("second Sync() result = %v, want %v", result, SyncSkippedPolicy)
+	}
+
+	data, err := os.ReadFile(f.Path())
+	if err != nil {
+		t.Fatalf("os.ReadFile() error = %v", err)
+	}
+	if got := string(data); got != `{"name":"default"}` {
+		t.Fatalf("file contents = %q, want %q", got, `{"name":"default"}`)
+	}
+}
+
+func TestFormatSyncDiskFilterDefaultsMemoryMaskToRewrite(t *testing.T) {
+	var f testMapFile
+	f.ComposePath(filepath.Join(t.TempDir(), "state.json"))
+
+	if err := os.WriteFile(f.Path(), []byte(`{"a":"disk"}`), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+	if loaded, err := f.Load(); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	} else if !loaded {
+		t.Fatal("Load() loaded = false, want true")
+	}
+
+	ctx := DefaultContext
+	ctx.SyncPolicy = SyncOnDiskPresent
+
+	result, err := f.Sync(ctx)
+	if err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if result != SyncWritten {
+		t.Fatalf("Sync() result = %v, want %v", result, SyncWritten)
+	}
+	if got := f.MemoryState(); got != MemorySynced {
+		t.Fatalf("MemoryState() after Sync = %v, want %v", got, MemorySynced)
+	}
+}
+
+func TestFormatSyncIfMissingSkipsWhenDiskPresent(t *testing.T) {
+	var f testMapFile
+	f.ComposePath(filepath.Join(t.TempDir(), "state.json"))
+
+	if err := os.WriteFile(f.Path(), []byte(`{"a":"disk"}`), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+	if loaded, err := f.Load(); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	} else if !loaded {
+		t.Fatal("Load() loaded = false, want true")
+	}
+
+	ctx := DefaultContext
+	ctx.SyncPolicy = SyncIfMissing
+
+	result, err := f.Sync(ctx)
+	if err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if result != SyncSkippedPolicy {
+		t.Fatalf("Sync() result = %v, want %v", result, SyncSkippedPolicy)
+	}
+	if got := f.MemoryState(); got != MemoryLoaded {
+		t.Fatalf("MemoryState() after skipped Sync = %v, want %v", got, MemoryLoaded)
+	}
+}
+
+func TestFormatSyncIfMissingSkipsWhenDiskStateUnknown(t *testing.T) {
+	var f testMapFile
+	f.ComposePath(filepath.Join(t.TempDir(), "state.json"))
+	f.Set(map[string]string{"a": "planned"})
+
+	ctx := DefaultContext
+	ctx.SyncPolicy = SyncIfMissing
+
+	result, err := f.Sync(ctx)
+	if err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if result != SyncSkippedPolicy {
+		t.Fatalf("Sync() result = %v, want %v", result, SyncSkippedPolicy)
+	}
+	if got := f.DiskState(); got != DiskUnknown {
+		t.Fatalf("DiskState() after skipped Sync = %v, want %v", got, DiskUnknown)
+	}
+	if got := f.MemoryState(); got != MemoryDirty {
+		t.Fatalf("MemoryState() after skipped Sync = %v, want %v", got, MemoryDirty)
+	}
+}
