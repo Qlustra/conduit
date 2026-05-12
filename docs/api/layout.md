@@ -131,6 +131,95 @@ Notable behavior:
 - `Output` and `CombinedOutput` reject explicit `Stdout` or `Stderr` writers in `RunOptions`
 - `Interpreter` runs the managed file as an argument to the interpreter command instead of executing it directly
 
+### `Link`
+
+```go
+type Link struct{}
+```
+
+Description:
+
+- symlink handle with cached target state and lifecycle helpers
+
+Methods:
+
+- `Path() string`: returns the bound link path
+- `Base() string`: returns the final path element
+- `Ext() string`: returns the final extension including the leading dot
+- `Stem() string`: returns the final path element without its final extension
+- `RelTo(base Pather) (string, error)`: returns the path relative to another node with a `Path()`
+- `JoinRelTo(base Pather, parts ...string) (string, error)`: joins path parts onto the relative path from another node
+- `RelToPath(base string) (string, error)`: returns the path relative to a raw base path
+- `JoinRelToPath(base string, parts ...string) (string, error)`: joins path parts onto the relative path from a raw base path
+- `DeclaredPath() (string, bool)`: returns the node's own declared layout fragment
+- `JoinDeclaredPath(parts ...string) (string, bool)`: joins path parts onto the declared layout fragment
+- `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the handle belongs to a composed tree
+- `ComposedRelativePath() (string, bool)`: returns the path relative to the compose base directory
+- `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
+- `Exists() bool`: reports whether a symlink exists at the path
+- `Target() (string, bool)`: returns the cached raw symlink target string
+- `MustTarget() string`: returns the cached target string or panics when it is absent
+- `SetTarget(target string)`: stores a raw symlink target string in memory and marks it dirty
+- `SetDefaultTarget(target string) bool`: sets the target only when it is currently absent
+- `HasTarget() bool`: reports whether a target string is currently cached
+- `HasContent() bool`: same cached-target check used by the generic load/sync contracts
+- `ClearTarget()`: drops the cached target string
+- `ResolvedTargetPath() (string, bool)`: resolves the cached target against the link's parent directory when it is relative
+- `TargetExists() (bool, error)`: reports whether the resolved target currently exists
+- `IsDangling() (bool, error)`: reports whether the cached target is currently missing
+- `Delete() error`: removes the symlink when it exists
+- `Load() (bool, error)`: reads the symlink target from disk
+- `Unload()`: drops the cached target string without touching disk
+- `Discover() (DiskState, error)`: observes the symlink's presence on disk without loading a new target
+- `Scan() (DiskState, error)`: observes the symlink's presence on disk without changing cached memory content
+- `Sync(ctx Context) (ResultCode, error)`: creates or rewrites the symlink from the cached target string when policy allows
+- `DiskState() DiskState`: returns the cached disk state
+- `MemoryState() MemoryState`: returns the cached memory state
+- `HasKnownDiskState() bool`: reports whether disk state has been observed
+- `WasObservedOnDisk() bool`: reports whether the last disk observation found a symlink
+- `HasBeenLoaded() bool`: reports whether target state has been loaded, synced, or dirtied in memory
+- `IsDirty() bool`: reports whether the cached target has been modified in memory since load or sync
+
+Notable behavior:
+
+- `Exists` uses `os.Lstat`, so dangling symlinks still count as existing
+- `Load` succeeds for dangling symlinks because `os.Readlink` returns the raw target string
+- `Scan`, `Discover`, and `Load` fail when the path exists but is not a symlink
+- `Sync` manages only the symlink entry at `Path()` and its parent directory
+- `Link` does not participate in `EnsureDeep`; links are materialized through `Sync`/`SyncDeep` after a target is set
+
+### `FileLink`
+
+```go
+type FileLink struct{}
+```
+
+Description:
+
+- symlink wrapper that exposes the resolved target as a `File` handle
+
+Methods:
+
+- all promoted `Link` methods
+- `TargetFile() (File, bool)`: resolves the cached target to a `File` handle
+- `MustTargetFile() File`: panicking version of `TargetFile()`
+
+### `DirLink`
+
+```go
+type DirLink struct{}
+```
+
+Description:
+
+- symlink wrapper that exposes the resolved target as a `Dir` handle
+
+Methods:
+
+- all promoted `Link` methods
+- `TargetDir() (Dir, bool)`: resolves the cached target to a `Dir` handle
+- `MustTargetDir() Dir`: panicking version of `TargetDir()`
+
 ### `RunOptions`
 
 ```go

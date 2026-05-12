@@ -5,7 +5,7 @@ Conduit layouts are plain Go structs with `layout` tags. `Compose` walks the str
 In code, that usually means:
 
 - import `github.com/qlustra/conduit` for operations such as `Compose`
-- import `github.com/qlustra/conduit/layout` for `Dir`, `File`, `Exec`, `Slot[T]`, and `TextTemplate[C]`
+- import `github.com/qlustra/conduit/layout` for `Dir`, `File`, `Link`, `FileLink`, `DirLink`, `Exec`, `Slot[T]`, and `TextTemplate[C]`
 - import `github.com/qlustra/conduit/formats` for `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`
 
 ## Defining a layout
@@ -97,6 +97,36 @@ Useful methods:
 - `Interpreter` for running the file through something like `[]string{"sh"}` or `[]string{"python3"}`
 
 If `Context.ExecMode` is unset, Conduit falls back to `FileMode` and adds execute bits automatically.
+
+### `Link`, `FileLink`, and `DirLink`
+
+`Link` models a symlink node at its own path. `FileLink` and `DirLink` embed `Link` and add typed access to the resolved target path.
+
+Useful methods on `Link`:
+
+- `Path()` returns the link path itself.
+- `Base()`, `Ext()`, and `Stem()` expose path fragments for the link path.
+- `RelTo(...)`, `JoinRelTo(...)`, `RelToPath(...)`, and `JoinRelToPath(...)` work like the other node types.
+- `DeclaredPath()` and `JoinDeclaredPath(...)` expose the node's own declared layout fragment.
+- `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` expose compose-base-relative path fragments.
+- `Exists()` reports whether a symlink exists at the path. It does not require the target to resolve.
+- `Target()`, `MustTarget()`, `SetTarget(...)`, `SetDefaultTarget(...)`, `HasTarget()`, and `ClearTarget()` manage the in-memory target string.
+- `ResolvedTargetPath()` resolves relative targets from the link's parent directory.
+- `TargetExists()` and `IsDangling()` inspect the current in-memory target.
+- `Load()`, `Discover()`, `Scan()`, `Sync(ctx)`, `Delete()`, `Unload()`, `DiskState()`, and `MemoryState()` follow the same state model used by typed files.
+
+Useful methods on the typed wrappers:
+
+- `FileLink.TargetFile()` / `MustTargetFile()`
+- `DirLink.TargetDir()` / `MustTargetDir()`
+
+Notable behavior:
+
+- `Link` does not implement ensure semantics. `EnsureDeep` leaves declared links alone.
+- `Load()` succeeds for dangling symlinks and loads the raw target string from `os.Readlink`.
+- `Scan()` and `Load()` fail when the path exists but is not a symlink.
+- `Sync(ctx)` manages only the symlink entry at the declared path. It never creates or validates the target payload.
+- `FileLink` and `DirLink` describe how you intend to use the target handle; they do not change the fact that the node at `Path()` is a symlink.
 
 ### Typed files
 

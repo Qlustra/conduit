@@ -6,7 +6,7 @@ Conduit is a contract-based content manager for Go.
 The module is split into three public packages:
 
 - `github.com/qlustra/conduit` for operations, `Context`, and sync policy
-- `github.com/qlustra/conduit/layout` for structural nodes such as `Dir`, `File`, `Exec`, `Slot[T]`, and `TextTemplate[C]`
+- `github.com/qlustra/conduit/layout` for structural nodes such as `Dir`, `File`, `Link`, `Exec`, `Slot[T]`, and `TextTemplate[C]`
 - `github.com/qlustra/conduit/formats` for codec-backed typed files such as `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`
 
 It lets you describe a filesystem as semantic Go types, then move state explicitly between disk and memory:
