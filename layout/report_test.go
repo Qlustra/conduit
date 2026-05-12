@@ -397,6 +397,40 @@ func TestReportRenderTreeAbsolutePaths(t *testing.T) {
 	}
 }
 
+func TestReportRenderTreeTrimsSharedAbsolutePrefix(t *testing.T) {
+	var report Report
+	base := filepath.Join(string(filepath.Separator), "tmp", "workspace", "project", "run")
+
+	report.Record(Entry{
+		Op:     OpSync,
+		Path:   filepath.Join(base, "codebase"),
+		Result: SyncNotApplicable,
+	})
+	report.Record(Entry{
+		Op:     OpSync,
+		Path:   filepath.Join(base, "codebase", ".gitignore"),
+		Result: SyncWritten,
+	})
+	report.Record(Entry{
+		Op:     OpSync,
+		Path:   filepath.Join(base, "codebase", "source", "apps", "go"),
+		Result: SyncTraversed,
+	})
+
+	want := strings.Join([]string{
+		"`- run",
+		"   `- codebase [sync:not_applicable]",
+		"      |- .gitignore [sync:written]",
+		"      `- source",
+		"         `- apps",
+		"            `- go [sync:traversed]",
+	}, "\n")
+
+	if got := report.RenderTree(); got != want {
+		t.Fatalf("RenderTree() =\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func assertEntries(t *testing.T, got []Entry, want []Entry) {
 	t.Helper()
 

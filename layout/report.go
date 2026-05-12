@@ -249,7 +249,12 @@ func (r *Report) RenderTree() string {
 	}
 
 	var lines []string
-	renderReportNode(root, "", &lines)
+	renderRoot := reportRenderRoot(root)
+	if renderRoot == root {
+		renderReportNode(root, "", &lines)
+	} else {
+		renderReportNode(&reportTreeNode{children: []*reportTreeNode{renderRoot}}, "", &lines)
+	}
 	return strings.Join(lines, "\n")
 }
 
@@ -335,6 +340,19 @@ func splitReportPath(path string) []string {
 	}
 
 	return parts
+}
+
+func reportRenderRoot(root *reportTreeNode) *reportTreeNode {
+	if root == nil {
+		return nil
+	}
+
+	cur := root
+	for len(cur.entries) == 0 && len(cur.children) == 1 && len(cur.children[0].entries) == 0 {
+		cur = cur.children[0]
+	}
+
+	return cur
 }
 
 func renderReportNode(n *reportTreeNode, prefix string, lines *[]string) {
