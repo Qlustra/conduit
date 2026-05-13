@@ -5,13 +5,10 @@ import (
 	"reflect"
 )
 
-// DefaultDeep
-// Applies default in-memory state for already composed/cached items.
-// Reflective, default policy -> memory cache
-// - walks already composed/cached hierarchy
-// - applies defaults without reading disk
-// - does not discover slot entries
-// - does not write to disk
+// DefaultDeep applies in-memory defaults across a composed or cached layout.
+//
+// It calls Default behavior on visited nodes without reading from disk,
+// discovering new slot entries, or writing anything back to disk.
 func DefaultDeep(target any) error {
 	if target == nil {
 		return fmt.Errorf("target must not be nil")

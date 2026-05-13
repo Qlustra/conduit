@@ -6,6 +6,7 @@ import (
 	"github.com/qlustra/conduit/layout"
 )
 
+// JSONCodec marshals and unmarshals typed values as indented JSON.
 type JSONCodec[T any] struct{}
 
 func (c JSONCodec[T]) Marshal(v T) ([]byte, error) {
@@ -23,6 +24,8 @@ func (c JSONCodec[T]) Unmarshal(data []byte) (T, error) {
 	return value, err
 }
 
+// JSONFile is a Format that stores typed content as indented JSON with a
+// trailing newline.
 type JSONFile[T any] struct {
 	layout.Format[T, JSONCodec[T]]
 }

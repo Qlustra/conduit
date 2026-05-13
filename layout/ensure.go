@@ -5,9 +5,11 @@ import (
 	"reflect"
 )
 
-// EnsureDeep
-// Materializes declared structure.
-// Constructive, memory shape -> filesystem structure
+// EnsureDeep materializes declared filesystem structure for a composed layout.
+//
+// It creates raw Dir, File, and Exec nodes and recurses through already
+// composed or cached children. It does not load typed content, discover new
+// slot entries from disk, write typed file state, or delete anything.
 func EnsureDeep(target any, ctx Context) (ResultCode, error) {
 	if target == nil {
 		return EnsureFailed, fmt.Errorf("target must not be nil")

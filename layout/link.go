@@ -6,6 +6,11 @@ import (
 	"path/filepath"
 )
 
+// Link models a symlink entry with explicit disk and memory state.
+//
+// Link manages only the symlink node at its own path. It does not create,
+// validate, or synchronize the target payload beyond resolving and observing
+// the target path when asked.
 type Link struct {
 	path         string
 	composeBase  string
@@ -18,14 +23,17 @@ type Link struct {
 	memory MemoryState
 }
 
+// FileLink is a Link that exposes the resolved target as a File handle.
 type FileLink struct {
 	Link
 }
 
+// DirLink is a Link that exposes the resolved target as a Dir handle.
 type DirLink struct {
 	Link
 }
 
+// NewLink returns a standalone symlink handle for path.
 func NewLink(path string) Link {
 	return newLinkWithCompose(path, "", false)
 }
@@ -43,24 +51,31 @@ func newLinkWithCompose(path string, composeBase string, composed bool) Link {
 	return link
 }
 
+// Path returns the symlink path itself.
 func (l Link) Path() string {
 	return l.path
 }
 
+// Base returns the final path element of the link path.
 func (l Link) Base() string {
 	return filepath.Base(l.path)
 }
 
+// Ext returns the final extension of the link path.
 func (l Link) Ext() string {
 	_, ext := splitBaseExt(l.Base())
 	return ext
 }
 
+// Stem returns the final path element of the link path without its final
+// extension.
 func (l Link) Stem() string {
 	stem, _ := splitBaseExt(l.Base())
 	return stem
 }
 
+// ComposedBaseDir returns the root directory that anchored composition, when
+// the handle belongs to a composed tree.
 func (l Link) ComposedBaseDir() (Dir, bool) {
 	if !l.composedBase {
 		return Dir{}, false
@@ -68,6 +83,8 @@ func (l Link) ComposedBaseDir() (Dir, bool) {
 	return newDirWithCompose(l.composeBase, l.composeBase, true), true
 }
 
+// DeclaredPath returns the node's own layout tag fragment when the handle was
+// attached through Compose.
 func (l Link) DeclaredPath() (string, bool) {
 	if !l.hasDeclared {
 		return "", false
@@ -75,6 +92,7 @@ func (l Link) DeclaredPath() (string, bool) {
 	return l.declaredPath, true
 }
 
+// JoinDeclaredPath joins parts onto the node's declared layout fragment.
 func (l Link) JoinDeclaredPath(parts ...string) (string, bool) {
 	declared, ok := l.DeclaredPath()
 	if !ok {
@@ -83,6 +101,7 @@ func (l Link) JoinDeclaredPath(parts ...string) (string, bool) {
 	return joinDeclaredPath(declared, parts...), true
 }
 
+// ComposedRelativePath returns the path relative to the tree's compose base.
 func (l Link) ComposedRelativePath() (string, bool) {
 	if !l.composedBase {
 		return "", false
@@ -94,6 +113,7 @@ func (l Link) ComposedRelativePath() (string, bool) {
 	return rel, true
 }
 
+// JoinComposedPath joins parts onto the compose-base-relative path.
 func (l Link) JoinComposedPath(parts ...string) (string, bool) {
 	rel, ok := l.ComposedRelativePath()
 	if !ok {
@@ -105,6 +125,7 @@ func (l Link) JoinComposedPath(parts ...string) (string, bool) {
 	return filepath.Join(append([]string{rel}, parts...)...), true
 }
 
+// RelTo returns the path relative to base.
 func (l Link) RelTo(base Pather) (string, error) {
 	if base == nil {
 		return "", fmt.Errorf("base path must not be nil")
@@ -112,6 +133,7 @@ func (l Link) RelTo(base Pather) (string, error) {
 	return filepath.Rel(base.Path(), l.Path())
 }
 
+// JoinRelTo joins parts onto the path relative to base.
 func (l Link) JoinRelTo(base Pather, parts ...string) (string, error) {
 	rel, err := l.RelTo(base)
 	if err != nil {
@@ -123,10 +145,12 @@ func (l Link) JoinRelTo(base Pather, parts ...string) (string, error) {
 	return filepath.Join(append([]string{rel}, parts...)...), nil
 }
 
+// RelToPath returns the path relative to base.
 func (l Link) RelToPath(base string) (string, error) {
 	return filepath.Rel(filepath.Clean(base), l.Path())
 }
 
+// JoinRelToPath joins parts onto the path relative to base.
 func (l Link) JoinRelToPath(base string, parts ...string) (string, error) {
 	rel, err := l.RelToPath(base)
 	if err != nil {
@@ -138,11 +162,15 @@ func (l Link) JoinRelToPath(base string, parts ...string) (string, error) {
 	return filepath.Join(append([]string{rel}, parts...)...), nil
 }
 
+// Exists reports whether a symlink exists at Path.
+//
+// Dangling symlinks still count as existing.
 func (l Link) Exists() bool {
 	ok, _ := l.isSymlink()
 	return ok
 }
 
+// Target returns the cached raw symlink target string, if any.
 func (l Link) Target() (string, bool) {
 	if l.target == nil {
 		return "", false
@@ -150,6 +178,7 @@ func (l Link) Target() (string, bool) {
 	return *l.target, true
 }
 
+// MustTarget returns the cached target string or panics when it is absent.
 func (l *Link) MustTarget() string {
 	if l.target == nil {
 		panic("link target is not loaded")
@@ -157,11 +186,16 @@ func (l *Link) MustTarget() string {
 	return *l.target
 }
 
+// SetTarget stores a raw symlink target string in memory and marks the link
+// dirty.
 func (l *Link) SetTarget(target string) {
 	l.target = &target
 	l.memory = MemoryDirty
 }
 
+// SetDefaultTarget stores target only when no cached target is present.
+//
+// It returns whether the default was applied.
 func (l *Link) SetDefaultTarget(target string) bool {
 	if l.target != nil {
 		return false
@@ -170,19 +204,24 @@ func (l *Link) SetDefaultTarget(target string) bool {
 	return true
 }
 
+// HasTarget reports whether a target string is currently cached.
 func (l Link) HasTarget() bool {
 	return l.target != nil
 }
 
+// HasContent reports whether a target string is currently cached.
 func (l Link) HasContent() bool {
 	return l.HasTarget()
 }
 
+// ClearTarget removes the cached target string and resets memory state.
 func (l *Link) ClearTarget() {
 	l.target = nil
 	l.memory = MemoryUnknown
 }
 
+// ResolvedTargetPath resolves the cached target against the link's parent
+// directory when it is relative.
 func (l Link) ResolvedTargetPath() (string, bool) {
 	target, ok := l.Target()
 	if !ok {
@@ -194,6 +233,7 @@ func (l Link) ResolvedTargetPath() (string, bool) {
 	return filepath.Clean(filepath.Join(filepath.Dir(l.path), target)), true
 }
 
+// TargetExists reports whether the resolved target currently exists.
 func (l Link) TargetExists() (bool, error) {
 	targetPath, ok := l.ResolvedTargetPath()
 	if !ok {
@@ -209,6 +249,8 @@ func (l Link) TargetExists() (bool, error) {
 	return false, err
 }
 
+// IsDangling reports whether the cached target currently resolves to a missing
+// filesystem entry.
 func (l Link) IsDangling() (bool, error) {
 	if !l.HasTarget() {
 		return false, nil
@@ -220,6 +262,10 @@ func (l Link) IsDangling() (bool, error) {
 	return !exists, nil
 }
 
+// Delete removes the symlink when it exists, clears cached target state, and
+// marks disk state missing.
+//
+// Delete fails if Path exists but is not a symlink.
 func (l *Link) Delete() error {
 	info, err := os.Lstat(l.Path())
 	if err != nil {
@@ -241,30 +287,39 @@ func (l *Link) Delete() error {
 	return nil
 }
 
+// DiskState returns the last known disk-state metadata.
 func (l Link) DiskState() DiskState {
 	return l.disk
 }
 
+// MemoryState returns the last known memory-state metadata.
 func (l Link) MemoryState() MemoryState {
 	return l.memory
 }
 
+// HasKnownDiskState reports whether disk state is something other than
+// DiskUnknown.
 func (l Link) HasKnownDiskState() bool {
 	return l.disk != DiskUnknown
 }
 
+// WasObservedOnDisk reports whether the last known disk state is DiskPresent.
 func (l Link) WasObservedOnDisk() bool {
 	return l.disk == DiskPresent
 }
 
+// HasBeenLoaded reports whether memory state has progressed beyond
+// MemoryUnknown.
 func (l Link) HasBeenLoaded() bool {
 	return l.memory == MemoryLoaded || l.memory == MemorySynced || l.memory == MemoryDirty
 }
 
+// IsDirty reports whether the cached target has changed since load or sync.
 func (l Link) IsDirty() bool {
 	return l.memory == MemoryDirty
 }
 
+// TargetFile returns the resolved link target as a File handle.
 func (l FileLink) TargetFile() (File, bool) {
 	targetPath, ok := l.ResolvedTargetPath()
 	if !ok {
@@ -273,6 +328,8 @@ func (l FileLink) TargetFile() (File, bool) {
 	return NewFile(targetPath), true
 }
 
+// MustTargetFile returns the resolved link target as a File handle or panics
+// when no target is cached.
 func (l *FileLink) MustTargetFile() File {
 	target, ok := l.TargetFile()
 	if !ok {
@@ -281,6 +338,7 @@ func (l *FileLink) MustTargetFile() File {
 	return target
 }
 
+// TargetDir returns the resolved link target as a Dir handle.
 func (l DirLink) TargetDir() (Dir, bool) {
 	targetPath, ok := l.ResolvedTargetPath()
 	if !ok {
@@ -289,6 +347,8 @@ func (l DirLink) TargetDir() (Dir, bool) {
 	return NewDir(targetPath), true
 }
 
+// MustTargetDir returns the resolved link target as a Dir handle or panics
+// when no target is cached.
 func (l *DirLink) MustTargetDir() Dir {
 	target, ok := l.TargetDir()
 	if !ok {
@@ -299,6 +359,7 @@ func (l *DirLink) MustTargetDir() Dir {
 
 // Compose
 
+// ComposePath binds the link to path and resets cached target and state.
 func (l *Link) ComposePath(path string) {
 	l.path = filepath.Clean(path)
 	l.composeBase = ""
@@ -322,6 +383,10 @@ func (l *Link) setDeclaredPath(path string) {
 
 // Load
 
+// Load reads the raw symlink target from disk into memory.
+//
+// Load succeeds for dangling symlinks because the raw target string is still
+// readable through os.Readlink.
 func (l *Link) Load() (bool, error) {
 	target, state, err := l.readTarget()
 	if err != nil {
@@ -342,6 +407,9 @@ func (l *Link) Load() (bool, error) {
 	return true, nil
 }
 
+// Unload clears the cached target and resets memory state.
+//
+// It preserves the current disk-state metadata.
 func (l *Link) Unload() {
 	l.target = nil
 	l.memory = MemoryUnknown
@@ -349,12 +417,20 @@ func (l *Link) Unload() {
 
 // Discover
 
+// Discover refreshes disk-state metadata without replacing the cached target.
+//
+// For Link, Discover has the same local effect as Scan.
 func (l *Link) Discover() (DiskState, error) {
 	return l.Scan()
 }
 
 // Sync
 
+// Sync creates or rewrites the symlink from the cached target when policy
+// allows the current state.
+//
+// Sync ensures the parent directory for the link itself but does not create or
+// validate the link target payload.
 func (l *Link) Sync(ctx Context) (ResultCode, error) {
 	if l.target == nil {
 		return SyncSkippedNoContent, nil
@@ -375,6 +451,9 @@ func (l *Link) Sync(ctx Context) (ResultCode, error) {
 
 // Scan
 
+// Scan refreshes disk-state metadata without replacing the cached target.
+//
+// Scan fails if Path exists but is not a symlink.
 func (l *Link) Scan() (DiskState, error) {
 	_, state, err := l.readTarget()
 	if err != nil {

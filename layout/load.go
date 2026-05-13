@@ -5,13 +5,12 @@ import (
 	"reflect"
 )
 
-// LoadDeep
-// Populates cached content from disk. Reflects filesystem into memory.
-// Reflective, filesystem content -> memory cache
-// - scans slots
-// - loads discovered typed files
-// - populates caches
-// - does not create missing files
+// LoadDeep loads composed layout state from disk into memory.
+//
+// It discovers slot-backed children from disk, composes them, and loads typed
+// file content recursively. Missing typed files clear cached content and are
+// marked missing. LoadDeep does not create missing files or write anything back
+// to disk.
 func LoadDeep(target any, ctx Context) (ResultCode, error) {
 	if target == nil {
 		return LoadFailed, fmt.Errorf("target must not be nil")

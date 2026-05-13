@@ -6,8 +6,13 @@ import (
 	"reflect"
 )
 
-// Compose
-// Builds path-bound semantic objects.
+// Compose binds a layout value to a filesystem root.
+//
+// target must be a non-nil pointer to a struct. Exported fields tagged with
+// `layout:"..."` are resolved relative to root and have their paths assigned.
+// Tagged pointer-to-struct fields are allocated automatically when needed.
+//
+// Compose only binds paths in memory. It does not touch the filesystem.
 func Compose(root string, target any) error {
 	root = filepath.Clean(root)
 	return compose(root, root, target)
@@ -162,6 +167,11 @@ func composePathAs[T any](path string, composeBase string) (T, error) {
 	return v.Elem().Interface().(T), nil
 }
 
+// ComposeAs composes a new value of T rooted at root.
+//
+// T must be a struct or pointer to a struct that follows Conduit's composition
+// rules. This is most useful when creating slot-backed children lazily from an
+// already composed Dir.
 func ComposeAs[T any](root Dir) (T, error) {
 	composeBase := root.Path()
 	if base, ok := root.ComposedBaseDir(); ok {

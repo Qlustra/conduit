@@ -9,6 +9,7 @@ import (
 
 // Entry
 
+// Entry records one path-level outcome from a deep traversal operation.
 type Entry struct {
 	Op     Operation
 	Path   string
@@ -16,10 +17,13 @@ type Entry struct {
 	Err    error
 }
 
+// IsError reports whether the entry carries an error.
 func (e Entry) IsError() bool {
 	return e.Err != nil
 }
 
+// IsSkipped reports whether the result represents a visited-but-not-applied
+// outcome.
 func (e Entry) IsSkipped() bool {
 	switch e.Result {
 	case LoadNotApplicable, DiscoverNotApplicable, ScanNotApplicable, SyncNotApplicable, SyncSkippedNoContent, SyncSkippedPolicy:
@@ -29,10 +33,13 @@ func (e Entry) IsSkipped() bool {
 	}
 }
 
+// IsSuccess reports whether the entry completed without error.
 func (e Entry) IsSuccess() bool {
 	return e.Err == nil
 }
 
+// ResultName returns a stable lowercase name for the result code relative to
+// the entry's operation.
 func (e Entry) ResultName() string {
 	switch e.Op {
 	case OpEnsure:
@@ -103,6 +110,9 @@ func (e Entry) ResultName() string {
 
 // Report
 
+// Report collects Entry values produced during deep traversal.
+//
+// A Report is safe for concurrent Record calls.
 type Report struct {
 	mu      sync.RWMutex
 	entries []Entry
@@ -116,6 +126,7 @@ type reportTreeNode struct {
 	index    map[string]*reportTreeNode
 }
 
+// Record appends one entry to the report.
 func (r *Report) Record(entry Entry) {
 	if r == nil {
 		return
@@ -126,6 +137,7 @@ func (r *Report) Record(entry Entry) {
 	r.mu.Unlock()
 }
 
+// Entries returns a snapshot copy of the currently recorded entries.
 func (r *Report) Entries() []Entry {
 	if r == nil {
 		return nil
@@ -139,6 +151,7 @@ func (r *Report) Entries() []Entry {
 	return entries
 }
 
+// Len returns the number of recorded entries.
 func (r *Report) Len() int {
 	if r == nil {
 		return 0
@@ -149,6 +162,7 @@ func (r *Report) Len() int {
 	return len(r.entries)
 }
 
+// HasErrors reports whether any recorded entry carries an error.
 func (r *Report) HasErrors() bool {
 	if r == nil {
 		return false
@@ -166,6 +180,7 @@ func (r *Report) HasErrors() bool {
 	return false
 }
 
+// Filter returns a snapshot of recorded entries for which keep returns true.
 func (r *Report) Filter(keep func(Entry) bool) []Entry {
 	if r == nil {
 		return nil
@@ -184,6 +199,7 @@ func (r *Report) Filter(keep func(Entry) bool) []Entry {
 	return entries
 }
 
+// Sort reorders the recorded entries in place using less.
 func (r *Report) Sort(less func(a Entry, b Entry) bool) {
 	if r == nil {
 		return
@@ -196,6 +212,7 @@ func (r *Report) Sort(less func(a Entry, b Entry) bool) {
 	r.mu.Unlock()
 }
 
+// SortByPath sorts the recorded entries by path, then operation, then result.
 func (r *Report) SortByPath() {
 	r.Sort(func(a Entry, b Entry) bool {
 		if a.Path != b.Path {
@@ -208,6 +225,9 @@ func (r *Report) SortByPath() {
 	})
 }
 
+// RenderTree renders the recorded entries as a path-oriented tree.
+//
+// Entries are sorted by path, operation, and result before rendering.
 func (r *Report) RenderTree() string {
 	entries := r.Entries()
 	if len(entries) == 0 {

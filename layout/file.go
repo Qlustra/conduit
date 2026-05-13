@@ -8,6 +8,11 @@ import (
 	"strings"
 )
 
+// File is a stateless handle to a regular file path.
+//
+// A File may be created directly or attached to a composed layout. When it is
+// attached through Compose, it can also report declared-path and
+// compose-base-relative metadata in addition to its filesystem path.
 type File struct {
 	path         string
 	composeBase  string
@@ -16,6 +21,7 @@ type File struct {
 	hasDeclared  bool
 }
 
+// NewFile returns a standalone file handle for path.
 func NewFile(path string) File {
 	return newFileWithCompose(path, "", false)
 }
@@ -29,24 +35,30 @@ func newFileWithCompose(path string, composeBase string, composed bool) File {
 	return file
 }
 
+// Path returns the bound filesystem path.
 func (f File) Path() string {
 	return f.path
 }
 
+// Base returns the final path element.
 func (f File) Base() string {
 	return filepath.Base(f.path)
 }
 
+// Ext returns the final extension including the leading dot.
 func (f File) Ext() string {
 	_, ext := splitBaseExt(f.Base())
 	return ext
 }
 
+// Stem returns the final path element without its final extension.
 func (f File) Stem() string {
 	stem, _ := splitBaseExt(f.Base())
 	return stem
 }
 
+// ComposedBaseDir returns the root directory that anchored composition, when
+// the handle belongs to a composed tree.
 func (f File) ComposedBaseDir() (Dir, bool) {
 	if !f.composedBase {
 		return Dir{}, false
@@ -54,6 +66,8 @@ func (f File) ComposedBaseDir() (Dir, bool) {
 	return newDirWithCompose(f.composeBase, f.composeBase, true), true
 }
 
+// DeclaredPath returns the node's own layout tag fragment when the handle was
+// attached through Compose.
 func (f File) DeclaredPath() (string, bool) {
 	if !f.hasDeclared {
 		return "", false
@@ -61,6 +75,7 @@ func (f File) DeclaredPath() (string, bool) {
 	return f.declaredPath, true
 }
 
+// JoinDeclaredPath joins parts onto the node's declared layout fragment.
 func (f File) JoinDeclaredPath(parts ...string) (string, bool) {
 	declared, ok := f.DeclaredPath()
 	if !ok {
@@ -69,6 +84,7 @@ func (f File) JoinDeclaredPath(parts ...string) (string, bool) {
 	return joinDeclaredPath(declared, parts...), true
 }
 
+// ComposedRelativePath returns the path relative to the tree's compose base.
 func (f File) ComposedRelativePath() (string, bool) {
 	if !f.composedBase {
 		return "", false
@@ -80,6 +96,7 @@ func (f File) ComposedRelativePath() (string, bool) {
 	return rel, true
 }
 
+// JoinComposedPath joins parts onto the compose-base-relative path.
 func (f File) JoinComposedPath(parts ...string) (string, bool) {
 	rel, ok := f.ComposedRelativePath()
 	if !ok {
@@ -91,6 +108,7 @@ func (f File) JoinComposedPath(parts ...string) (string, bool) {
 	return filepath.Join(append([]string{rel}, parts...)...), true
 }
 
+// RelTo returns the path relative to base.
 func (f File) RelTo(base Pather) (string, error) {
 	if base == nil {
 		return "", fmt.Errorf("base path must not be nil")
@@ -98,6 +116,7 @@ func (f File) RelTo(base Pather) (string, error) {
 	return filepath.Rel(base.Path(), f.Path())
 }
 
+// JoinRelTo joins parts onto the path relative to base.
 func (f File) JoinRelTo(base Pather, parts ...string) (string, error) {
 	rel, err := f.RelTo(base)
 	if err != nil {
@@ -109,10 +128,12 @@ func (f File) JoinRelTo(base Pather, parts ...string) (string, error) {
 	return filepath.Join(append([]string{rel}, parts...)...), nil
 }
 
+// RelToPath returns the path relative to base.
 func (f File) RelToPath(base string) (string, error) {
 	return filepath.Rel(filepath.Clean(base), f.Path())
 }
 
+// JoinRelToPath joins parts onto the path relative to base.
 func (f File) JoinRelToPath(base string, parts ...string) (string, error) {
 	rel, err := f.RelToPath(base)
 	if err != nil {
@@ -124,15 +145,19 @@ func (f File) JoinRelToPath(base string, parts ...string) (string, error) {
 	return filepath.Join(append([]string{rel}, parts...)...), nil
 }
 
+// Exists reports whether a filesystem entry currently exists at Path.
 func (f File) Exists() bool {
 	_, err := os.Stat(f.Path())
 	return err == nil
 }
 
+// Chown applies os.Chown to the file path.
 func (f File) Chown(uid int, gid int) error {
 	return os.Chown(f.Path(), uid, gid)
 }
 
+// IsExecutable reports whether Path currently points to an executable regular
+// file.
 func (f File) IsExecutable() bool {
 	info, err := os.Stat(f.Path())
 	if err != nil {
@@ -141,10 +166,13 @@ func (f File) IsExecutable() bool {
 	return info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
 }
 
+// Truncate resizes the file in place using os.Truncate.
 func (f File) Truncate(size int64) error {
 	return os.Truncate(f.Path(), size)
 }
 
+// WriteBytes creates parent directories if needed and rewrites the file
+// contents.
 func (f File) WriteBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(f.path), dirMode); err != nil {
 		return err
@@ -152,10 +180,12 @@ func (f File) WriteBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode)
 	return os.WriteFile(f.path, data, fileMode)
 }
 
+// ReadBytes reads the file contents.
 func (f File) ReadBytes() ([]byte, error) {
 	return os.ReadFile(f.path)
 }
 
+// DeleteIfExists removes the file when it exists.
 func (f File) DeleteIfExists() error {
 	_, err := os.Stat(f.Path())
 	if err != nil {
@@ -164,6 +194,8 @@ func (f File) DeleteIfExists() error {
 	return os.Remove(f.Path())
 }
 
+// ReadBytesIfExists reads the file when present and returns ok == false when
+// it is missing.
 func (f File) ReadBytesIfExists() ([]byte, bool, error) {
 	data, err := f.ReadBytes()
 	if err == nil {
@@ -177,6 +209,7 @@ func (f File) ReadBytesIfExists() ([]byte, bool, error) {
 
 // Compose
 
+// ComposePath binds the handle to path and resets composition metadata.
 func (f *File) ComposePath(path string) {
 	f.path = filepath.Clean(path)
 	f.composeBase = ""
@@ -195,6 +228,9 @@ func (f *File) setDeclaredPath(path string) {
 
 // Ensure
 
+// Ensure creates parent directories and creates the file when it is missing.
+//
+// Existing contents are preserved.
 func (f File) Ensure(ctx Context) error {
 	if err := os.MkdirAll(filepath.Dir(f.path), ctx.DirMode); err != nil {
 		return err
@@ -234,6 +270,7 @@ func joinDeclaredPath(base string, parts ...string) string {
 
 // Copy
 
+// CopyToPath copies the file payload onto the exact destination path.
 func (f File) CopyToPath(path string, opts CopyOptions) error {
 	dst := filepath.Clean(path)
 	if samePath(f.Path(), dst) {
@@ -243,10 +280,12 @@ func (f File) CopyToPath(path string, opts CopyOptions) error {
 	return newCopier(opts).copyFile(f.Path(), dst)
 }
 
+// CopyToFile copies the file payload onto dst.Path().
 func (f File) CopyToFile(dst File, opts CopyOptions) error {
 	return f.CopyToPath(dst.Path(), opts)
 }
 
+// CopyIntoDir copies the file under dir using the source basename.
 func (f File) CopyIntoDir(dir Dir, opts CopyOptions) error {
 	return f.CopyToPath(dir.File(f.Base()).Path(), opts)
 }

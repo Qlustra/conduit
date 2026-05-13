@@ -8,21 +8,28 @@ import (
 	"sync"
 )
 
+// SlotEntry is one cached key-item pair returned by Slot.Entries.
 type SlotEntry[T any] struct {
 	Name string
 	Item T
 }
 
+// Slot models repeated child layouts under one directory.
+//
+// Each key maps to one child root below the slot path. Slot caches composed
+// items in memory and discovers or loads them only when explicitly asked.
 type Slot[T any] struct {
 	root  Dir
 	mu    sync.RWMutex
 	items map[string]T
 }
 
+// NewSlot returns a slot rooted at root.
 func NewSlot[T any](root Dir) Slot[T] {
 	return Slot[T]{root: root}
 }
 
+// Path returns the slot root directory path.
 func (s *Slot[T]) Path() string {
 	return s.root.Path()
 }
@@ -47,14 +54,17 @@ func (s *Slot[T]) JoinComposedPath(parts ...string) (string, bool) {
 	return s.root.JoinComposedPath(parts...)
 }
 
+// Exists reports whether the slot root currently exists on disk.
 func (s *Slot[T]) Exists() bool {
 	return s.root.Exists()
 }
 
+// Root returns the slot root directory handle.
 func (s *Slot[T]) Root() Dir {
 	return s.root
 }
 
+// Len returns the number of cached items.
 func (s *Slot[T]) Len() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -62,11 +72,13 @@ func (s *Slot[T]) Len() int {
 	return len(s.items)
 }
 
+// Has reports whether a child directory with name currently exists on disk.
 func (s *Slot[T]) Has(name string) bool {
 	_, err := os.Stat(s.root.Dir(name).Path())
 	return err == nil
 }
 
+// Get returns the cached item for name without composing a missing one.
 func (s *Slot[T]) Get(name string) (T, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -75,6 +87,7 @@ func (s *Slot[T]) Get(name string) (T, bool) {
 	return item, ok
 }
 
+// Put inserts or replaces a cached item without touching disk.
 func (s *Slot[T]) Put(name string, item T) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -85,6 +98,7 @@ func (s *Slot[T]) Put(name string, item T) {
 	s.items[name] = item
 }
 
+// Remove evicts a cached item without touching disk.
 func (s *Slot[T]) Remove(name string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -92,6 +106,8 @@ func (s *Slot[T]) Remove(name string) {
 	delete(s.items, name)
 }
 
+// Delete removes the child directory tree from disk and evicts the cached
+// item.
 func (s *Slot[T]) Delete(name string) error {
 	if err := s.root.Dir(name).DeleteIfExists(); err != nil {
 		return err
@@ -104,6 +120,7 @@ func (s *Slot[T]) Delete(name string) error {
 	return nil
 }
 
+// Clear drops all cached items without touching disk.
 func (s *Slot[T]) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -111,6 +128,9 @@ func (s *Slot[T]) Clear() {
 	s.items = make(map[string]T)
 }
 
+// Entries returns a sorted snapshot of cached entries.
+//
+// Entries is cache-based only; it does not discover from disk.
 func (s *Slot[T]) Entries() []SlotEntry[T] {
 	s.mu.RLock()
 	entries := make([]SlotEntry[T], 0, len(s.items))
@@ -129,6 +149,9 @@ func (s *Slot[T]) Entries() []SlotEntry[T] {
 	return entries
 }
 
+// All iterates cached entries in sorted key order.
+//
+// All is cache-based only; it does not discover from disk.
 func (s *Slot[T]) All() iter.Seq2[string, T] {
 	return func(yield func(string, T) bool) {
 		for _, entry := range s.Entries() {
@@ -139,6 +162,7 @@ func (s *Slot[T]) All() iter.Seq2[string, T] {
 	}
 }
 
+// Keys returns the cached item names in sorted order.
 func (s *Slot[T]) Keys() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -151,6 +175,10 @@ func (s *Slot[T]) Keys() []string {
 	return keys
 }
 
+// At returns the cached item for name, composing and caching it on demand when
+// needed.
+//
+// At does not ensure the item exists on disk.
 func (s *Slot[T]) At(name string) (T, error) {
 	s.mu.RLock()
 	// Fast path under RLock. On a miss, compose outside the mutex and
@@ -184,6 +212,7 @@ func (s *Slot[T]) At(name string) (T, error) {
 	return item, nil
 }
 
+// MustAt returns At(name) or panics on composition error.
 func (s *Slot[T]) MustAt(name string) T {
 	v, err := s.At(name)
 	if err != nil {
@@ -192,6 +221,8 @@ func (s *Slot[T]) MustAt(name string) T {
 	return v
 }
 
+// Add ensures the child root exists on disk, composes the item, ensures its
+// declared structure, and caches it.
 func (s *Slot[T]) Add(name string, ctx Context) (T, error) {
 	childRoot := s.root.Dir(name)
 
@@ -233,6 +264,8 @@ func (s *Slot[T]) Add(name string, ctx Context) (T, error) {
 	return item, nil
 }
 
+// Require returns the named item only if its child directory already exists on
+// disk.
 func (s *Slot[T]) Require(name string) (T, error) {
 	child := s.root.Dir(name)
 	if _, err := os.Stat(child.Path()); err != nil {
@@ -245,6 +278,7 @@ func (s *Slot[T]) Require(name string) (T, error) {
 
 // Compose
 
+// ComposePath binds the slot root and clears the cache.
 func (s *Slot[T]) ComposePath(path string) {
 	s.root = NewDir(path)
 	s.items = make(map[string]T)
@@ -260,10 +294,14 @@ func (s *Slot[T]) setDeclaredPath(path string) {
 
 // Ensure
 
+// Ensure creates the slot root directory.
 func (s *Slot[T]) Ensure(ctx Context) error {
 	return s.root.Ensure(ctx)
 }
 
+// EnsureDeep ensures the slot root and all currently cached items.
+//
+// It does not invent uncached entries.
 func (s *Slot[T]) EnsureDeep(ctx Context) (ResultCode, error) {
 	if err := s.root.Ensure(ctx); err != nil {
 		return EnsureFailed, err
@@ -290,6 +328,8 @@ func (s *Slot[T]) EnsureDeep(ctx Context) (ResultCode, error) {
 
 // Load
 
+// LoadDeep discovers child directories from disk, composes them, and loads
+// them recursively.
 func (s *Slot[T]) LoadDeep(ctx Context) (ResultCode, error) {
 	entries, err := os.ReadDir(s.root.Path())
 	if err != nil {
@@ -320,6 +360,9 @@ func (s *Slot[T]) LoadDeep(ctx Context) (ResultCode, error) {
 
 // Scan
 
+// ScanDeep scans only currently cached items.
+//
+// It does not discover new slot entries from disk.
 func (s *Slot[T]) ScanDeep(ctx Context) (ResultCode, error) {
 	s.mu.RLock()
 	items := make(map[string]T, len(s.items))
@@ -339,6 +382,8 @@ func (s *Slot[T]) ScanDeep(ctx Context) (ResultCode, error) {
 
 // Discover
 
+// DiscoverDeep discovers child directories from disk and scans them
+// recursively without loading typed content.
 func (s *Slot[T]) DiscoverDeep(ctx Context) (ResultCode, error) {
 	entries, err := os.ReadDir(s.root.Path())
 	if err != nil {
@@ -369,6 +414,9 @@ func (s *Slot[T]) DiscoverDeep(ctx Context) (ResultCode, error) {
 
 // Sync
 
+// SyncDeep ensures and syncs only currently cached items.
+//
+// It does not invent uncached entries.
 func (s *Slot[T]) SyncDeep(ctx Context) (ResultCode, error) {
 	s.mu.RLock()
 	items := make(map[string]T, len(s.items))
@@ -391,6 +439,7 @@ func (s *Slot[T]) SyncDeep(ctx Context) (ResultCode, error) {
 
 // Render
 
+// RenderDeep renders only currently cached items.
 func (s *Slot[T]) RenderDeep() error {
 	s.mu.RLock()
 	items := make(map[string]T, len(s.items))
@@ -410,6 +459,7 @@ func (s *Slot[T]) RenderDeep() error {
 
 // Default
 
+// DefaultDeep applies defaults only to currently cached items.
 func (s *Slot[T]) DefaultDeep() error {
 	s.mu.RLock()
 	items := make(map[string]T, len(s.items))

@@ -5,13 +5,13 @@ import (
 	"reflect"
 )
 
-// RenderDeep
-// Derives renderable text content into memory for already composed/cached items.
-// Reflective, render state -> text cache
-// - walks already composed/cached hierarchy
-// - renders text-backed template wrappers
-// - does not discover slot entries
-// - does not write to disk
+// RenderDeep derives rendered text content into memory for a composed or
+// cached layout.
+//
+// It walks already composed or cached children, evaluates Renderable or
+// Templatable nodes, and stores the rendered text in their cached file
+// content. RenderDeep does not discover slot entries or write anything to
+// disk.
 func RenderDeep(target any) error {
 	if target == nil {
 		return fmt.Errorf("target must not be nil")

@@ -5,10 +5,10 @@ import (
 	"reflect"
 )
 
-// ScanDeep
-// Scans filesystem according to in-memory semantic structures and compares observed state.
-// Observes both sides without mutating either.
-// Observational, filesystem presence -> handler state/cache metadata
+// ScanDeep refreshes disk-state metadata for already composed or cached items.
+//
+// It observes whether known nodes are present on disk without loading content
+// into memory, discovering new slot entries, or writing anything back to disk.
 func ScanDeep(target any, ctx Context) (ResultCode, error) {
 	if target == nil {
 		return ScanFailed, fmt.Errorf("target must not be nil")

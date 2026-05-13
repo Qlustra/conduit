@@ -8,29 +8,61 @@ import (
 	"strings"
 )
 
+// CopySymlinkPolicy controls how copy helpers handle symlinks encountered in
+// the source tree.
 type CopySymlinkPolicy uint8
 
 const (
+	// CopySymlinkPreserve recreates symlinks as symlinks using the raw source
+	// target string.
 	CopySymlinkPreserve CopySymlinkPolicy = iota
+
+	// CopySymlinkFollow copies the payload reached through the symlink instead of
+	// preserving the symlink entry.
 	CopySymlinkFollow
+
+	// CopySymlinkReject fails when a symlink is encountered.
 	CopySymlinkReject
 )
 
+// CopyOverwritePolicy controls what copy helpers do when the destination
+// already exists.
 type CopyOverwritePolicy uint8
 
 const (
+	// CopyOverwriteFail returns an error when the destination already exists.
 	CopyOverwriteFail CopyOverwritePolicy = iota
+
+	// CopyOverwriteReplace removes the existing destination before copying.
 	CopyOverwriteReplace
 )
 
+// CopyOptions configures File and Dir copy helpers.
+//
+// The zero value is treated as DefaultCopyOptions.
 type CopyOptions struct {
-	Overwrite    CopyOverwritePolicy
-	Symlinks     CopySymlinkPolicy
+	// Overwrite controls whether an existing destination is rejected or
+	// replaced.
+	Overwrite CopyOverwritePolicy
+
+	// Symlinks controls how symlinks in the source tree are handled.
+	Symlinks CopySymlinkPolicy
+
+	// PreserveMode controls whether source modes are reused on created files and
+	// directories.
 	PreserveMode bool
-	FileMode     os.FileMode
-	DirMode      os.FileMode
+
+	// FileMode is the fallback mode for created files when PreserveMode is
+	// false.
+	FileMode os.FileMode
+
+	// DirMode is the fallback mode for created directories when PreserveMode is
+	// false.
+	DirMode os.FileMode
 }
 
+// DefaultCopyOptions preserves source modes and symlinks and fails if the
+// destination already exists.
 var DefaultCopyOptions = CopyOptions{
 	Overwrite:    CopyOverwriteFail,
 	Symlinks:     CopySymlinkPreserve,

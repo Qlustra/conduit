@@ -14,22 +14,29 @@ var (
 	errExecInterpreterEmpty = errors.New("interpreter must contain a command")
 )
 
+// Exec is a File with executable creation and process-launch helpers.
 type Exec struct {
 	File
 }
 
+// NewExec returns a standalone executable file handle for path.
 func NewExec(path string) Exec {
 	return Exec{File: NewFile(path)}
 }
 
+// ComposePath binds the executable handle to path.
 func (e *Exec) ComposePath(path string) {
 	e.File = NewFile(path)
 }
 
+// Ensure creates the file and ensures executable permissions.
 func (e Exec) Ensure(ctx Context) error {
 	return e.EnsureExecutable(ctx)
 }
 
+// EnsureExecutable creates the file if needed and applies executable mode.
+//
+// When ctx.ExecMode is zero, FileMode is used with execute bits added.
 func (e Exec) EnsureExecutable(ctx Context) error {
 	ctx.FileMode = e.executableMode(ctx)
 	if err := e.File.Ensure(ctx); err != nil {
@@ -38,20 +45,41 @@ func (e Exec) EnsureExecutable(ctx Context) error {
 	return os.Chmod(e.Path(), ctx.FileMode)
 }
 
+// IsExecutable reports whether Path currently points to an executable regular
+// file.
 func (e Exec) IsExecutable() bool {
 	return e.File.IsExecutable()
 }
 
+// RunOptions configures process execution for Exec helpers.
 type RunOptions struct {
-	Dir         string
-	Args        []string
-	Env         []string
-	Stdin       io.Reader
-	Stdout      io.Writer
-	Stderr      io.Writer
+	// Dir sets the process working directory.
+	Dir string
+
+	// Args supplies argv after the executable path.
+	Args []string
+
+	// Env appends environment variables to the current process environment.
+	Env []string
+
+	// Stdin connects process standard input.
+	Stdin io.Reader
+
+	// Stdout connects process standard output.
+	Stdout io.Writer
+
+	// Stderr connects process standard error.
+	Stderr io.Writer
+
+	// Interpreter, when set, runs the managed file as an argument to the named
+	// interpreter command.
 	Interpreter []string
 }
 
+// Command builds an exec.Cmd for the managed file.
+//
+// Invalid configuration is reflected in cmd.Err rather than being returned
+// separately.
 func (e Exec) Command(ctx context.Context, opts RunOptions) *exec.Cmd {
 	cmd, err := e.command(ctx, opts)
 	if err != nil {
@@ -96,10 +124,14 @@ func (e Exec) command(ctx context.Context, opts RunOptions) (*exec.Cmd, error) {
 	return cmd, nil
 }
 
+// Run executes the managed file using opts.
 func (e Exec) Run(ctx context.Context, opts RunOptions) error {
 	return e.Command(ctx, opts).Run()
 }
 
+// Output executes the managed file and captures standard output.
+//
+// It returns an error if opts.Stdout or opts.Stderr is already set.
 func (e Exec) Output(ctx context.Context, opts RunOptions) ([]byte, error) {
 	cmd := e.Command(ctx, opts)
 	if opts.Stdout != nil || opts.Stderr != nil {
@@ -108,6 +140,10 @@ func (e Exec) Output(ctx context.Context, opts RunOptions) ([]byte, error) {
 	return cmd.Output()
 }
 
+// CombinedOutput executes the managed file and captures combined standard
+// output and standard error.
+//
+// It returns an error if opts.Stdout or opts.Stderr is already set.
 func (e Exec) CombinedOutput(ctx context.Context, opts RunOptions) ([]byte, error) {
 	cmd := e.Command(ctx, opts)
 	if opts.Stdout != nil || opts.Stderr != nil {
@@ -118,6 +154,7 @@ func (e Exec) CombinedOutput(ctx context.Context, opts RunOptions) ([]byte, erro
 
 // Ensure
 
+// EnsureDeep ensures the executable node during deep traversal.
 func (e Exec) EnsureDeep(ctx Context) (ResultCode, error) {
 	err := e.Ensure(ctx)
 	result := EnsureEnsured

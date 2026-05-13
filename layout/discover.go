@@ -5,13 +5,13 @@ import (
 	"reflect"
 )
 
-// DiscoverDeep
-// Discovers filesystem-backed layout structure without loading typed file content.
-// Reflective, filesystem presence -> composed structure and handler state/cache metadata
-// - discovers slots from disk
-// - scans discovered typed files
-// - populates slot caches
-// - does not load file content into memory
+// DiscoverDeep discovers composed layout structure from disk without loading
+// typed file content.
+//
+// It discovers slot-backed children from disk, composes them, and refreshes
+// disk-state metadata for discovered typed files. In-memory typed content is
+// preserved. DiscoverDeep does not create files, write files, or replace
+// cached typed values from disk.
 func DiscoverDeep(target any, ctx Context) (ResultCode, error) {
 	if target == nil {
 		return DiscoverFailed, fmt.Errorf("target must not be nil")
