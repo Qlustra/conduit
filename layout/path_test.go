@@ -5,6 +5,10 @@ import (
 	"testing"
 )
 
+type testJSONFile struct {
+	testMapFile
+}
+
 func TestDirPathHelpers(t *testing.T) {
 	dir := NewDir(filepath.Join("workspace", "services", "api.v2"))
 
@@ -53,8 +57,9 @@ func TestComposedPathsTrackComposeBaseAcrossTree(t *testing.T) {
 	}
 
 	type workspace struct {
-		Root     Dir            `layout:"."`
-		Services Slot[*service] `layout:"services"`
+		Root     Dir                    `layout:"."`
+		Services Slot[*service]         `layout:"services"`
+		Configs  FileSlot[testJSONFile] `layout:"configs"`
 	}
 
 	var ws workspace
@@ -85,6 +90,12 @@ func TestComposedPathsTrackComposeBaseAcrossTree(t *testing.T) {
 	if got, ok := ws.Services.JoinComposedPath("api"); !ok || got != filepath.Join("services", "api") {
 		t.Fatalf("Services.JoinComposedPath() = (%q, %t), want (%q, true)", got, ok, filepath.Join("services", "api"))
 	}
+	if got, ok := ws.Configs.ComposedRelativePath(); !ok || got != "configs" {
+		t.Fatalf("Configs.ComposedRelativePath() = (%q, %t), want (%q, true)", got, ok, "configs")
+	}
+	if got, ok := ws.Configs.JoinComposedPath("app.json"); !ok || got != filepath.Join("configs", "app.json") {
+		t.Fatalf("Configs.JoinComposedPath() = (%q, %t), want (%q, true)", got, ok, filepath.Join("configs", "app.json"))
+	}
 
 	if got, ok := svc.Root.ComposedRelativePath(); !ok || got != filepath.Join("services", "api") {
 		t.Fatalf("service.Root.ComposedRelativePath() = (%q, %t), want (%q, true)", got, ok, filepath.Join("services", "api"))
@@ -100,12 +111,18 @@ func TestComposedPathsTrackComposeBaseAcrossTree(t *testing.T) {
 	if got, ok := svc.Config.JoinComposedPath("bak"); !ok || got != filepath.Join("services", "api", "config.yaml", "bak") {
 		t.Fatalf("Config.JoinComposedPath() = (%q, %t), want (%q, true)", got, ok, filepath.Join("services", "api", "config.yaml", "bak"))
 	}
+
+	config := ws.Configs.MustAt("app.json")
+	if got, ok := config.ComposedRelativePath(); !ok || got != filepath.Join("configs", "app.json") {
+		t.Fatalf("config.ComposedRelativePath() = (%q, %t), want (%q, true)", got, ok, filepath.Join("configs", "app.json"))
+	}
 }
 
 func TestComposedPathsAreUnavailableWithoutComposition(t *testing.T) {
 	dir := NewDir("workspace")
 	file := NewFile(filepath.Join("workspace", "config.yaml"))
 	slot := NewSlot[*struct{}](dir)
+	fileSlot := NewFileSlot[testJSONFile](dir)
 
 	if _, ok := dir.ComposedBaseDir(); ok {
 		t.Fatal("Dir.ComposedBaseDir() ok = true, want false")
@@ -136,6 +153,15 @@ func TestComposedPathsAreUnavailableWithoutComposition(t *testing.T) {
 	if _, ok := slot.JoinComposedPath("child"); ok {
 		t.Fatal("Slot.JoinComposedPath() ok = true, want false")
 	}
+	if _, ok := fileSlot.ComposedBaseDir(); ok {
+		t.Fatal("FileSlot.ComposedBaseDir() ok = true, want false")
+	}
+	if _, ok := fileSlot.ComposedRelativePath(); ok {
+		t.Fatal("FileSlot.ComposedRelativePath() ok = true, want false")
+	}
+	if _, ok := fileSlot.JoinComposedPath("child"); ok {
+		t.Fatal("FileSlot.JoinComposedPath() ok = true, want false")
+	}
 }
 
 func TestDeclaredPathsTrackLocalLayoutFragments(t *testing.T) {
@@ -146,8 +172,9 @@ func TestDeclaredPathsTrackLocalLayoutFragments(t *testing.T) {
 	}
 
 	type workspace struct {
-		Root     Dir            `layout:"."`
-		Services Slot[*service] `layout:"services"`
+		Root     Dir                    `layout:"."`
+		Services Slot[*service]         `layout:"services"`
+		Configs  FileSlot[testJSONFile] `layout:"configs"`
 	}
 
 	var ws workspace
@@ -170,6 +197,12 @@ func TestDeclaredPathsTrackLocalLayoutFragments(t *testing.T) {
 	if got, ok := ws.Services.JoinDeclaredPath("api"); !ok || got != filepath.Join("services", "api") {
 		t.Fatalf("Services.JoinDeclaredPath() = (%q, %t), want (%q, true)", got, ok, filepath.Join("services", "api"))
 	}
+	if got, ok := ws.Configs.DeclaredPath(); !ok || got != "configs" {
+		t.Fatalf("Configs.DeclaredPath() = (%q, %t), want (%q, true)", got, ok, "configs")
+	}
+	if got, ok := ws.Configs.JoinDeclaredPath("app.json"); !ok || got != filepath.Join("configs", "app.json") {
+		t.Fatalf("Configs.JoinDeclaredPath() = (%q, %t), want (%q, true)", got, ok, filepath.Join("configs", "app.json"))
+	}
 
 	if got, ok := svc.Root.DeclaredPath(); !ok || got != "." {
 		t.Fatalf("service.Root.DeclaredPath() = (%q, %t), want (%q, true)", got, ok, ".")
@@ -190,6 +223,11 @@ func TestDeclaredPathsTrackLocalLayoutFragments(t *testing.T) {
 	}
 	if _, ok := derived.JoinDeclaredPath("child"); ok {
 		t.Fatal("derived Dir.JoinDeclaredPath() ok = true, want false")
+	}
+
+	config := ws.Configs.MustAt("app.json")
+	if _, ok := config.DeclaredPath(); ok {
+		t.Fatal("file slot item DeclaredPath() ok = true, want false")
 	}
 }
 

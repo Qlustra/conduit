@@ -5,7 +5,7 @@ Conduit layouts are plain Go structs with `layout` tags. `Compose` walks the str
 In code, that usually means:
 
 - import `github.com/qlustra/conduit` for operations such as `Compose`
-- import `github.com/qlustra/conduit/layout` for `Dir`, `File`, `Link`, `FileLink`, `DirLink`, `Exec`, `Slot[T]`, and `TextTemplate[C]`
+- import `github.com/qlustra/conduit/layout` for `Dir`, `File`, `Link`, `FileLink`, `DirLink`, `Exec`, `Slot[T]`, `FileSlot[T]`, and `TextTemplate[C]`
 - import `github.com/qlustra/conduit/formats` for `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`
 
 ## Defining a layout
@@ -188,6 +188,34 @@ The composed-path helpers return `ok == false` until a node has been attached th
 The declared-path helpers are different: they return the node's own declared layout fragment only. They do not reconstruct ancestor fragments. For example, a field declared as `layout:"build"` reports `build`, not `bin/build`, even when it lives inside a nested struct rooted at `layout:"bin"`.
 
 The ordinary relative helpers are different again: they ignore composition metadata and declared layout metadata entirely. They just perform `filepath.Rel` and optional joining against another path-bearing node or a raw base path.
+
+### `FileSlot[T]`
+
+`FileSlot[T]` models repeated direct-child files under one directory:
+
+```go
+type Workspace struct {
+	Configs layout.FileSlot[formats.YAMLFile[ServiceConfig]] `layout:"configs"`
+}
+```
+
+Each key becomes a file path directly under the slot path:
+
+```text
+configs/
+  api.yaml
+  worker.yaml
+```
+
+Useful methods mirror `Slot[T]`, but with file semantics:
+
+- `At(name)` composes and caches an item lazily at `slotRoot/<name>`.
+- `Add(name, ctx)` ensures the slot root, composes the file-backed item, and ensures it.
+- `Delete(name)` removes the child file from disk when it exists and evicts the cached item.
+- `Require(name)` fails unless the child file already exists on disk.
+- `LoadDeep(ctx)` and `DiscoverDeep(ctx)` enumerate direct child files and ignore subdirectories.
+
+As with `Slot[T]`, `Entries()`, `All()`, `Len()`, and `Keys()` are cache-based only.
 
 ## Composition rules
 

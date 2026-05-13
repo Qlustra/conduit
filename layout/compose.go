@@ -114,14 +114,11 @@ func resolvePath(base string, tag string) string {
 	}
 }
 
-func ComposeAs[T any](root Dir) (T, error) {
+func composePathAs[T any](path string, composeBase string) (T, error) {
 	var zero T
 
 	typ := reflect.TypeOf((*T)(nil)).Elem()
-	composeBase := root.Path()
-	if base, ok := root.ComposedBaseDir(); ok {
-		composeBase = base.Path()
-	}
+	composeBaseAwareType := reflect.TypeOf((*composeBaseAware)(nil)).Elem()
 
 	if typ.Kind() == reflect.Pointer {
 		elem := typ.Elem()
@@ -130,7 +127,15 @@ func ComposeAs[T any](root Dir) (T, error) {
 		}
 
 		v := reflect.New(elem)
-		if err := compose(root.Path(), composeBase, v.Interface()); err != nil {
+		if v.Type().Implements(composableEntryType) {
+			v.Interface().(Composable).ComposePath(path)
+			if v.Type().Implements(composeBaseAwareType) {
+				v.Interface().(composeBaseAware).setComposeBase(composeBase)
+			}
+			return v.Interface().(T), nil
+		}
+
+		if err := compose(path, composeBase, v.Interface()); err != nil {
 			return zero, err
 		}
 
@@ -142,9 +147,25 @@ func ComposeAs[T any](root Dir) (T, error) {
 	}
 
 	v := reflect.New(typ)
-	if err := compose(root.Path(), composeBase, v.Interface()); err != nil {
+	if v.Type().Implements(composableEntryType) {
+		v.Interface().(Composable).ComposePath(path)
+		if v.Type().Implements(composeBaseAwareType) {
+			v.Interface().(composeBaseAware).setComposeBase(composeBase)
+		}
+		return v.Elem().Interface().(T), nil
+	}
+
+	if err := compose(path, composeBase, v.Interface()); err != nil {
 		return zero, err
 	}
 
 	return v.Elem().Interface().(T), nil
+}
+
+func ComposeAs[T any](root Dir) (T, error) {
+	composeBase := root.Path()
+	if base, ok := root.ComposedBaseDir(); ok {
+		composeBase = base.Path()
+	}
+	return composePathAs[T](root.Path(), composeBase)
 }

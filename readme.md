@@ -6,7 +6,7 @@ Conduit is a contract-based content manager for Go.
 The module is split into three public packages:
 
 - `github.com/qlustra/conduit` for operations, `Context`, and sync policy
-- `github.com/qlustra/conduit/layout` for structural nodes such as `Dir`, `File`, `Link`, `Exec`, `Slot[T]`, and `TextTemplate[C]`
+- `github.com/qlustra/conduit/layout` for structural nodes such as `Dir`, `File`, `Link`, `Exec`, `Slot[T]`, `FileSlot[T]`, and `TextTemplate[C]`
 - `github.com/qlustra/conduit/formats` for codec-backed typed files such as `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`
 
 It lets you describe a filesystem as semantic Go types, then move state explicitly between disk and memory:
@@ -86,6 +86,21 @@ ctx := conduit.DefaultContext
 ctx.SyncPolicy = conduit.SyncIfMissing
 
 _, _ = conduit.SyncDeep(&ws, ctx)
+```
+
+Direct child files can be modeled with `FileSlot[T]`:
+
+```go
+type Workspace struct {
+	Configs layout.FileSlot[formats.YAMLFile[AppConfig]] `layout:"configs"`
+}
+
+var ws Workspace
+_ = conduit.Compose("/workspace", &ws)
+
+cfg, _ := ws.Configs.Add("billing.yaml", conduit.DefaultContext)
+_ = cfg.LoadOrInit(AppConfig{Name: "billing", Port: 8080})
+_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
 ```
 
 Managed executables stay part of the layout and can be run through `Exec`:

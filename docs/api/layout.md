@@ -264,7 +264,7 @@ Description:
 
 Notable behavior:
 
-- implemented naturally by `Dir`, `File`, `Exec`, `Slot[T]`, typed files, and text-template wrappers that expose `Path()`
+- implemented naturally by `Dir`, `File`, `Exec`, `Slot[T]`, `FileSlot[T]`, typed files, and text-template wrappers that expose `Path()`
 - used by `RelTo(...)` and `JoinRelTo(...)` without requiring method overloading
 
 ### `Defaulter`
@@ -389,6 +389,68 @@ Notable behavior:
 - `LoadDeep` discovers directory-backed entries from disk
 - `ScanDeep` and `SyncDeep` do not discover uncached entries
 - `Slot.SyncDeep` ensures cached children before syncing them
+
+### `FileSlot[T]`
+
+```go
+type FileSlot[T any] struct{}
+```
+
+### `FileSlotEntry[T]`
+
+```go
+type FileSlotEntry[T any] struct {
+	Name string
+	Item T
+}
+```
+
+Description:
+
+- keyed container for repeated direct-child files rooted under one directory
+
+Methods:
+
+- `Path() string`: returns the slot root path
+- `DeclaredPath() (string, bool)`: returns the slot field's declared layout fragment
+- `JoinDeclaredPath(parts ...string) (string, bool)`: joins path parts onto the slot's declared layout fragment
+- `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the slot belongs to a composed tree
+- `ComposedRelativePath() (string, bool)`: returns the slot root path relative to the compose base directory
+- `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the slot's composed-relative path
+- `Exists() bool`: reports whether the slot root exists on disk
+- `Root() Dir`: returns the slot root as a `Dir`
+- `Len() int`: returns the number of cached items
+- `Has(name string) bool`: reports whether a named child file exists on disk
+- `Get(name string) (T, bool)`: returns a cached item only
+- `Put(name string, item T)`: inserts or replaces a cached item
+- `Remove(name string)`: removes a cached item
+- `Delete(name string) error`: removes the child file from disk if present and evicts the cached item
+- `Clear()`: clears the cache
+- `Entries() []FileSlotEntry[T]`: returns a sorted snapshot of cached entries
+- `All() iter.Seq2[string, T]`: iterates cached entries in sorted key order
+- `Keys() []string`: returns sorted cached keys
+- `At(name string) (T, error)`: returns a cached item or composes and caches one lazily
+- `MustAt(name string) T`: panicking form of `At`
+- `Add(name string, ctx Context) (T, error)`: ensures the slot root, composes the file-backed item, ensures it, and caches it
+- `Require(name string) (T, error)`: returns an item only when the child file already exists on disk
+- `Ensure(ctx Context) error`: ensures the slot root directory
+- `EnsureDeep(ctx Context) (ResultCode, error)`: ensures the slot root and all cached items
+- `DiscoverDeep(ctx Context) (ResultCode, error)`: discovers child files on disk and scans them without loading typed content
+- `LoadDeep(ctx Context) (ResultCode, error)`: discovers child files on disk and loads them
+- `ScanDeep(ctx Context) (ResultCode, error)`: scans only cached items
+- `SyncDeep(ctx Context) (ResultCode, error)`: ensures cached items, then syncs typed content within those items
+
+Notable behavior:
+
+- `At` composes items relative to `slotRoot/<name>` and caches them
+- `Add` ensures the slot root and calls `EnsureDeep` on the item
+- `Delete` removes both the on-disk child file and the cached entry
+- `Len`, `Entries`, `All`, and `Keys` are cache-based; they do not list the filesystem directly
+- `Entries` and `All` return cached items as-is, preserving pointer or value semantics chosen by `T`
+- the declared-path helpers delegate to the slot root and expose the slot field's own declared fragment
+- the composed-path helpers delegate to the slot root and return `ok == false` until the slot has been attached through `Compose`
+- `DiscoverDeep` and `LoadDeep` discover file-backed entries from disk and ignore subdirectories
+- `ScanDeep` and `SyncDeep` do not discover uncached entries
 
 ### `TextTemplate[C]`
 

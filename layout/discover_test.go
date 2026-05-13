@@ -107,3 +107,79 @@ func TestDiscoverDeepDiscoversSlotEntriesWithoutLoadingContent(t *testing.T) {
 		t.Fatalf("discovered.Config.MemoryState() = %v, want %v", got, MemoryUnknown)
 	}
 }
+
+func TestDiscoverDeepDiscoversFileSlotEntriesWithoutLoadingContent(t *testing.T) {
+	type root struct {
+		Configs FileSlot[*testMapFile] `layout:"configs"`
+	}
+
+	var layout root
+	base := t.TempDir()
+
+	if err := Compose(base, &layout); err != nil {
+		t.Fatalf("Compose() error = %v", err)
+	}
+
+	cached, err := layout.Configs.At("api.json")
+	if err != nil {
+		t.Fatalf("Configs.At() error = %v", err)
+	}
+	cached.Set(map[string]string{"cached": "value"})
+
+	if err := os.MkdirAll(filepath.Dir(cached.Path()), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(cached.Path(), []byte(`{"name":"api"}`), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	diskOnlyPath := filepath.Join(base, "configs", "worker.json")
+	if err := os.MkdirAll(filepath.Dir(diskOnlyPath), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(diskOnlyPath, []byte(`{"name":"worker"}`), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(base, "configs", "nested"), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll() error = %v", err)
+	}
+
+	if _, err := DiscoverDeep(&layout, DefaultContext); err != nil {
+		t.Fatalf("DiscoverDeep() error = %v", err)
+	}
+
+	if got := cached.DiskState(); got != DiskPresent {
+		t.Fatalf("cached.DiskState() = %v, want %v", got, DiskPresent)
+	}
+	if got := cached.MemoryState(); got != MemoryDirty {
+		t.Fatalf("cached.MemoryState() = %v, want %v", got, MemoryDirty)
+	}
+	value, ok := cached.Get()
+	if !ok {
+		t.Fatalf("cached.Get() ok = false, want true")
+	}
+	if got := value["cached"]; got != "value" {
+		t.Fatalf("cached.Get()[\"cached\"] = %q, want %q", got, "value")
+	}
+
+	if keys := layout.Configs.Keys(); len(keys) != 2 || keys[0] != "api.json" || keys[1] != "worker.json" {
+		t.Fatalf("Configs.Keys() = %v, want [api.json worker.json]", keys)
+	}
+
+	discovered, ok := layout.Configs.Get("worker.json")
+	if !ok {
+		t.Fatalf("Configs.Get(\"worker.json\") = false, want true")
+	}
+	if discovered.HasContent() {
+		t.Fatalf("discovered.HasContent() = true, want false")
+	}
+	if got := discovered.DiskState(); got != DiskPresent {
+		t.Fatalf("discovered.DiskState() = %v, want %v", got, DiskPresent)
+	}
+	if got := discovered.MemoryState(); got != MemoryUnknown {
+		t.Fatalf("discovered.MemoryState() = %v, want %v", got, MemoryUnknown)
+	}
+	if _, ok := layout.Configs.Get("nested"); ok {
+		t.Fatalf("Configs.Get(\"nested\") = true, want false")
+	}
+}

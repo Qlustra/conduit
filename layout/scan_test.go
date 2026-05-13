@@ -89,3 +89,55 @@ func TestScanDeepScansCachedFieldsAndDoesNotDiscoverSlotEntries(t *testing.T) {
 		t.Fatalf("Services.Get(\"worker\") = true, want false")
 	}
 }
+
+func TestScanDeepScansCachedFileSlotFieldsAndDoesNotDiscoverEntries(t *testing.T) {
+	type root struct {
+		Configs FileSlot[*testMapFile] `layout:"configs"`
+	}
+
+	var layout root
+	base := t.TempDir()
+
+	if err := Compose(base, &layout); err != nil {
+		t.Fatalf("Compose() error = %v", err)
+	}
+
+	cached, err := layout.Configs.At("api.json")
+	if err != nil {
+		t.Fatalf("Configs.At() error = %v", err)
+	}
+	cached.Set(map[string]string{"cached": "value"})
+
+	if err := os.MkdirAll(filepath.Dir(cached.Path()), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(cached.Path(), []byte(`{"name":"api"}`), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	diskOnlyPath := filepath.Join(base, "configs", "worker.json")
+	if err := os.MkdirAll(filepath.Dir(diskOnlyPath), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(diskOnlyPath, []byte(`{"name":"worker"}`), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	if _, err := ScanDeep(&layout, DefaultContext); err != nil {
+		t.Fatalf("ScanDeep() error = %v", err)
+	}
+
+	if got := cached.DiskState(); got != DiskPresent {
+		t.Fatalf("cached.DiskState() = %v, want %v", got, DiskPresent)
+	}
+	if got := cached.MemoryState(); got != MemoryDirty {
+		t.Fatalf("cached.MemoryState() = %v, want %v", got, MemoryDirty)
+	}
+
+	if keys := layout.Configs.Keys(); len(keys) != 1 || keys[0] != "api.json" {
+		t.Fatalf("Configs.Keys() = %v, want [api.json]", keys)
+	}
+	if _, ok := layout.Configs.Get("worker.json"); ok {
+		t.Fatalf("Configs.Get(\"worker.json\") = true, want false")
+	}
+}
