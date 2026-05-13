@@ -124,3 +124,62 @@ A practical rule:
 - YAML for shared runtime config
 - JSON for machine-generated output
 - TOML for local developer settings
+
+## Generated text with `TextTemplate`
+
+When the output is fully derived text rather than operator-edited structured data, use `layout.TextTemplate[C]`:
+
+```go
+type NotesContext struct {
+	Service string
+	Port    int
+}
+
+type NotesFile struct {
+	layout.TextTemplate[NotesContext]
+}
+
+func (f *NotesFile) Template() string {
+	return "service={{ .Service }}\nport={{ .Port }}\n"
+}
+```
+
+Typical flow:
+
+```go
+notes.SetContext(NotesContext{
+	Service: "api",
+	Port:    8080,
+})
+
+_ = conduit.RenderDeep(&workspace)
+_, _ = notes.Sync(conduit.DefaultContext)
+```
+
+Why `TextTemplate` here:
+
+- it keeps generated text in the same disk/memory state model as the structured formats
+- render context stays separate from rendered file content
+- it fits scripts, README fragments, `.env` files, and other derived text artifacts
+
+## One-time defaults with sync policy
+
+Use typed defaults plus sync policy when a missing file should be initialized once and then left alone:
+
+```go
+_ = svc.Config.LoadOrInit(ServiceConfig{
+	Name: "worker",
+	Port: 7000,
+})
+
+ctx := conduit.DefaultContext
+ctx.SyncPolicy = conduit.SyncIfMissing
+
+_, _ = svc.Config.Sync(ctx)
+```
+
+Why this works:
+
+- `LoadOrInit` keeps the default only in memory when the file is missing
+- `SyncIfMissing` writes only after disk has been observed missing
+- later sync passes skip the file once it exists

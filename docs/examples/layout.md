@@ -93,6 +93,52 @@ This is useful when the filesystem itself is the contract:
 - `EnsureDeep` can create empty script files with executable permissions
 - `Exec` lets the layout invoke those files without hard-coding extra paths elsewhere
 
+## Flat config bundles with `FileSlot[T]`
+
+```go
+type ServiceOverride struct {
+	Replicas int      `yaml:"replicas"`
+	Flags    []string `yaml:"flags"`
+}
+
+type Environment struct {
+	Root      layout.Dir                                           `layout:"."`
+	Overrides layout.FileSlot[formats.YAMLFile[ServiceOverride]]   `layout:"overrides"`
+}
+```
+
+On disk, each key maps directly to one file instead of a child directory:
+
+```text
+environment/
+  overrides/
+    api.yaml
+    worker.yaml
+```
+
+Why this works well:
+
+- `FileSlot[T]` keeps the dynamic key space explicit without inventing an extra directory layer per item
+- each file still participates in the normal typed-file lifecycle (`Load`, `Discover`, `Sync`, `Scan`)
+- it matches cases where the filename itself is the contract, such as `*.yaml` overrides or per-tenant manifests
+
+## Shared assets through links
+
+```go
+type Service struct {
+	Root      layout.Dir      `layout:"."`
+	Config    formats.YAMLFile[ServiceConfig] `layout:"config.yaml"`
+	SharedEnv layout.FileLink `layout:".env"`
+	Cache     layout.DirLink  `layout:"cache"`
+}
+```
+
+This works well when the layout owns the link entry but not the target payload:
+
+- `SharedEnv` can point at a checked-in `.env` template or a generated secret file
+- `Cache` can point several services at one shared dependency cache directory
+- `SyncDeep` manages only the symlink nodes; the linked file or directory stays under separate ownership
+
 ## Tenant directories
 
 ```go
@@ -110,5 +156,5 @@ This pattern is useful when keys come from user input or disk discovery:
 
 - `Items.Add("acme", ctx)` creates a new tenant
 - `DiscoverDeep(&tenants, ctx)` discovers tenants already present on disk without loading their typed files
-- `LoadDeep(&tenants, ctx)` discovers tenants already present on disk
+- `LoadDeep(&tenants, ctx)` discovers tenants already present on disk and loads their typed files
 - `Items.Keys()` gives you a stable list of cached tenant names

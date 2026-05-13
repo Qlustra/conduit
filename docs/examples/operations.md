@@ -141,3 +141,66 @@ _, _ = svc.Config.Sync(ctx)
 ```
 
 This writes the default only after the file has been observed missing, and it skips later sync passes once the file exists.
+
+## Render generated files explicitly
+
+Goal: keep derived text artifacts in a separate render phase instead of mixing them into load or sync.
+
+```go
+type ReadmeContext struct {
+	Name string
+	Port int
+}
+
+type ReadmeFile struct {
+	layout.TextTemplate[ReadmeContext]
+}
+
+func (f *ReadmeFile) Template() string {
+	return "# {{ .Name }}\n\nPort: {{ .Port }}\n"
+}
+
+type Service struct {
+	Readme ReadmeFile `layout:"README.md"`
+}
+
+svc := ws.Services.MustAt("api")
+svc.Readme.SetContext(ReadmeContext{
+	Name: "api",
+	Port: 8080,
+})
+
+_ = conduit.RenderDeep(&ws)
+_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
+```
+
+Why the sequence matters:
+
+- `SetContext` prepares render inputs in memory
+- `RenderDeep` turns template context into cached file content
+- `SyncDeep` persists the rendered text using the same typed-file sync rules as other managed files
+
+## Collect a traversal report
+
+Goal: inspect what a deep operation actually visited and whether it skipped, wrote, or failed per path.
+
+```go
+var report conduit.Report
+
+ctx := conduit.DefaultContext
+ctx.Reporter = &report
+
+_, _ = conduit.SyncDeep(&ws, ctx)
+
+entries := report.Entries()
+tree := report.RenderTree()
+
+_ = entries
+_ = tree
+```
+
+Why this is useful:
+
+- `ResultCode` on the root only tells you the top-level outcome
+- the report lets you inspect per-path results after `EnsureDeep`, `LoadDeep`, `DiscoverDeep`, `ScanDeep`, or `SyncDeep`
+- `RenderTree()` is useful when you want one human-readable summary for logs or tests
