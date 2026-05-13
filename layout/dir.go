@@ -166,3 +166,25 @@ func (d *Dir) setDeclaredPath(path string) {
 func (d Dir) Ensure(ctx Context) error {
 	return os.MkdirAll(d.path, ctx.DirMode)
 }
+
+// Copy
+
+func (d Dir) CopyToPath(path string, opts CopyOptions) error {
+	dst := filepath.Clean(path)
+	if samePath(d.Path(), dst) {
+		return fmt.Errorf("source and destination must differ: %s", d.Path())
+	}
+	if pathWithin(dst, d.Path()) {
+		return fmt.Errorf("destination path %s must not be inside source directory %s", dst, d.Path())
+	}
+
+	return newCopier(opts).copyDir(d.Path(), dst)
+}
+
+func (d Dir) CopyToDir(dst Dir, opts CopyOptions) error {
+	return d.CopyToPath(dst.Path(), opts)
+}
+
+func (d Dir) CopyIntoDir(parent Dir, opts CopyOptions) error {
+	return d.CopyToPath(parent.Dir(d.Base()).Path(), opts)
+}

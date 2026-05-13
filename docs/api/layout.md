@@ -32,6 +32,9 @@ Methods:
 - `Join(parts ...string) string`: joins descendant path segments onto the directory path
 - `Dir(name string) Dir`: returns a child directory handle
 - `File(name string) File`: returns a child file handle
+- `CopyToPath(path string, opts CopyOptions) error`: copies the directory tree onto an exact destination path
+- `CopyToDir(dst Dir, opts CopyOptions) error`: same exact-path directory copy using `dst.Path()`
+- `CopyIntoDir(parent Dir, opts CopyOptions) error`: copies the directory tree under `parent` using the source basename
 - `DeleteIfExists() error`: removes the directory tree when it exists
 - `Ensure(ctx Context) error`: creates the directory tree using `ctx.DirMode`
 
@@ -73,6 +76,9 @@ Methods:
 - `WriteBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error`: creates parent directories and writes raw bytes
 - `ReadBytes() ([]byte, error)`: reads the file contents
 - `ReadBytesIfExists() ([]byte, bool, error)`: reads the file if present and returns `ok == false` for missing files
+- `CopyToPath(path string, opts CopyOptions) error`: copies the file payload to an exact destination path
+- `CopyToFile(dst File, opts CopyOptions) error`: same exact-path file copy using `dst.Path()`
+- `CopyIntoDir(dir Dir, opts CopyOptions) error`: copies the file under `dir` using the source basename
 - `DeleteIfExists() error`: removes the file when it exists
 - `Ensure(ctx Context) error`: creates the parent directories and creates the file if missing
 
@@ -80,10 +86,58 @@ Notable behavior:
 
 - `Ensure` uses `os.O_CREATE` and does not truncate existing file contents
 - `WriteBytes` always rewrites the file contents
+- `CopyTo*` uses streamed I/O through `io.Copy`; it does not read the whole file into memory first
 - `Exists` only checks that some filesystem entry exists at the path
 - the declared-path helpers return `ok == false` when the handle was not attached through `Compose`
 - the composed-path helpers return `ok == false` when the handle was not attached through `Compose`
 - dotfiles such as `.env` report an empty extension and keep the full basename as the stem
+
+### `CopyOptions`
+
+```go
+type CopyOptions struct{}
+```
+
+Description:
+
+- policy object for `File` and `Dir` copy helpers
+
+Fields:
+
+- `Overwrite CopyOverwritePolicy`: controls whether an existing destination is rejected or replaced
+- `Symlinks CopySymlinkPolicy`: controls whether symlinks are preserved, followed, or rejected
+- `PreserveMode bool`: when true, copies use source permission bits for new files and directories
+- `FileMode os.FileMode`: fallback file mode when `PreserveMode` is false
+- `DirMode os.FileMode`: fallback directory mode when `PreserveMode` is false
+
+Notable behavior:
+
+- `DefaultCopyOptions` preserves symlinks, preserves source modes, and fails when the destination already exists
+- the zero `CopyOptions{}` value is treated as `DefaultCopyOptions`
+- when `PreserveMode` is false and a mode field is zero, copy falls back to `DefaultContext.FileMode` or `DefaultContext.DirMode`
+
+### `CopyOverwritePolicy`
+
+```go
+type CopyOverwritePolicy uint8
+```
+
+Constants:
+
+- `CopyOverwriteFail`: return an error when the destination path already exists
+- `CopyOverwriteReplace`: remove the existing destination path before copying
+
+### `CopySymlinkPolicy`
+
+```go
+type CopySymlinkPolicy uint8
+```
+
+Constants:
+
+- `CopySymlinkPreserve`: recreate symlinks as symlinks using the raw source target string
+- `CopySymlinkFollow`: copy the symlink target payload instead of the symlink entry
+- `CopySymlinkReject`: fail when a symlink is encountered
 
 ### `Exec`
 

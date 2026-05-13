@@ -53,6 +53,7 @@ Useful methods:
 - `Exists()` reports whether the directory currently exists on disk.
 - `Join(...)` builds a descendant path.
 - `Dir(name)` and `File(name)` derive child handles.
+- `CopyToPath(path, opts)`, `CopyToDir(dir, opts)`, and `CopyIntoDir(parent, opts)` copy directory trees with explicit overwrite, symlink, and mode policy.
 - `Ensure(ctx)` creates the directory tree.
 - `DeleteIfExists()` removes the directory recursively when it exists.
 
@@ -69,10 +70,13 @@ Useful methods:
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` for compose-base-relative path fragments
 - `ReadBytes()` and `ReadBytesIfExists()`
 - `WriteBytes(data, dirMode, fileMode)`
+- `CopyToPath(path, opts)`, `CopyToFile(dst, opts)`, and `CopyIntoDir(dir, opts)` for streamed file copies
 - `Ensure(ctx)` to create the file and its parent directories
 - `DeleteIfExists()`
 
 Use `File` when you want raw bytes and do not need codec-backed state tracking.
+
+Copy helpers use `layout.CopyOptions`. `layout.DefaultCopyOptions` preserves source modes, preserves symlinks as symlinks, and fails when the destination already exists. Switch `Overwrite` to `layout.CopyOverwriteReplace` when you want replacement semantics, and switch `Symlinks` to `layout.CopySymlinkFollow` or `layout.CopySymlinkReject` when preserving symlinks is not what you want.
 
 ### `Exec`
 
