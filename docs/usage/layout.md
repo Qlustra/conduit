@@ -51,7 +51,10 @@ Useful methods:
 - `DeclaredPath()` and `JoinDeclaredPath(...)` expose the node's own declared layout fragment.
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` expose compose-base-relative paths when the handle belongs to a composed tree.
 - `Exists()` reports whether the directory currently exists on disk.
+- `Chown(uid, gid)` applies `os.Chown` to the directory path.
 - `Join(...)` builds a descendant path.
+- `List()` returns the directory's direct children.
+- `ChangeTo()` changes the process working directory to that path.
 - `Dir(name)` and `File(name)` derive child handles.
 - `CopyToPath(path, opts)`, `CopyToDir(dir, opts)`, and `CopyIntoDir(parent, opts)` copy directory trees with explicit overwrite, symlink, and mode policy.
 - `Ensure(ctx)` creates the directory tree.
@@ -69,6 +72,9 @@ Useful methods:
 - `DeclaredPath()` and `JoinDeclaredPath(...)` for local declared layout fragments
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` for compose-base-relative path fragments
 - `ReadBytes()` and `ReadBytesIfExists()`
+- `Chown(uid, gid)` for ownership changes
+- `IsExecutable()` to check execute bits on regular files
+- `Truncate(size)` to resize the file in place
 - `WriteBytes(data, dirMode, fileMode)`
 - `CopyToPath(path, opts)`, `CopyToFile(dst, opts)`, and `CopyIntoDir(dir, opts)` for streamed file copies
 - `Ensure(ctx)` to create the file and its parent directories

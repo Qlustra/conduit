@@ -122,9 +122,21 @@ func (d Dir) Exists() bool {
 	return err == nil
 }
 
+func (d Dir) Chown(uid int, gid int) error {
+	return os.Chown(d.Path(), uid, gid)
+}
+
+func (d Dir) ChangeTo() error {
+	return os.Chdir(d.Path())
+}
+
 func (d Dir) Join(parts ...string) string {
 	all := append([]string{d.path}, parts...)
 	return filepath.Join(all...)
+}
+
+func (d Dir) List() ([]os.DirEntry, error) {
+	return os.ReadDir(d.Path())
 }
 
 func (d Dir) Dir(name string) Dir {

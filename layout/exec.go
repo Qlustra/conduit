@@ -39,11 +39,7 @@ func (e Exec) EnsureExecutable(ctx Context) error {
 }
 
 func (e Exec) IsExecutable() bool {
-	info, err := os.Stat(e.Path())
-	if err != nil {
-		return false
-	}
-	return info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
+	return e.File.IsExecutable()
 }
 
 type RunOptions struct {

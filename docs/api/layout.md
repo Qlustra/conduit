@@ -29,7 +29,10 @@ Methods:
 - `ComposedRelativePath() (string, bool)`: returns the path relative to the compose base directory
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
 - `Exists() bool`: reports whether the path currently exists
+- `Chown(uid, gid int) error`: applies `os.Chown` to the directory path
 - `Join(parts ...string) string`: joins descendant path segments onto the directory path
+- `List() ([]os.DirEntry, error)`: returns the directory's direct children using `os.ReadDir`
+- `ChangeTo() error`: changes the process working directory to this path
 - `Dir(name string) Dir`: returns a child directory handle
 - `File(name string) File`: returns a child file handle
 - `CopyToPath(path string, opts CopyOptions) error`: copies the directory tree onto an exact destination path
@@ -42,6 +45,7 @@ Notable behavior:
 
 - `DeleteIfExists` uses recursive removal
 - `Exists` only checks current filesystem state; it does not validate that the path is a directory
+- `List` returns entries sorted by filename, matching `os.ReadDir`
 - the declared-path helpers return `ok == false` when the handle was not attached through `Compose`
 - for a root field declared as `layout:"."`, `DeclaredPath()` returns `.`
 - the composed-path helpers return `ok == false` when the handle was not attached through `Compose`
@@ -73,6 +77,9 @@ Methods:
 - `ComposedRelativePath() (string, bool)`: returns the path relative to the compose base directory
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
 - `Exists() bool`: reports whether the path currently exists
+- `Chown(uid, gid int) error`: applies `os.Chown` to the file path
+- `IsExecutable() bool`: reports whether the current target is an executable regular file
+- `Truncate(size int64) error`: resizes the file using `os.Truncate`
 - `WriteBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error`: creates parent directories and writes raw bytes
 - `ReadBytes() ([]byte, error)`: reads the file contents
 - `ReadBytesIfExists() ([]byte, bool, error)`: reads the file if present and returns `ok == false` for missing files
@@ -86,6 +93,7 @@ Notable behavior:
 
 - `Ensure` uses `os.O_CREATE` and does not truncate existing file contents
 - `WriteBytes` always rewrites the file contents
+- `IsExecutable` returns false for missing paths and non-regular filesystem entries
 - `CopyTo*` uses streamed I/O through `io.Copy`; it does not read the whole file into memory first
 - `Exists` only checks that some filesystem entry exists at the path
 - the declared-path helpers return `ok == false` when the handle was not attached through `Compose`

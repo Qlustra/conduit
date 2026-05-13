@@ -129,6 +129,22 @@ func (f File) Exists() bool {
 	return err == nil
 }
 
+func (f File) Chown(uid int, gid int) error {
+	return os.Chown(f.Path(), uid, gid)
+}
+
+func (f File) IsExecutable() bool {
+	info, err := os.Stat(f.Path())
+	if err != nil {
+		return false
+	}
+	return info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
+}
+
+func (f File) Truncate(size int64) error {
+	return os.Truncate(f.Path(), size)
+}
+
 func (f File) WriteBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(f.path), dirMode); err != nil {
 		return err
