@@ -74,6 +74,9 @@ func (s *Slot[T]) Len() int {
 
 // Has reports whether a child directory with name currently exists on disk.
 func (s *Slot[T]) Has(name string) bool {
+	if err := validateSlotItemName("slot item", name); err != nil {
+		return false
+	}
 	_, err := os.Stat(s.root.Dir(name).Path())
 	return err == nil
 }
@@ -109,6 +112,9 @@ func (s *Slot[T]) Remove(name string) {
 // Delete removes the child directory tree from disk and evicts the cached
 // item.
 func (s *Slot[T]) Delete(name string) error {
+	if err := validateSlotItemName("slot item", name); err != nil {
+		return err
+	}
 	if err := s.root.Dir(name).DeleteIfExists(); err != nil {
 		return err
 	}
@@ -180,6 +186,10 @@ func (s *Slot[T]) Keys() []string {
 //
 // At does not ensure the item exists on disk.
 func (s *Slot[T]) At(name string) (T, error) {
+	if err := validateSlotItemName("slot item", name); err != nil {
+		var zero T
+		return zero, err
+	}
 	s.mu.RLock()
 	// Fast path under RLock. On a miss, compose outside the mutex and
 	// re-check under Lock so concurrent callers converge on one cached item.
@@ -224,6 +234,10 @@ func (s *Slot[T]) MustAt(name string) T {
 // Add ensures the child root exists on disk, composes the item, ensures its
 // declared structure, and caches it.
 func (s *Slot[T]) Add(name string, ctx Context) (T, error) {
+	if err := validateSlotItemName("slot item", name); err != nil {
+		var zero T
+		return zero, err
+	}
 	childRoot := s.root.Dir(name)
 
 	if err := childRoot.Ensure(ctx); err != nil {
@@ -267,6 +281,10 @@ func (s *Slot[T]) Add(name string, ctx Context) (T, error) {
 // Require returns the named item only if its child directory already exists on
 // disk.
 func (s *Slot[T]) Require(name string) (T, error) {
+	if err := validateSlotItemName("slot item", name); err != nil {
+		var zero T
+		return zero, err
+	}
 	child := s.root.Dir(name)
 	if _, err := os.Stat(child.Path()); err != nil {
 		var zero T

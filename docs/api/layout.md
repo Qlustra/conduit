@@ -534,6 +534,7 @@ Notable behavior:
 - `At` composes items relative to `slotRoot/<name>` and caches them
 - `Add` ensures the slot root and calls `EnsureDeep` on the item
 - `Delete` removes both the on-disk child file and the cached entry
+- item names must identify a single direct child; empty, absolute, dot, dot-dot, and separator-containing names are rejected
 - `Len`, `Entries`, `All`, and `Keys` are cache-based; they do not list the filesystem directly
 - `Entries` and `All` return cached items as-is, preserving pointer or value semantics chosen by `T`
 - the declared-path helpers delegate to the slot root and expose the slot field's own declared fragment
@@ -598,6 +599,7 @@ Notable behavior:
 - `At` composes items relative to `slotRoot/<name>` and caches them
 - `Add` ensures the slot root but does not materialize the symlink entry itself; links are created by `Sync`/`SyncDeep`
 - `Delete` removes only symlink entries and returns an error when a non-symlink entry exists at the child path
+- item names must identify a single direct child; empty, absolute, dot, dot-dot, and separator-containing names are rejected
 - `Len`, `Entries`, `All`, and `Keys` are cache-based; they do not list the filesystem directly
 - `Entries` and `All` return cached items as-is, preserving value semantics chosen by `T`
 - the declared-path helpers delegate to the slot root and expose the slot field's own declared fragment

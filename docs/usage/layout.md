@@ -201,6 +201,8 @@ Useful methods:
 
 `Entries()` and `All()` are cache-based only. They do not discover from disk or lazily compose missing items.
 
+Slot item names must identify one direct child only. Empty names, absolute paths, `.` / `..`, and names containing path separators are rejected.
+
 The composed-path helpers return `ok == false` until a node has been attached through `Compose`. When they are available, the compose base is the same root that anchored the whole composed tree, not the nearest nested struct or slot item.
 
 The declared-path helpers are different: they return the node's own declared layout fragment only. They do not reconstruct ancestor fragments. For example, a field declared as `layout:"build"` reports `build`, not `bin/build`, even when it lives inside a nested struct rooted at `layout:"bin"`.
@@ -235,6 +237,8 @@ Useful methods mirror `Slot[T]`, but with file semantics:
 
 As with `Slot[T]`, `Entries()`, `All()`, `Len()`, and `Keys()` are cache-based only.
 
+File slot item names follow the same direct-child restriction as `Slot[T]`.
+
 ### `LinkSlot[T]`
 
 `LinkSlot[T]` models repeated direct-child symlink entries under one directory:
@@ -268,6 +272,8 @@ Useful methods mirror `FileSlot[T]`, but with symlink-entry semantics:
 - `layout.DirLink`
 
 Use `LinkSlot[layout.Link]` when targets may vary between files and directories.
+
+Link slot item names follow the same direct-child restriction as `Slot[T]`.
 
 ## Composition rules
 

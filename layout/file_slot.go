@@ -75,6 +75,9 @@ func (s *FileSlot[T]) Len() int {
 
 // Has reports whether a regular file with name currently exists on disk.
 func (s *FileSlot[T]) Has(name string) bool {
+	if err := validateSlotItemName("file slot item", name); err != nil {
+		return false
+	}
 	info, err := os.Stat(s.root.File(name).Path())
 	return err == nil && !info.IsDir()
 }
@@ -109,6 +112,9 @@ func (s *FileSlot[T]) Remove(name string) {
 
 // Delete removes the child file from disk and evicts the cached item.
 func (s *FileSlot[T]) Delete(name string) error {
+	if err := validateSlotItemName("file slot item", name); err != nil {
+		return err
+	}
 	if err := s.root.File(name).DeleteIfExists(); err != nil {
 		return err
 	}
@@ -180,6 +186,10 @@ func (s *FileSlot[T]) Keys() []string {
 //
 // At does not ensure the file exists on disk.
 func (s *FileSlot[T]) At(name string) (T, error) {
+	if err := validateSlotItemName("file slot item", name); err != nil {
+		var zero T
+		return zero, err
+	}
 	s.mu.RLock()
 	if item, ok := s.items[name]; ok {
 		s.mu.RUnlock()
@@ -225,6 +235,10 @@ func (s *FileSlot[T]) MustAt(name string) T {
 // Add ensures the slot root exists on disk, composes the item, ensures its
 // declared structure, and caches it.
 func (s *FileSlot[T]) Add(name string, ctx Context) (T, error) {
+	if err := validateSlotItemName("file slot item", name); err != nil {
+		var zero T
+		return zero, err
+	}
 	if err := s.root.Ensure(ctx); err != nil {
 		var zero T
 		return zero, err
@@ -257,6 +271,10 @@ func (s *FileSlot[T]) Add(name string, ctx Context) (T, error) {
 
 // Require returns the named item only if its file already exists on disk.
 func (s *FileSlot[T]) Require(name string) (T, error) {
+	if err := validateSlotItemName("file slot item", name); err != nil {
+		var zero T
+		return zero, err
+	}
 	child := s.root.File(name)
 	info, err := os.Stat(child.Path())
 	if err != nil {

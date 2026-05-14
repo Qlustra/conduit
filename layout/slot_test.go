@@ -207,3 +207,31 @@ func TestSlotLenTracksCachedItems(t *testing.T) {
 		t.Fatalf("Len() after Clear() = %d, want 0", got)
 	}
 }
+
+func TestSlotRejectsNamesOutsideDirectChildren(t *testing.T) {
+	type item struct {
+		Config testMapFile `layout:"config.json"`
+	}
+
+	var slot Slot[*item]
+	slot.ComposePath(filepath.Join(t.TempDir(), "services"))
+
+	invalid := []string{"", ".", "..", "nested/api", "../api", `/tmp/api`}
+	for _, name := range invalid {
+		if slot.Has(name) {
+			t.Fatalf("Has(%q) = true, want false", name)
+		}
+		if _, err := slot.At(name); err == nil {
+			t.Fatalf("At(%q) error = nil, want non-nil", name)
+		}
+		if _, err := slot.Add(name, DefaultContext); err == nil {
+			t.Fatalf("Add(%q) error = nil, want non-nil", name)
+		}
+		if _, err := slot.Require(name); err == nil {
+			t.Fatalf("Require(%q) error = nil, want non-nil", name)
+		}
+		if err := slot.Delete(name); err == nil {
+			t.Fatalf("Delete(%q) error = nil, want non-nil", name)
+		}
+	}
+}

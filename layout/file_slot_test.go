@@ -194,3 +194,27 @@ func TestFileSlotRequireNeedsExistingFile(t *testing.T) {
 		t.Fatalf("Path() = %q", got)
 	}
 }
+
+func TestFileSlotRejectsNamesOutsideDirectChildren(t *testing.T) {
+	var slot FileSlot[*testMapFile]
+	slot.ComposePath(filepath.Join(t.TempDir(), "configs"))
+
+	invalid := []string{"", ".", "..", "nested/api.json", "../api.json", `/tmp/api.json`}
+	for _, name := range invalid {
+		if slot.Has(name) {
+			t.Fatalf("Has(%q) = true, want false", name)
+		}
+		if _, err := slot.At(name); err == nil {
+			t.Fatalf("At(%q) error = nil, want non-nil", name)
+		}
+		if _, err := slot.Add(name, DefaultContext); err == nil {
+			t.Fatalf("Add(%q) error = nil, want non-nil", name)
+		}
+		if _, err := slot.Require(name); err == nil {
+			t.Fatalf("Require(%q) error = nil, want non-nil", name)
+		}
+		if err := slot.Delete(name); err == nil {
+			t.Fatalf("Delete(%q) error = nil, want non-nil", name)
+		}
+	}
+}

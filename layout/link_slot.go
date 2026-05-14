@@ -81,6 +81,9 @@ func (s *LinkSlot[T]) Len() int {
 
 // Has reports whether a symlink entry with name currently exists on disk.
 func (s *LinkSlot[T]) Has(name string) bool {
+	if err := validateSlotItemName("link slot item", name); err != nil {
+		return false
+	}
 	ok, err := isSymlinkPath(s.root.File(name).Path())
 	return err == nil && ok
 }
@@ -115,6 +118,9 @@ func (s *LinkSlot[T]) Remove(name string) {
 
 // Delete removes the child symlink from disk and evicts the cached item.
 func (s *LinkSlot[T]) Delete(name string) error {
+	if err := validateSlotItemName("link slot item", name); err != nil {
+		return err
+	}
 	link := NewLink(s.root.File(name).Path())
 	if err := link.Delete(); err != nil {
 		return err
@@ -187,6 +193,10 @@ func (s *LinkSlot[T]) Keys() []string {
 //
 // At does not ensure the symlink exists on disk.
 func (s *LinkSlot[T]) At(name string) (T, error) {
+	if err := validateSlotItemName("link slot item", name); err != nil {
+		var zero T
+		return zero, err
+	}
 	s.mu.RLock()
 	if item, ok := s.items[name]; ok {
 		s.mu.RUnlock()
@@ -233,6 +243,10 @@ func (s *LinkSlot[T]) MustAt(name string) T {
 //
 // The link entry itself is still materialized by Sync or SyncDeep.
 func (s *LinkSlot[T]) Add(name string, ctx Context) (T, error) {
+	if err := validateSlotItemName("link slot item", name); err != nil {
+		var zero T
+		return zero, err
+	}
 	if err := s.root.Ensure(ctx); err != nil {
 		var zero T
 		return zero, err
@@ -251,6 +265,10 @@ func (s *LinkSlot[T]) Add(name string, ctx Context) (T, error) {
 // Require returns the named item only if its symlink entry already exists on
 // disk.
 func (s *LinkSlot[T]) Require(name string) (T, error) {
+	if err := validateSlotItemName("link slot item", name); err != nil {
+		var zero T
+		return zero, err
+	}
 	childPath := s.root.File(name).Path()
 	ok, err := isSymlinkPath(childPath)
 	if err != nil {
