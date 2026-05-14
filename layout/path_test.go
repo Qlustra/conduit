@@ -306,3 +306,50 @@ func TestRelHelpersWorkWithSlotAsBase(t *testing.T) {
 		t.Fatalf("Config.RelTo(Services) = (%q, %v), want (%q, nil)", got, err, filepath.Join("api", "config.yaml"))
 	}
 }
+
+func TestComposeRejectsAbsoluteLayoutTag(t *testing.T) {
+	type workspace struct {
+		Config File `layout:"/etc/passwd"`
+	}
+
+	var ws workspace
+	err := Compose("/workspace", &ws)
+	if err == nil {
+		t.Fatal("Compose() error = nil, want non-nil")
+	}
+}
+
+func TestComposeRejectsEscapingLayoutTag(t *testing.T) {
+	type service struct {
+		Config File `layout:"../../../secrets/config.yaml"`
+	}
+
+	type workspace struct {
+		Services struct {
+			API service `layout:"api"`
+		} `layout:"services"`
+	}
+
+	var ws workspace
+	err := Compose("/workspace", &ws)
+	if err == nil {
+		t.Fatal("Compose() error = nil, want non-nil")
+	}
+}
+
+func TestComposeAllowsBacktrackingThatStaysWithinComposeRoot(t *testing.T) {
+	type tooling struct {
+		Bin struct {
+			Hooks Dir `layout:"../hooks"`
+		} `layout:"bin"`
+	}
+
+	var layout tooling
+	if err := Compose("/workspace", &layout); err != nil {
+		t.Fatalf("Compose() error = %v", err)
+	}
+
+	if got := layout.Bin.Hooks.Path(); got != filepath.Join("/workspace", "hooks") {
+		t.Fatalf("Hooks.Path() = %q, want %q", got, filepath.Join("/workspace", "hooks"))
+	}
+}

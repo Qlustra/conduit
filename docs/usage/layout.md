@@ -288,6 +288,8 @@ Link slot item names follow the same direct-child restriction as `Slot[T]`.
 
 The tag is always resolved relative to the containing struct's root. `layout:"."` means "bind this field to the current root".
 
+Tags must remain inside the original `Compose` root. Absolute tags are rejected, and relative tags that would resolve outside the compose root fail composition.
+
 The deep operations (`EnsureDeep`, `DiscoverDeep`, `LoadDeep`, `SyncDeep`, `ScanDeep`) also recurse through anonymous embedded fields.
 
 Nested structs work naturally:

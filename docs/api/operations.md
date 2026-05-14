@@ -237,6 +237,7 @@ Notable behavior:
 - returns an error if `target` is nil, not a pointer, or does not point to a struct
 - allocates tagged pointer-to-struct fields as needed
 - only fields tagged with `layout:"..."` are composed
+- layout tags must stay within the original compose root; absolute tags and escaping relative tags return an error
 
 ### `EnsureDeep`
 

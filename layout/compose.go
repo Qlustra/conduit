@@ -50,7 +50,10 @@ func composeInto(base string, composeBase string, dst reflect.Value) error {
 			continue
 		}
 
-		path := resolvePath(base, tag)
+		path, err := resolvePath(base, composeBase, tag)
+		if err != nil {
+			return fmt.Errorf("field %q: %w", structField.Name, err)
+		}
 
 		if err := assignPath(path, composeBase, tag, field, composeBaseAwareType, declaredPathAwareType); err != nil {
 			return fmt.Errorf("field %q: %w", structField.Name, err)
@@ -110,13 +113,24 @@ func assignPath(path string, composeBase string, declaredPath string, field refl
 	return fmt.Errorf("unsupported field type %s", field.Type())
 }
 
-func resolvePath(base string, tag string) string {
+func resolvePath(base string, composeBase string, tag string) (string, error) {
+	if filepath.IsAbs(tag) {
+		return "", fmt.Errorf("layout tag %q must be relative to the compose root", tag)
+	}
+
+	var path string
 	switch tag {
 	case ".", "":
-		return base
+		path = base
 	default:
-		return filepath.Join(base, tag)
+		path = filepath.Join(base, tag)
 	}
+
+	if !pathWithin(path, composeBase) {
+		return "", fmt.Errorf("layout tag %q resolves outside compose root %s", tag, composeBase)
+	}
+
+	return path, nil
 }
 
 func composePathAs[T any](path string, composeBase string) (T, error) {
