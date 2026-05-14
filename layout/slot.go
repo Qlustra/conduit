@@ -416,6 +416,8 @@ func (s *Slot[T]) DiscoverDeep(ctx Context) (ResultCode, error) {
 
 // SyncDeep ensures and syncs only currently cached items.
 //
+// The preparation ensure phase respects ctx.EnsurePolicy.
+//
 // It does not invent uncached entries.
 func (s *Slot[T]) SyncDeep(ctx Context) (ResultCode, error) {
 	s.mu.RLock()

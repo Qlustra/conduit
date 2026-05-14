@@ -297,6 +297,10 @@ const (
 	// EnsureEnsured reports that the visited node was ensured successfully.
 	EnsureEnsured ResultCode = iota + 1
 
+	// EnsureSkippedPolicy reports that ensure was skipped by the current ensure
+	// policy.
+	EnsureSkippedPolicy
+
 	// EnsureFailed reports that ensure failed.
 	EnsureFailed
 )

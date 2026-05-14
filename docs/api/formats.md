@@ -56,6 +56,7 @@ Content methods:
 - `Read() (T, error)`: reads and unmarshals from disk
 - `ReadIfExists() (T, bool, error)`: reads and unmarshals when the file exists
 - `LoadOrInit(defaultValue T) error`: loads existing content or stores a default value in memory when missing
+- `EnsureDeep(ctx Context) (ResultCode, error)`: ensures the backing file when `ctx.EnsurePolicy` includes syncable nodes
 - `Save(ctx Context) error`: writes the cached value and marks memory state synced
 - `Load() (bool, error)`: loads content into memory and reports whether the file existed
 - `Discover()`: refreshes disk-state metadata without replacing in-memory content and returns the observed state value
@@ -75,6 +76,7 @@ Notable behavior:
 - `Set` does not write to disk
 - `SetDefault` returns `false` and leaves content unchanged when content is already cached
 - `Save` fails when no content is loaded
+- `EnsureDeep` returns `EnsureSkippedPolicy` when `ctx.EnsurePolicy` excludes syncable stateful nodes
 - `Sync` returns `SyncSkippedNoContent` when no content is loaded
 - `Sync` returns `SyncSkippedPolicy` when `ctx.SyncPolicy` excludes the current memory state or last known disk state
 - `Load` on a missing file clears cached content, sets disk state to missing, and resets memory state to unknown

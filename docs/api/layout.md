@@ -459,7 +459,7 @@ Notable behavior:
 - `DiscoverDeep` discovers directory-backed entries from disk without loading typed files
 - `LoadDeep` discovers directory-backed entries from disk
 - `ScanDeep` and `SyncDeep` do not discover uncached entries
-- `Slot.SyncDeep` ensures cached children before syncing them
+- `Slot.SyncDeep` ensures cached children before syncing them, and that preparation ensure pass respects `Context.EnsurePolicy`
 
 ### `FileSlot[T]`
 
@@ -522,6 +522,7 @@ Notable behavior:
 - the composed-path helpers delegate to the slot root and return `ok == false` until the slot has been attached through `Compose`
 - `DiscoverDeep` and `LoadDeep` discover file-backed entries from disk and ignore subdirectories
 - `ScanDeep` and `SyncDeep` do not discover uncached entries
+- `FileSlot.SyncDeep` ensures cached children before syncing them, and that preparation ensure pass respects `Context.EnsurePolicy`
 
 ### `TextTemplate[C]`
 

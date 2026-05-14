@@ -39,6 +39,9 @@ func (e Exec) Ensure(ctx Context) error {
 //
 // When ctx.ExecMode is zero, FileMode is used with execute bits added.
 func (e Exec) EnsureExecutable(ctx Context) error {
+	if !ctx.ensurePolicy().allowsExec() {
+		return nil
+	}
 	ctx.FileMode = e.executableMode(ctx)
 	if err := e.File.Ensure(ctx); err != nil {
 		return err

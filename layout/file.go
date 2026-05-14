@@ -297,6 +297,9 @@ func (f *File) setDeclaredPath(path string) {
 //
 // Existing contents are preserved.
 func (f File) Ensure(ctx Context) error {
+	if !ctx.ensurePolicy().allowsFile() {
+		return nil
+	}
 	if err := os.MkdirAll(filepath.Dir(f.path), ctx.DirMode); err != nil {
 		return err
 	}

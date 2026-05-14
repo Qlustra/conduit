@@ -26,7 +26,7 @@ func (e Entry) IsError() bool {
 // outcome.
 func (e Entry) IsSkipped() bool {
 	switch e.Result {
-	case LoadNotApplicable, DiscoverNotApplicable, ScanNotApplicable, SyncNotApplicable, SyncSkippedNoContent, SyncSkippedPolicy, ValidateNotApplicable:
+	case EnsureSkippedPolicy, LoadNotApplicable, DiscoverNotApplicable, ScanNotApplicable, SyncNotApplicable, SyncSkippedNoContent, SyncSkippedPolicy, ValidateNotApplicable:
 		return true
 	default:
 		return false
@@ -46,6 +46,8 @@ func (e Entry) ResultName() string {
 		switch e.Result {
 		case EnsureEnsured:
 			return "ensured"
+		case EnsureSkippedPolicy:
+			return "skipped_policy"
 		case EnsureFailed:
 			return "failed"
 		}

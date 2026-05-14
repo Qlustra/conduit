@@ -206,6 +206,9 @@ func (d *Dir) setDeclaredPath(path string) {
 
 // Ensure creates the directory tree using ctx.DirMode.
 func (d Dir) Ensure(ctx Context) error {
+	if !ctx.ensurePolicy().allowsDir() {
+		return nil
+	}
 	return os.MkdirAll(d.path, ctx.DirMode)
 }
 

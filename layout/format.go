@@ -161,6 +161,22 @@ func (f *Format[T, C]) saveLoaded(ctx Context) error {
 	return nil
 }
 
+// EnsureDeep materializes the backing file for a syncable typed file when the
+// current ensure policy allows syncable nodes.
+func (f Format[T, C]) EnsureDeep(ctx Context) (ResultCode, error) {
+	if !ctx.ensurePolicy().allowsSyncable() {
+		return EnsureSkippedPolicy, nil
+	}
+
+	fileCtx := ctx.withEnsurePolicy(EnsureFiles)
+	err := f.File.Ensure(fileCtx)
+	result := EnsureEnsured
+	if err != nil {
+		result = EnsureFailed
+	}
+	return result, err
+}
+
 // Compose
 
 // ComposePath binds the format to path and resets its cached content and state.

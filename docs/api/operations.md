@@ -16,10 +16,11 @@ Default value:
 
 ```go
 conduit.Context{
-	DirMode:    0o755,
-	FileMode:   0o644,
-	ExecMode:   0o755,
-	SyncPolicy: conduit.SyncRewrite,
+	DirMode:      0o755,
+	FileMode:     0o644,
+	ExecMode:     0o755,
+	EnsurePolicy: conduit.EnsureAll,
+	SyncPolicy:   conduit.SyncRewrite,
 }
 ```
 
@@ -35,11 +36,12 @@ Notable behavior:
 
 ```go
 type Context struct {
-	DirMode    os.FileMode
-	FileMode   os.FileMode
-	ExecMode   os.FileMode
-	SyncPolicy conduit.SyncPolicy
-	Reporter   conduit.Reporter
+	DirMode      os.FileMode
+	FileMode     os.FileMode
+	ExecMode     os.FileMode
+	EnsurePolicy conduit.EnsurePolicy
+	SyncPolicy   conduit.SyncPolicy
+	Reporter     conduit.Reporter
 }
 ```
 
@@ -48,15 +50,37 @@ Fields:
 - `DirMode`: mode used when creating directories
 - `FileMode`: mode used when creating regular files
 - `ExecMode`: mode used when creating or ensuring `Exec` files
+- `EnsurePolicy`: selects which node kinds `Ensure` and `EnsureDeep` may materialize
 - `SyncPolicy`: selects which typed memory states `Sync` and `SyncDeep` may write, with optional disk-state filters
 - `Reporter`: optional sink for per-path deep-operation results
 
 Notable behavior:
 
 - when `ExecMode` is zero, `Exec` falls back to `FileMode` and adds execute bits automatically
+- when `EnsurePolicy` is zero, ensure operations fall back to `EnsureAll`
 - when `SyncPolicy` has no memory-state bits, sync operations fall back to `SyncRewrite`
 - when `SyncPolicy` has no disk-state bits, sync operations do not restrict by disk state
 - when `Reporter` is nil, deep operations do not collect traversal reports
+
+### `EnsurePolicy`
+
+```go
+type EnsurePolicy uint8
+```
+
+Description:
+
+- bitmask policy that filters which node kinds `Ensure` and `EnsureDeep` may materialize
+
+Constants:
+
+- `EnsureDirs`: include raw directories
+- `EnsureFiles`: include raw files
+- `EnsureExecs`: include executable files
+- `EnsureSyncables`: include syncable stateful wrappers such as typed files
+- `EnsureAll`: historical ensure behavior
+- `EnsureScaffold`: raw `Dir`, `File`, and `Exec` scaffolding only
+- `EnsureNone`: explicit no-op ensure policy
 
 ### `ValidateOptions`
 
@@ -157,6 +181,7 @@ Description:
 
 Notable validate results:
 
+- `EnsureSkippedPolicy`
 - `ValidateOK`
 - `ValidateTraversed`
 - `ValidateNotApplicable`
@@ -232,6 +257,8 @@ Returns:
 Notable behavior:
 
 - creates `layout.Dir`, `layout.File`, and `layout.Exec` nodes as required by the layout
+- ensures syncable stateful wrappers only when `ctx.EnsurePolicy` includes them
+- records `EnsureSkippedPolicy` for visited nodes skipped by `ctx.EnsurePolicy`
 - only ensures cached `layout.Slot[T]` items
 - does not load typed file content
 - does not discover new slot items from disk
@@ -319,7 +346,7 @@ Notable behavior:
 - only writes typed files that currently have content loaded in memory
 - applies `ctx.SyncPolicy` to typed memory state and optional disk-state filters before writing
 - only syncs cached `layout.Slot[T]` items
-- `layout.Slot[T]` ensures cached children before syncing them
+- `layout.Slot[T]` and `layout.FileSlot[T]` ensure cached children before syncing them, and that ensure pass respects `ctx.EnsurePolicy`
 - does not materialize standalone raw `layout.Dir` or `layout.File` nodes
 - does not delete files or directories
 - returns an error if `target` is nil

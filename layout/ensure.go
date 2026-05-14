@@ -8,8 +8,9 @@ import (
 // EnsureDeep materializes declared filesystem structure for a composed layout.
 //
 // It creates raw Dir, File, and Exec nodes and recurses through already
-// composed or cached children. It does not load typed content, discover new
-// slot entries from disk, write typed file state, or delete anything.
+// composed or cached children. ctx.EnsurePolicy can narrow which node kinds
+// are materialized. EnsureDeep does not load typed content, discover new slot
+// entries from disk, write typed file state, or delete anything.
 func EnsureDeep(target any, ctx Context) (ResultCode, error) {
 	if target == nil {
 		return EnsureFailed, fmt.Errorf("target must not be nil")
@@ -34,6 +35,12 @@ func ensureDeepValue(v reflect.Value, ctx Context) (ResultCode, error) {
 			}
 			return result, err
 		}
+		if v.Type().Implements(syncerType) && !ctx.ensurePolicy().allowsSyncable() {
+			if path, ok := pathOf(v.Interface()); ok {
+				return recordResult(ctx, OpEnsure, path, EnsureSkippedPolicy, nil)
+			}
+			return EnsureSkippedPolicy, nil
+		}
 		v = v.Elem()
 	}
 
@@ -46,10 +53,19 @@ func ensureDeepValue(v reflect.Value, ctx Context) (ResultCode, error) {
 			}
 			return result, err
 		}
+		if ptr.Type().Implements(syncerType) && !ctx.ensurePolicy().allowsSyncable() {
+			if path, ok := pathOf(ptr.Interface()); ok {
+				return recordResult(ctx, OpEnsure, path, EnsureSkippedPolicy, nil)
+			}
+			return EnsureSkippedPolicy, nil
+		}
 	}
 
 	switch v.Type() {
 	case dirType:
+		if !ctx.ensurePolicy().allowsDir() {
+			return recordResult(ctx, OpEnsure, v.Interface().(Dir).Path(), EnsureSkippedPolicy, nil)
+		}
 		err := v.Interface().(Dir).Ensure(ctx)
 		result := EnsureEnsured
 		if err != nil {
@@ -58,6 +74,9 @@ func ensureDeepValue(v reflect.Value, ctx Context) (ResultCode, error) {
 		return recordResult(ctx, OpEnsure, v.Interface().(Dir).Path(), result, err)
 
 	case fileType:
+		if !ctx.ensurePolicy().allowsFile() {
+			return recordResult(ctx, OpEnsure, v.Interface().(File).Path(), EnsureSkippedPolicy, nil)
+		}
 		err := v.Interface().(File).Ensure(ctx)
 		result := EnsureEnsured
 		if err != nil {

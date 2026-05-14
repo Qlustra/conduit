@@ -16,6 +16,12 @@ type Context = layout.Context
 // layout.SyncPolicy for the full policy model and constant descriptions.
 type SyncPolicy = layout.SyncPolicy
 
+// EnsurePolicy is an alias for layout.EnsurePolicy.
+//
+// It controls which node kinds Ensure and EnsureDeep may materialize. See
+// layout.EnsurePolicy for the full policy model and constant descriptions.
+type EnsurePolicy = layout.EnsurePolicy
+
 // Reporter is an alias for layout.Reporter.
 //
 // See layout.Reporter for the reporting contract used during deep traversal.
@@ -50,8 +56,19 @@ type ResultCode = layout.ResultCode
 // DefaultContext aliases layout.DefaultContext for callers using the root
 // conduit facade.
 //
-// See layout.DefaultContext for the exact default modes and sync policy.
+// See layout.DefaultContext for the exact default modes and ensure/sync policy.
 var DefaultContext = layout.DefaultContext
+
+const (
+	EnsureDirs      EnsurePolicy = layout.EnsureDirs
+	EnsureFiles     EnsurePolicy = layout.EnsureFiles
+	EnsureExecs     EnsurePolicy = layout.EnsureExecs
+	EnsureSyncables EnsurePolicy = layout.EnsureSyncables
+
+	EnsureAll      EnsurePolicy = layout.EnsureAll
+	EnsureScaffold EnsurePolicy = layout.EnsureScaffold
+	EnsureNone     EnsurePolicy = layout.EnsureNone
+)
 
 const (
 	SyncOnLoaded      SyncPolicy = layout.SyncOnLoaded
@@ -77,8 +94,9 @@ const (
 )
 
 const (
-	EnsureEnsured ResultCode = layout.EnsureEnsured
-	EnsureFailed  ResultCode = layout.EnsureFailed
+	EnsureEnsured       ResultCode = layout.EnsureEnsured
+	EnsureSkippedPolicy ResultCode = layout.EnsureSkippedPolicy
+	EnsureFailed        ResultCode = layout.EnsureFailed
 
 	LoadLoaded        ResultCode = layout.LoadLoaded
 	LoadMissing       ResultCode = layout.LoadMissing

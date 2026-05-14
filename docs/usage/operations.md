@@ -26,6 +26,7 @@ What it does:
 - creates directories declared by `Dir`
 - creates files declared by `File`
 - creates executable files declared by `Exec`
+- creates backing files for syncable stateful nodes when `ctx.EnsurePolicy` includes them
 - ensures already cached `Slot` items
 
 What it does not do:
@@ -35,6 +36,12 @@ What it does not do:
 - delete anything
 
 For `Slot[T]`, only cached items are ensured. Use `slot.Add(name, ctx)` when you want to create a new dynamic child explicitly.
+
+`ctx.EnsurePolicy` lets you narrow the pass. For example:
+
+- `conduit.EnsureAll` preserves the historical behavior
+- `conduit.EnsureScaffold` materializes raw `Dir`, `File`, and `Exec` nodes but skips syncable stateful wrappers
+- `conduit.EnsureDirs | conduit.EnsureSyncables` creates directories and syncable backing files, but skips raw standalone files
 
 ## Load
 
@@ -93,6 +100,7 @@ What it does:
 
 - writes typed files that currently hold content and match `ctx.SyncPolicy`
 - syncs already cached slot items recursively
+- runs the slot/file-slot preparation ensure phase under the same `ctx.EnsurePolicy`
 - allows callers to choose rewrite behavior per sync pass
 
 What it does not do:
@@ -175,19 +183,34 @@ Every filesystem operation accepts a `Context`:
 
 ```go
 ctx := conduit.Context{
-	DirMode:    0o755,
-	FileMode:   0o644,
-	ExecMode:   0o755,
-	SyncPolicy: conduit.SyncRewrite,
-	Reporter:   &conduit.Report{},
+	DirMode:      0o755,
+	FileMode:     0o644,
+	ExecMode:     0o755,
+	EnsurePolicy: conduit.EnsureAll,
+	SyncPolicy:   conduit.SyncRewrite,
+	Reporter:     &conduit.Report{},
 }
 ```
 
 - `DirMode` controls created directories.
 - `FileMode` controls regular files.
 - `ExecMode` controls `Exec` files.
+- `EnsurePolicy` controls which node kinds `Ensure` and `EnsureDeep` may materialize.
 - `SyncPolicy` controls which typed memory states `Sync` and `SyncDeep` may write, with optional extra disk-state filters.
 - `Reporter` optionally collects per-path operation results during deep traversal.
+
+Available ensure policy bits:
+
+- `conduit.EnsureDirs`
+- `conduit.EnsureFiles`
+- `conduit.EnsureExecs`
+- `conduit.EnsureSyncables`
+
+Available ensure policy presets:
+
+- `conduit.EnsureAll`
+- `conduit.EnsureScaffold`
+- `conduit.EnsureNone`
 
 Available sync policies:
 
@@ -211,10 +234,11 @@ Behavior notes:
 
 ```go
 conduit.Context{
-	DirMode:    0o755,
-	FileMode:   0o644,
-	ExecMode:   0o755,
-	SyncPolicy: conduit.SyncRewrite,
+	DirMode:      0o755,
+	FileMode:     0o644,
+	ExecMode:     0o755,
+	EnsurePolicy: conduit.EnsureAll,
+	SyncPolicy:   conduit.SyncRewrite,
 }
 ```
 

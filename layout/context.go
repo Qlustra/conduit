@@ -2,6 +2,42 @@ package layout
 
 import "os"
 
+// EnsurePolicy is a bitmask that controls which node kinds Ensure and
+// EnsureDeep may materialize.
+//
+// The zero value preserves the historical default behavior and is treated as
+// EnsureAll. Use EnsureNone when an explicit no-op ensure pass is desired.
+type EnsurePolicy uint8
+
+const (
+	// EnsureDirs allows directory materialization.
+	EnsureDirs EnsurePolicy = 1 << iota
+
+	// EnsureFiles allows raw File materialization.
+	EnsureFiles
+
+	// EnsureExecs allows Exec materialization.
+	EnsureExecs
+
+	// EnsureSyncables allows stateful Syncer-backed nodes such as Format-backed
+	// typed files to materialize their own backing files during ensure.
+	EnsureSyncables
+
+	ensurePolicyNoneSentinel
+)
+
+const (
+	// EnsureAll preserves the library's historical ensure behavior.
+	EnsureAll EnsurePolicy = EnsureDirs | EnsureFiles | EnsureExecs | EnsureSyncables
+
+	// EnsureScaffold materializes only raw filesystem scaffolding and skips
+	// stateful syncable nodes.
+	EnsureScaffold EnsurePolicy = EnsureDirs | EnsureFiles | EnsureExecs
+
+	// EnsureNone disables ensure materialization explicitly.
+	EnsureNone EnsurePolicy = ensurePolicyNoneSentinel
+)
+
 // SyncPolicy is a bitmask that controls which in-memory states Sync and
 // SyncDeep may write.
 //
@@ -54,8 +90,8 @@ const (
 	syncPolicyDiskMask   = SyncOnDiskUnknown | SyncOnDiskMissing | SyncOnDiskPresent
 )
 
-// Context carries per-operation filesystem modes, sync policy, and optional
-// reporting hooks.
+// Context carries per-operation filesystem modes, ensure and sync policy, and
+// optional reporting hooks.
 type Context struct {
 	// DirMode is used when creating directories.
 	DirMode os.FileMode
@@ -66,6 +102,10 @@ type Context struct {
 	// ExecMode is used when creating Exec files. When zero, Exec falls back to
 	// FileMode and adds execute bits automatically.
 	ExecMode os.FileMode
+
+	// EnsurePolicy controls which node kinds Ensure and EnsureDeep may
+	// materialize. The zero value behaves like EnsureAll.
+	EnsurePolicy EnsurePolicy
 
 	// SyncPolicy controls which cached values Sync and SyncDeep may write.
 	SyncPolicy SyncPolicy
@@ -79,12 +119,88 @@ type Context struct {
 // library examples.
 //
 // It creates directories with mode 0o755, regular files with 0o644,
-// executables with 0o755, and uses SyncRewrite behavior.
+// executables with 0o755, uses EnsureAll behavior, and uses SyncRewrite
+// behavior.
 var DefaultContext = Context{
-	DirMode:    0o755,
-	FileMode:   0o644,
-	ExecMode:   0o755,
-	SyncPolicy: SyncRewrite,
+	DirMode:      0o755,
+	FileMode:     0o644,
+	ExecMode:     0o755,
+	EnsurePolicy: EnsureAll,
+	SyncPolicy:   SyncRewrite,
+}
+
+func (ctx Context) ensurePolicy() EnsurePolicy {
+	return ctx.EnsurePolicy.normalized()
+}
+
+func (ctx Context) withEnsurePolicy(policy EnsurePolicy) Context {
+	ctx.EnsurePolicy = policy
+	return ctx
+}
+
+func (p EnsurePolicy) normalized() EnsurePolicy {
+	if p&EnsureNone != 0 {
+		return 0
+	}
+	p &= EnsureAll
+	if p == 0 {
+		return EnsureAll
+	}
+	return p
+}
+
+// Allow returns p with bits enabled.
+//
+// Bits outside the public EnsureAll mask are ignored. Allow clears the
+// explicit EnsureNone sentinel so callers can build a policy up from
+// EnsureNone.
+func (p EnsurePolicy) Allow(bits EnsurePolicy) EnsurePolicy {
+	if p&EnsureNone != 0 {
+		p = 0
+	}
+	return p | (bits & EnsureAll)
+}
+
+// Deny returns p with bits disabled.
+//
+// Bits outside the public EnsureAll mask are ignored. When the resulting mask
+// would be empty, Deny returns EnsureNone so the explicit no-op intent is
+// preserved instead of falling back to default EnsureAll normalization.
+func (p EnsurePolicy) Deny(bits EnsurePolicy) EnsurePolicy {
+	if p&EnsureNone != 0 {
+		return p
+	}
+
+	p &^= bits & EnsureAll
+	if p == 0 {
+		return EnsureNone
+	}
+	return p
+}
+
+// Has reports whether all requested bits are enabled on p.
+//
+// Bits outside the public EnsureAll mask are ignored.
+func (p EnsurePolicy) Has(bits EnsurePolicy) bool {
+	p = p.normalized()
+	bits &= EnsureAll
+	return bits != 0 && p&bits == bits
+}
+
+func (p EnsurePolicy) allowsDir() bool {
+	return p.normalized()&EnsureDirs != 0
+}
+
+func (p EnsurePolicy) allowsFile() bool {
+	return p.normalized()&EnsureFiles != 0
+}
+
+func (p EnsurePolicy) allowsExec() bool {
+	return p.normalized()&EnsureExecs != 0
+}
+
+func (p EnsurePolicy) allowsSyncable() bool {
+	return p.normalized()&EnsureSyncables != 0
 }
 
 func (ctx Context) syncPolicy() SyncPolicy {
