@@ -160,7 +160,7 @@ func (c copier) copySymlink(src string, dst string, kind sourceKind) error {
 	}
 }
 
-func (c copier) copyRegularFile(src string, dst string, info os.FileInfo) error {
+func (c copier) copyRegularFile(src string, dst string, info os.FileInfo) (err error) {
 	if err := c.prepareDestination(dst); err != nil {
 		return err
 	}
@@ -172,7 +172,11 @@ func (c copier) copyRegularFile(src string, dst string, info os.FileInfo) error 
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer func() {
+		if closeErr := in.Close(); err == nil {
+			err = closeErr
+		}
+	}()
 
 	mode := c.opts.fileMode(info.Mode())
 	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)

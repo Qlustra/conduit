@@ -206,7 +206,7 @@ func (f File) AppendString(content string, dirMode os.FileMode, fileMode os.File
 
 // AppendFile creates parent directories if needed and appends the source file
 // payload.
-func (f File) AppendFile(src File, dirMode os.FileMode, fileMode os.FileMode) error {
+func (f File) AppendFile(src File, dirMode os.FileMode, fileMode os.FileMode) (err error) {
 	if samePath(f.Path(), src.Path()) {
 		return fmt.Errorf("source and destination must differ: %s", f.Path())
 	}
@@ -215,9 +215,14 @@ func (f File) AppendFile(src File, dirMode os.FileMode, fileMode os.FileMode) er
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer func() {
+		if closeErr := in.Close(); err == nil {
+			err = closeErr
+		}
+	}()
 
-	return f.AppendReader(in, dirMode, fileMode)
+	err = f.AppendReader(in, dirMode, fileMode)
+	return err
 }
 
 // AppendFiles creates parent directories if needed and appends each source
