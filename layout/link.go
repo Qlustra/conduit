@@ -162,6 +162,23 @@ func (l Link) JoinRelToPath(base string, parts ...string) (string, error) {
 	return filepath.Join(append([]string{rel}, parts...)...), nil
 }
 
+// RelPathTo returns the target path relative to Path().
+func (l Link) RelPathTo(target string) (string, error) {
+	return filepath.Rel(l.Path(), filepath.Clean(target))
+}
+
+// JoinRelPathTo joins parts onto the target path relative to Path().
+func (l Link) JoinRelPathTo(target string, parts ...string) (string, error) {
+	rel, err := l.RelPathTo(target)
+	if err != nil {
+		return "", err
+	}
+	if len(parts) == 0 {
+		return rel, nil
+	}
+	return filepath.Join(append([]string{rel}, parts...)...), nil
+}
+
 // Exists reports whether a symlink exists at Path.
 //
 // Dangling symlinks still count as existing.

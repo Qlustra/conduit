@@ -274,6 +274,15 @@ func TestRelHelpersUsePatherAndStringBases(t *testing.T) {
 	if got, err := ws.Config.JoinRelToPath(filepath.Join("workspace"), "bak"); err != nil || got != filepath.Join("app", "config.yaml", "bak") {
 		t.Fatalf("Config.JoinRelToPath() = (%q, %v), want (%q, nil)", got, err, filepath.Join("app", "config.yaml", "bak"))
 	}
+	if got, err := ws.Root.RelPathTo(ws.Config.Path()); err != nil || got != "config.yaml" {
+		t.Fatalf("Root.RelPathTo(Config.Path()) = (%q, %v), want (%q, nil)", got, err, "config.yaml")
+	}
+	if got, err := ws.Config.RelPathTo(filepath.Join("workspace", "app")); err != nil || got != ".." {
+		t.Fatalf("Config.RelPathTo(workspace/app) = (%q, %v), want (%q, nil)", got, err, "..")
+	}
+	if got, err := ws.Root.JoinRelPathTo(ws.Logs.Path(), "current"); err != nil || got != filepath.Join("logs", "current") {
+		t.Fatalf("Root.JoinRelPathTo(Logs.Path(), current) = (%q, %v), want (%q, nil)", got, err, filepath.Join("logs", "current"))
+	}
 }
 
 func TestRelHelpersWorkWithSlotAsBase(t *testing.T) {

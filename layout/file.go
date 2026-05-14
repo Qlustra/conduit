@@ -157,6 +157,23 @@ func (f File) JoinRelToPath(base string, parts ...string) (string, error) {
 	return filepath.Join(append([]string{rel}, parts...)...), nil
 }
 
+// RelPathTo returns the target path relative to Path().
+func (f File) RelPathTo(target string) (string, error) {
+	return filepath.Rel(f.Path(), filepath.Clean(target))
+}
+
+// JoinRelPathTo joins parts onto the target path relative to Path().
+func (f File) JoinRelPathTo(target string, parts ...string) (string, error) {
+	rel, err := f.RelPathTo(target)
+	if err != nil {
+		return "", err
+	}
+	if len(parts) == 0 {
+		return rel, nil
+	}
+	return filepath.Join(append([]string{rel}, parts...)...), nil
+}
+
 // Exists reports whether a filesystem entry currently exists at Path.
 func (f File) Exists() bool {
 	_, err := os.Stat(f.Path())

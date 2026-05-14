@@ -48,8 +48,9 @@ Useful methods:
 - `Stem()` returns the final path element without its final extension.
 - `ParentPath()` returns the parent path string.
 - `ParentDir()` returns the parent as a `Dir` handle.
-- `RelTo(...)` and `JoinRelTo(...)` build paths relative to another path-bearing node.
+- `RelTo(...)` and `JoinRelTo(...)` build the receiver path relative to another path-bearing node.
 - `RelToPath(...)` and `JoinRelToPath(...)` do the same against a raw string base.
+- `RelPathTo(...)` and `JoinRelPathTo(...)` reverse that direction and build a target path relative to the receiver.
 - `DeclaredPath()` and `JoinDeclaredPath(...)` expose the node's own declared layout fragment.
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` expose compose-base-relative paths when the handle belongs to a composed tree.
 - `Exists()` reports whether the directory currently exists on disk.
@@ -72,7 +73,8 @@ Useful methods:
 - `Path()` and `Exists()`
 - `Base()`, `Ext()`, and `Stem()` for path fragments
 - `ParentPath()` and `ParentDir()` for filesystem parent lookup
-- `RelTo(...)`, `JoinRelTo(...)`, `RelToPath(...)`, and `JoinRelToPath(...)` for ordinary relative path math
+- `RelTo(...)`, `JoinRelTo(...)`, `RelToPath(...)`, and `JoinRelToPath(...)` when the receiver should be made relative to a base
+- `RelPathTo(...)` and `JoinRelPathTo(...)` when some target path should be made relative to the receiver
 - `DeclaredPath()` and `JoinDeclaredPath(...)` for local declared layout fragments
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` for compose-base-relative path fragments
 - `ReadBytes()` and `ReadBytesIfExists()`
@@ -98,7 +100,7 @@ Useful methods:
 
 - `Ensure(ctx)` and `EnsureExecutable(ctx)` create the file with executable permissions.
 - `Base()`, `Ext()`, and `Stem()` are inherited from `File`.
-- `RelTo(...)`, `JoinRelTo(...)`, `RelToPath(...)`, and `JoinRelToPath(...)` are inherited from `File`.
+- `RelTo(...)`, `JoinRelTo(...)`, `RelToPath(...)`, `JoinRelToPath(...)`, `RelPathTo(...)`, and `JoinRelPathTo(...)` are inherited from `File`.
 - `DeclaredPath()` and `JoinDeclaredPath(...)` are inherited from `File`.
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` are inherited from `File`.
 - `IsExecutable()` reports whether the current target is an executable regular file.
@@ -122,7 +124,7 @@ Useful methods on `Link`:
 
 - `Path()` returns the link path itself.
 - `Base()`, `Ext()`, and `Stem()` expose path fragments for the link path.
-- `RelTo(...)`, `JoinRelTo(...)`, `RelToPath(...)`, and `JoinRelToPath(...)` work like the other node types.
+- `RelTo(...)`, `JoinRelTo(...)`, `RelToPath(...)`, `JoinRelToPath(...)`, `RelPathTo(...)`, and `JoinRelPathTo(...)` work like the other node types.
 - `DeclaredPath()` and `JoinDeclaredPath(...)` expose the node's own declared layout fragment.
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` expose compose-base-relative path fragments.
 - `Exists()` reports whether a symlink exists at the path. It does not require the target to resolve.

@@ -23,8 +23,10 @@ Methods:
 - `ParentDir() Dir`: returns the parent directory handle
 - `RelTo(base Pather) (string, error)`: returns the path relative to another node with a `Path()`
 - `JoinRelTo(base Pather, parts ...string) (string, error)`: joins path parts onto the relative path from another node
-- `RelToPath(base string) (string, error)`: returns the path relative to a raw base path
-- `JoinRelToPath(base string, parts ...string) (string, error)`: joins path parts onto the relative path from a raw base path
+- `RelToPath(base string) (string, error)`: returns the receiver path relative to a raw base path
+- `JoinRelToPath(base string, parts ...string) (string, error)`: joins path parts onto the receiver path relative to a raw base path
+- `RelPathTo(target string) (string, error)`: returns a target path relative to the receiver path
+- `JoinRelPathTo(target string, parts ...string) (string, error)`: joins path parts onto a target path relative to the receiver path
 - `DeclaredPath() (string, bool)`: returns the node's own declared layout fragment
 - `JoinDeclaredPath(parts ...string) (string, bool)`: joins path parts onto the declared layout fragment
 - `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the handle belongs to a composed tree
@@ -51,6 +53,7 @@ Notable behavior:
 - `Exists` only checks current filesystem state; it does not validate that the path is a directory
 - `List` returns entries sorted by filename, matching `os.ReadDir`
 - `ParentDir` preserves compose-base metadata when the receiver belongs to a composed tree
+- `RelToPath` and `RelPathTo` differ only by direction: `RelToPath` makes the receiver relative to a base, while `RelPathTo` makes a target relative to the receiver
 - the declared-path helpers return `ok == false` when the handle was not attached through `Compose`
 - for a root field declared as `layout:"."`, `DeclaredPath()` returns `.`
 - the composed-path helpers return `ok == false` when the handle was not attached through `Compose`
@@ -76,8 +79,10 @@ Methods:
 - `ParentDir() Dir`: returns the parent directory handle
 - `RelTo(base Pather) (string, error)`: returns the path relative to another node with a `Path()`
 - `JoinRelTo(base Pather, parts ...string) (string, error)`: joins path parts onto the relative path from another node
-- `RelToPath(base string) (string, error)`: returns the path relative to a raw base path
-- `JoinRelToPath(base string, parts ...string) (string, error)`: joins path parts onto the relative path from a raw base path
+- `RelToPath(base string) (string, error)`: returns the receiver path relative to a raw base path
+- `JoinRelToPath(base string, parts ...string) (string, error)`: joins path parts onto the receiver path relative to a raw base path
+- `RelPathTo(target string) (string, error)`: returns a target path relative to the receiver path
+- `JoinRelPathTo(target string, parts ...string) (string, error)`: joins path parts onto a target path relative to the receiver path
 - `DeclaredPath() (string, bool)`: returns the node's own declared layout fragment
 - `JoinDeclaredPath(parts ...string) (string, bool)`: joins path parts onto the declared layout fragment
 - `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the handle belongs to a composed tree
@@ -115,6 +120,7 @@ Notable behavior:
 - the declared-path helpers return `ok == false` when the handle was not attached through `Compose`
 - the composed-path helpers return `ok == false` when the handle was not attached through `Compose`
 - `ParentDir` preserves compose-base metadata when the receiver belongs to a composed tree
+- `RelToPath` and `RelPathTo` differ only by direction: `RelToPath` makes the receiver relative to a base, while `RelPathTo` makes a target relative to the receiver
 - dotfiles such as `.env` report an empty extension and keep the full basename as the stem
 
 ### `CopyOptions`
@@ -184,6 +190,8 @@ Methods:
 - `JoinRelTo(base Pather, parts ...string) (string, error)`
 - `RelToPath(base string) (string, error)`
 - `JoinRelToPath(base string, parts ...string) (string, error)`
+- `RelPathTo(target string) (string, error)`
+- `JoinRelPathTo(target string, parts ...string) (string, error)`
 - `DeclaredPath() (string, bool)`
 - `JoinDeclaredPath(parts ...string) (string, bool)`
 - `ComposedBaseDir() (Dir, bool)`
@@ -230,6 +238,8 @@ Methods:
 - `JoinRelTo(base Pather, parts ...string) (string, error)`: joins path parts onto the relative path from another node
 - `RelToPath(base string) (string, error)`: returns the path relative to a raw base path
 - `JoinRelToPath(base string, parts ...string) (string, error)`: joins path parts onto the relative path from a raw base path
+- `RelPathTo(target string) (string, error)`: returns a target path relative to the link path
+- `JoinRelPathTo(target string, parts ...string) (string, error)`: joins path parts onto a target path relative to the link path
 - `DeclaredPath() (string, bool)`: returns the node's own declared layout fragment
 - `JoinDeclaredPath(parts ...string) (string, bool)`: joins path parts onto the declared layout fragment
 - `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the handle belongs to a composed tree
