@@ -58,6 +58,7 @@ Useful methods:
 - `Dir(name)` and `File(name)` derive child handles.
 - `CopyToPath(path, opts)`, `CopyToDir(dir, opts)`, and `CopyIntoDir(parent, opts)` copy directory trees with explicit overwrite, symlink, and mode policy.
 - `Ensure(ctx)` creates the directory tree.
+- `Empty()` removes all children while preserving the directory itself.
 - `DeleteIfExists()` removes the directory recursively when it exists.
 
 ### `File`

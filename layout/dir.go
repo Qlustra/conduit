@@ -183,6 +183,38 @@ func (d Dir) DeleteIfExists() error {
 	return os.RemoveAll(d.Path())
 }
 
+// Empty removes all children under the directory while preserving the
+// directory itself.
+//
+// Empty returns nil when the directory is missing. If Path exists but is not a
+// directory, Empty returns an error. Symlink children are removed as entries
+// and are never followed.
+func (d Dir) Empty() error {
+	info, err := os.Stat(d.Path())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("path %s is not a directory", d.Path())
+	}
+
+	entries, err := os.ReadDir(d.Path())
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		if err := os.RemoveAll(filepath.Join(d.Path(), entry.Name())); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Compose
 
 // ComposePath binds the handle to path and resets composition metadata.

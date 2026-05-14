@@ -38,12 +38,14 @@ Methods:
 - `CopyToPath(path string, opts CopyOptions) error`: copies the directory tree onto an exact destination path
 - `CopyToDir(dst Dir, opts CopyOptions) error`: same exact-path directory copy using `dst.Path()`
 - `CopyIntoDir(parent Dir, opts CopyOptions) error`: copies the directory tree under `parent` using the source basename
+- `Empty() error`: removes all children while preserving the directory itself
 - `DeleteIfExists() error`: removes the directory tree when it exists
 - `Ensure(ctx Context) error`: creates the directory tree using `ctx.DirMode`
 
 Notable behavior:
 
 - `DeleteIfExists` uses recursive removal
+- `Empty` removes symlink children as entries and does not follow them
 - `Exists` only checks current filesystem state; it does not validate that the path is a directory
 - `List` returns entries sorted by filename, matching `os.ReadDir`
 - the declared-path helpers return `ok == false` when the handle was not attached through `Compose`

@@ -61,6 +61,90 @@ func TestDirChangeToChangesWorkingDirectory(t *testing.T) {
 	}
 }
 
+func TestDirEmptyRemovesChildrenAndPreservesDirectory(t *testing.T) {
+	root := NewDir(t.TempDir())
+
+	if err := os.MkdirAll(root.Dir("nested").Dir("deeper").Path(), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(nested) error = %v", err)
+	}
+	if err := os.WriteFile(root.File("nested/deeper/payload.txt").Path(), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile(payload) error = %v", err)
+	}
+	if err := os.WriteFile(root.File("top.txt").Path(), []byte("top"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile(top) error = %v", err)
+	}
+
+	if err := root.Empty(); err != nil {
+		t.Fatalf("Empty() error = %v", err)
+	}
+
+	info, err := os.Stat(root.Path())
+	if err != nil {
+		t.Fatalf("os.Stat(root) error = %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatal("root after Empty() is not a directory")
+	}
+
+	entries, err := root.List()
+	if err != nil {
+		t.Fatalf("List() after Empty() error = %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("len(List()) after Empty() = %d, want 0", len(entries))
+	}
+}
+
+func TestDirEmptyMissingDirectoryIsNoOp(t *testing.T) {
+	root := NewDir(filepath.Join(t.TempDir(), "missing"))
+
+	if err := root.Empty(); err != nil {
+		t.Fatalf("Empty() on missing dir error = %v", err)
+	}
+}
+
+func TestDirEmptyRejectsNonDirectoryPath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "payload.txt")
+	if err := os.WriteFile(path, []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	root := NewDir(path)
+	if err := root.Empty(); err == nil {
+		t.Fatal("Empty() on file path error = nil, want non-nil")
+	}
+}
+
+func TestDirEmptyRemovesSymlinkEntriesWithoutFollowingThem(t *testing.T) {
+	base := t.TempDir()
+	root := NewDir(filepath.Join(base, "workspace"))
+	target := NewDir(filepath.Join(base, "target"))
+
+	if err := os.MkdirAll(root.Path(), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(root) error = %v", err)
+	}
+	if err := os.MkdirAll(target.Path(), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(target) error = %v", err)
+	}
+	if err := os.WriteFile(target.File("payload.txt").Path(), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile(target payload) error = %v", err)
+	}
+	if err := os.Symlink(target.Path(), root.Dir("linked").Path()); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	if err := root.Empty(); err != nil {
+		t.Fatalf("Empty() error = %v", err)
+	}
+
+	if _, err := os.Lstat(root.Dir("linked").Path()); !os.IsNotExist(err) {
+		t.Fatalf("os.Lstat(linked) err = %v, want not-exist", err)
+	}
+	if _, err := os.Stat(target.File("payload.txt").Path()); err != nil {
+		t.Fatalf("os.Stat(target payload) error = %v", err)
+	}
+}
+
 func TestFileTruncateShrinksFile(t *testing.T) {
 	file := NewFile(filepath.Join(t.TempDir(), "payload.txt"))
 
