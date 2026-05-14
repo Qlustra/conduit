@@ -33,7 +33,7 @@ Methods:
 - `ComposedRelativePath() (string, bool)`: returns the path relative to the compose base directory
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
 - `Exists() bool`: reports whether the path currently exists
-- `Chown(uid, gid int) error`: applies `os.Chown` to the directory path
+- `Chown(uid, gid int, ctx Context) error`: applies `os.Chown` to the directory path
 - `Join(parts ...string) string`: joins descendant path segments onto the directory path
 - `List() ([]os.DirEntry, error)`: returns the directory's direct children using `os.ReadDir`
 - `ChangeTo() error`: changes the process working directory to this path
@@ -42,14 +42,17 @@ Methods:
 - `CopyToPath(path string, opts CopyOptions) error`: copies the directory tree onto an exact destination path
 - `CopyToDir(dst Dir, opts CopyOptions) error`: same exact-path directory copy using `dst.Path()`
 - `CopyIntoDir(parent Dir, opts CopyOptions) error`: copies the directory tree under `parent` using the source basename
-- `Empty() error`: removes all children while preserving the directory itself
-- `DeleteIfExists() error`: removes the directory tree when it exists
+- `Validate(opts ValidateOptions) error`: validates that the path is either missing or a directory and that validation policy accepts the path shape
+- `Empty(ctx Context) error`: removes all children while preserving the directory itself
+- `DeleteIfExists(ctx Context) error`: removes the directory tree when it exists
 - `Ensure(ctx Context) error`: creates the directory tree using `ctx.DirMode`
 
 Notable behavior:
 
 - `DeleteIfExists` uses recursive removal
 - `Empty` rejects symlink roots and removes symlink children as entries without following them
+- mutating `Dir` operations reject symlink leaves; `Link` is the type that manages symlink entries intentionally
+- mutating `Dir` operations also reject symlink parents by default; set `Context.PathSafetyPolicy` to `PathSafetyFollowSymlinks` to opt in to path-following behavior
 - `Exists` only checks current filesystem state; it does not validate that the path is a directory
 - `List` returns entries sorted by filename, matching `os.ReadDir`
 - `ParentDir` preserves compose-base metadata when the receiver belongs to a composed tree
@@ -89,21 +92,22 @@ Methods:
 - `ComposedRelativePath() (string, bool)`: returns the path relative to the compose base directory
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
 - `Exists() bool`: reports whether the path currently exists
-- `Chown(uid, gid int) error`: applies `os.Chown` to the file path
+- `Chown(uid, gid int, ctx Context) error`: applies `os.Chown` to the file path
 - `IsExecutable() bool`: reports whether the current target is an executable regular file
-- `Truncate(size int64) error`: resizes the file using `os.Truncate`
-- `AppendReader(src io.Reader, dirMode os.FileMode, fileMode os.FileMode) error`: creates parent directories if needed and appends bytes read from a reader
-- `AppendBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error`: creates parent directories if needed and appends raw bytes
-- `AppendString(content string, dirMode os.FileMode, fileMode os.FileMode) error`: creates parent directories if needed and appends string content
-- `AppendFile(src File, dirMode os.FileMode, fileMode os.FileMode) error`: creates parent directories if needed and appends another file's payload
-- `AppendFiles(dirMode os.FileMode, fileMode os.FileMode, srcs ...File) error`: appends multiple file payloads in order
-- `WriteBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error`: creates parent directories and writes raw bytes
+- `Truncate(size int64, ctx Context) error`: resizes the file using `os.Truncate`
+- `AppendReader(src io.Reader, ctx Context) error`: creates parent directories if needed and appends bytes read from a reader
+- `AppendBytes(data []byte, ctx Context) error`: creates parent directories if needed and appends raw bytes
+- `AppendString(content string, ctx Context) error`: creates parent directories if needed and appends string content
+- `AppendFile(src File, ctx Context) error`: creates parent directories if needed and appends another file's payload
+- `AppendFiles(ctx Context, srcs ...File) error`: appends multiple file payloads in order
+- `WriteBytes(data []byte, ctx Context) error`: creates parent directories and writes raw bytes
 - `ReadBytes() ([]byte, error)`: reads the file contents
 - `ReadBytesIfExists() ([]byte, bool, error)`: reads the file if present and returns `ok == false` for missing files
 - `CopyToPath(path string, opts CopyOptions) error`: copies the file payload to an exact destination path
 - `CopyToFile(dst File, opts CopyOptions) error`: same exact-path file copy using `dst.Path()`
 - `CopyIntoDir(dir Dir, opts CopyOptions) error`: copies the file under `dir` using the source basename
-- `DeleteIfExists() error`: removes the file when it exists
+- `Validate(opts ValidateOptions) error`: validates that the path is either missing or a regular file and that validation policy accepts the path shape
+- `DeleteIfExists(ctx Context) error`: removes the file when it exists
 - `Ensure(ctx Context) error`: creates the parent directories and creates the file if missing
 
 Notable behavior:
@@ -114,6 +118,8 @@ Notable behavior:
 - append helpers create parent directories and the destination file when missing
 - concurrent append calls rely on OS append mode for destination offset management, but no whole-call atomicity is guaranteed
 - `WriteBytes` always rewrites the file contents
+- mutating `File` operations reject symlink leaves; `Link` is the type that manages symlink entries intentionally
+- mutating `File` operations reject symlink parents by default; set `Context.PathSafetyPolicy` to `PathSafetyFollowSymlinks` to opt in to path-following behavior
 - `IsExecutable` returns false for missing paths and non-regular filesystem entries
 - `CopyTo*` uses streamed I/O through `io.Copy`; it does not read the whole file into memory first
 - `Exists` only checks that some filesystem entry exists at the path
@@ -137,13 +143,14 @@ Fields:
 
 - `Overwrite CopyOverwritePolicy`: controls whether an existing destination is rejected or replaced
 - `Symlinks CopySymlinkPolicy`: controls whether symlinks are preserved, followed, or rejected
+- `PathSafetyPolicy PathSafetyPolicy`: controls whether destination path resolution rejects symlink parents
 - `PreserveMode bool`: when true, copies use source permission bits for new files and directories
 - `FileMode os.FileMode`: fallback file mode when `PreserveMode` is false
 - `DirMode os.FileMode`: fallback directory mode when `PreserveMode` is false
 
 Notable behavior:
 
-- `DefaultCopyOptions` preserves symlinks, preserves source modes, and fails when the destination already exists
+- `DefaultCopyOptions` preserves source symlinks, preserves source modes, rejects symlink parents in destination paths, and fails when the destination already exists
 - the zero `CopyOptions{}` value is treated as `DefaultCopyOptions`
 - when `PreserveMode` is false and a mode field is zero, copy falls back to `DefaultContext.FileMode` or `DefaultContext.DirMode`
 
@@ -200,8 +207,9 @@ Methods:
 - `Exists() bool`
 - `ReadBytes() ([]byte, error)`
 - `ReadBytesIfExists() ([]byte, bool, error)`
-- `WriteBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error`
-- `DeleteIfExists() error`
+- `WriteBytes(data []byte, ctx Context) error`
+- `DeleteIfExists(ctx Context) error`
+- `Validate(opts ValidateOptions) error`: validates executable file shape and validation-path policy
 - `Ensure(ctx Context) error`: creates the file and ensures executable permissions
 - `EnsureExecutable(ctx Context) error`: same executable materialization behavior as `Ensure`
 - `IsExecutable() bool`: reports whether the current target is an executable regular file
@@ -213,6 +221,7 @@ Methods:
 Notable behavior:
 
 - `Ensure` and `EnsureExecutable` apply `Context.ExecMode`, or `FileMode` with execute bits added when `ExecMode` is zero
+- mutating `Exec` operations reject symlink leaves and reject symlink parents by default; set `Context.PathSafetyPolicy` to `PathSafetyFollowSymlinks` to opt in to path-following behavior
 - `Command` returns an `*exec.Cmd` even when configuration is invalid; the error is stored on `cmd.Err`
 - `Run` fails when `ctx` is nil
 - `Output` and `CombinedOutput` reject explicit `Stdout` or `Stderr` writers in `RunOptions`
@@ -256,7 +265,8 @@ Methods:
 - `ResolvedTargetPath() (string, bool)`: resolves the cached target against the link's parent directory when it is relative
 - `TargetExists() (bool, error)`: reports whether the resolved target currently exists
 - `IsDangling() (bool, error)`: reports whether the cached target is currently missing
-- `Delete() error`: removes the symlink when it exists
+- `Delete(ctx Context) error`: removes the symlink when it exists
+- `Validate(opts ValidateOptions) error`: validates that the path is either missing or a symlink and that validation policy accepts the path shape
 - `Load() (bool, error)`: reads the symlink target from disk
 - `Unload()`: drops the cached target string without touching disk
 - `Discover() (DiskState, error)`: observes the symlink's presence on disk without loading a new target
@@ -290,6 +300,7 @@ Description:
 Methods:
 
 - all promoted `Link` methods
+- `Validate(opts ValidateOptions) error`: validates the link entry plus resolved target file type when a target is cached
 - `TargetFile() (File, bool)`: resolves the cached target to a `File` handle
 - `MustTargetFile() File`: panicking version of `TargetFile()`
 
@@ -306,6 +317,7 @@ Description:
 Methods:
 
 - all promoted `Link` methods
+- `Validate(opts ValidateOptions) error`: validates the link entry plus resolved target directory type when a target is cached
 - `TargetDir() (Dir, bool)`: resolves the cached target to a `Dir` handle
 - `MustTargetDir() Dir`: panicking version of `TargetDir()`
 

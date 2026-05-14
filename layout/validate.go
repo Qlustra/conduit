@@ -39,7 +39,7 @@ func validateDeepValue(v reflect.Value, opts ValidateOptions) (ResultCode, error
 		}
 
 		if v.Type().Implements(validatorType) {
-			err := v.Interface().(Validator).Validate()
+			err := v.Interface().(Validator).Validate(opts)
 			result := ValidateOK
 			if err != nil {
 				result = ValidateFailed
@@ -65,7 +65,7 @@ func validateDeepValue(v reflect.Value, opts ValidateOptions) (ResultCode, error
 		}
 
 		if ptr.Type().Implements(validatorType) {
-			err := ptr.Interface().(Validator).Validate()
+			err := ptr.Interface().(Validator).Validate(opts)
 			result := ValidateOK
 			if err != nil {
 				result = ValidateFailed
@@ -75,11 +75,6 @@ func validateDeepValue(v reflect.Value, opts ValidateOptions) (ResultCode, error
 			}
 			return result, err
 		}
-	}
-
-	switch v.Type() {
-	case dirType, fileType:
-		return recordValidateResult(opts, OpValidate, v.Interface().(Pather).Path(), ValidateNotApplicable, nil)
 	}
 
 	if v.Kind() != reflect.Struct {

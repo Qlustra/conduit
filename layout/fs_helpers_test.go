@@ -74,7 +74,7 @@ func TestDirEmptyRemovesChildrenAndPreservesDirectory(t *testing.T) {
 		t.Fatalf("os.WriteFile(top) error = %v", err)
 	}
 
-	if err := root.Empty(); err != nil {
+	if err := root.Empty(DefaultContext); err != nil {
 		t.Fatalf("Empty() error = %v", err)
 	}
 
@@ -98,7 +98,7 @@ func TestDirEmptyRemovesChildrenAndPreservesDirectory(t *testing.T) {
 func TestDirEmptyMissingDirectoryIsNoOp(t *testing.T) {
 	root := NewDir(filepath.Join(t.TempDir(), "missing"))
 
-	if err := root.Empty(); err != nil {
+	if err := root.Empty(DefaultContext); err != nil {
 		t.Fatalf("Empty() on missing dir error = %v", err)
 	}
 }
@@ -110,7 +110,7 @@ func TestDirEmptyRejectsNonDirectoryPath(t *testing.T) {
 	}
 
 	root := NewDir(path)
-	if err := root.Empty(); err == nil {
+	if err := root.Empty(DefaultContext); err == nil {
 		t.Fatal("Empty() on file path error = nil, want non-nil")
 	}
 }
@@ -130,7 +130,7 @@ func TestDirEmptyRejectsSymlinkRoot(t *testing.T) {
 		t.Fatalf("os.Symlink() error = %v", err)
 	}
 
-	if err := root.Empty(); err == nil {
+	if err := root.Empty(DefaultContext); err == nil {
 		t.Fatal("Empty() on symlink root error = nil, want non-nil")
 	}
 
@@ -157,7 +157,7 @@ func TestDirEmptyRemovesSymlinkEntriesWithoutFollowingThem(t *testing.T) {
 		t.Fatalf("os.Symlink() error = %v", err)
 	}
 
-	if err := root.Empty(); err != nil {
+	if err := root.Empty(DefaultContext); err != nil {
 		t.Fatalf("Empty() error = %v", err)
 	}
 
@@ -175,8 +175,8 @@ func TestFileTruncateShrinksFile(t *testing.T) {
 	if err := os.WriteFile(file.Path(), []byte("abcdef"), 0o644); err != nil {
 		t.Fatalf("os.WriteFile() error = %v", err)
 	}
-	if err := file.Truncate(3); err != nil {
-		t.Fatalf("Truncate() error = %v", err)
+	if err := file.Truncate(3, DefaultContext); err != nil {
+		t.Fatalf("Truncate(, DefaultContext) error = %v", err)
 	}
 
 	data, err := os.ReadFile(file.Path())
@@ -234,10 +234,78 @@ func TestFileAndDirChownCallThroughToOS(t *testing.T) {
 		t.Fatalf("os.Mkdir() error = %v", err)
 	}
 
-	if err := file.Chown(-1, -1); err != nil {
+	if err := file.Chown(-1, -1, DefaultContext); err != nil {
 		t.Fatalf("File.Chown() error = %v", err)
 	}
-	if err := dir.Chown(-1, -1); err != nil {
+	if err := dir.Chown(-1, -1, DefaultContext); err != nil {
+		t.Fatalf("Dir.Chown() error = %v", err)
+	}
+}
+
+func TestFileChownRejectsSymlinkLeaf(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Chown is not supported on Windows")
+	}
+
+	base := t.TempDir()
+	target := filepath.Join(base, "target.txt")
+	link := NewFile(filepath.Join(base, "payload.txt"))
+
+	if err := os.WriteFile(target, []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile(target) error = %v", err)
+	}
+	if err := os.Symlink(target, link.Path()); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	if err := link.Chown(-1, -1, DefaultContext); err == nil {
+		t.Fatal("File.Chown() error = nil, want non-nil for symlink leaf")
+	}
+}
+
+func TestDirChownRejectsSymlinkParentByDefault(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Chown is not supported on Windows")
+	}
+
+	base := t.TempDir()
+	realDir := filepath.Join(base, "real")
+	linkParent := filepath.Join(base, "alias")
+	dir := NewDir(filepath.Join(linkParent, "workspace"))
+
+	if err := os.MkdirAll(filepath.Join(realDir, "workspace"), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(real workspace) error = %v", err)
+	}
+	if err := os.Symlink(realDir, linkParent); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	if err := dir.Chown(-1, -1, DefaultContext); err == nil {
+		t.Fatal("Dir.Chown() error = nil, want non-nil for symlink parent")
+	}
+}
+
+func TestDirChownCanFollowSymlinkParentWhenEnabled(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Chown is not supported on Windows")
+	}
+
+	base := t.TempDir()
+	realDir := filepath.Join(base, "real")
+	linkParent := filepath.Join(base, "alias")
+	dir := NewDir(filepath.Join(linkParent, "workspace"))
+
+	if err := os.MkdirAll(filepath.Join(realDir, "workspace"), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(real workspace) error = %v", err)
+	}
+	if err := os.Symlink(realDir, linkParent); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	ctx := DefaultContext
+	ctx.PathSafetyPolicy = PathSafetyFollowSymlinks
+
+	if err := dir.Chown(-1, -1, ctx); err != nil {
 		t.Fatalf("Dir.Chown() error = %v", err)
 	}
 }

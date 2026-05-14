@@ -1,7 +1,9 @@
 package layout
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -171,7 +173,10 @@ func (d Dir) Exists() bool {
 }
 
 // Chown applies os.Chown to the directory path.
-func (d Dir) Chown(uid int, gid int) error {
+func (d Dir) Chown(uid int, gid int, ctx Context) error {
+	if err := guardPathMutation(d.Path(), ctx.pathSafetyPolicy(), expectDir); err != nil {
+		return err
+	}
 	return os.Chown(d.Path(), uid, gid)
 }
 
@@ -202,10 +207,16 @@ func (d Dir) File(name string) File {
 }
 
 // DeleteIfExists removes the directory tree when it exists.
-func (d Dir) DeleteIfExists() error {
-	_, err := os.Stat(d.Path())
+func (d Dir) DeleteIfExists(ctx Context) error {
+	if err := guardPathMutation(d.Path(), ctx.pathSafetyPolicy(), expectDir); err != nil {
+		return err
+	}
+	_, err := os.Lstat(d.Path())
 	if err != nil {
-		return nil
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
 	}
 	return os.RemoveAll(d.Path())
 }
@@ -216,23 +227,16 @@ func (d Dir) DeleteIfExists() error {
 // Empty returns nil when the directory is missing. If Path exists but is not a
 // directory, Empty returns an error. Symlink roots are rejected. Symlink
 // children are removed as entries and are never followed.
-func (d Dir) Empty() error {
-	info, err := os.Lstat(d.Path())
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
+func (d Dir) Empty(ctx Context) error {
+	if err := guardPathMutation(d.Path(), ctx.pathSafetyPolicy(), expectDir); err != nil {
 		return err
-	}
-	if info.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("path %s is a symlink, not a directory", d.Path())
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("path %s is not a directory", d.Path())
 	}
 
 	entries, err := os.ReadDir(d.Path())
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
 		return err
 	}
 
@@ -271,7 +275,16 @@ func (d Dir) Ensure(ctx Context) error {
 	if !ctx.ensurePolicy().allowsDir() {
 		return nil
 	}
+	if err := guardPathMutation(d.Path(), ctx.pathSafetyPolicy(), expectDir); err != nil {
+		return err
+	}
 	return os.MkdirAll(d.path, ctx.DirMode)
+}
+
+// Validate reports an error when Path exists but is not a directory, or when
+// validation policy rejects any symlink parent in the path.
+func (d Dir) Validate(opts ValidateOptions) error {
+	return guardPathMutation(d.Path(), opts.PathSafetyPolicy, expectDir)
 }
 
 // Copy
@@ -287,6 +300,9 @@ func (d Dir) CopyToPath(path string, opts CopyOptions) error {
 	}
 	if pathWithin(dst, d.Path()) {
 		return fmt.Errorf("destination path %s must not be inside source directory %s", dst, d.Path())
+	}
+	if err := guardNodeKind(d.Path(), expectDir); err != nil {
+		return err
 	}
 
 	return newCopier(opts).copyDir(d.Path(), dst)

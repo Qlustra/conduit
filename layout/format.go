@@ -67,8 +67,8 @@ func (f *Format[T, C]) Clear() {
 
 // Delete removes the file from disk when it exists, clears cached content, and
 // marks disk state missing.
-func (f *Format[T, C]) Delete() error {
-	if err := f.File.DeleteIfExists(); err != nil {
+func (f *Format[T, C]) Delete(ctx Context) error {
+	if err := f.File.DeleteIfExists(ctx); err != nil {
 		return err
 	}
 	f.Clear()
@@ -98,7 +98,7 @@ func (f Format[T, C]) Write(value T, ctx Context) error {
 	if err != nil {
 		return err
 	}
-	return f.File.WriteBytes(data, ctx.DirMode, ctx.FileMode)
+	return f.File.WriteBytes(data, ctx)
 }
 
 // Read reads and unmarshals the file from disk without changing cached state.

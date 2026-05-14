@@ -9,7 +9,7 @@ import (
 func TestFileAppendBytesCreatesParentDirs(t *testing.T) {
 	file := NewFile(filepath.Join(t.TempDir(), "nested", "payload.txt"))
 
-	if err := file.AppendBytes([]byte("alpha"), 0o755, 0o644); err != nil {
+	if err := file.AppendBytes([]byte("alpha"), DefaultContext); err != nil {
 		t.Fatalf("AppendBytes() error = %v", err)
 	}
 
@@ -28,7 +28,7 @@ func TestFileAppendStringAppendsToExistingFile(t *testing.T) {
 	if err := os.WriteFile(file.Path(), []byte("alpha"), 0o644); err != nil {
 		t.Fatalf("os.WriteFile() error = %v", err)
 	}
-	if err := file.AppendString("beta", 0o755, 0o644); err != nil {
+	if err := file.AppendString("beta", DefaultContext); err != nil {
 		t.Fatalf("AppendString() error = %v", err)
 	}
 
@@ -52,7 +52,7 @@ func TestFileAppendFileAppendsSourceContent(t *testing.T) {
 	if err := os.WriteFile(src.Path(), []byte("beta"), 0o644); err != nil {
 		t.Fatalf("os.WriteFile(src) error = %v", err)
 	}
-	if err := dst.AppendFile(src, 0o755, 0o644); err != nil {
+	if err := dst.AppendFile(src, DefaultContext); err != nil {
 		t.Fatalf("AppendFile() error = %v", err)
 	}
 
@@ -77,7 +77,7 @@ func TestFileAppendFilesPreservesOrder(t *testing.T) {
 	if err := os.WriteFile(second.Path(), []byte("two\n"), 0o644); err != nil {
 		t.Fatalf("os.WriteFile(second) error = %v", err)
 	}
-	if err := dst.AppendFiles(0o755, 0o644, first, second); err != nil {
+	if err := dst.AppendFiles(DefaultContext, first, second); err != nil {
 		t.Fatalf("AppendFiles() error = %v", err)
 	}
 
@@ -100,7 +100,7 @@ func TestFileAppendFilesReturnsPartialWriteOnError(t *testing.T) {
 		t.Fatalf("os.WriteFile(first) error = %v", err)
 	}
 
-	err := dst.AppendFiles(0o755, 0o644, first, missing)
+	err := dst.AppendFiles(DefaultContext, first, missing)
 	if err == nil {
 		t.Fatal("AppendFiles() error = nil, want non-nil")
 	}
@@ -121,7 +121,7 @@ func TestFileAppendFileRejectsSelfAppend(t *testing.T) {
 		t.Fatalf("os.WriteFile() error = %v", err)
 	}
 
-	err := file.AppendFile(file, 0o755, 0o644)
+	err := file.AppendFile(file, DefaultContext)
 	if err == nil {
 		t.Fatal("AppendFile() error = nil, want non-nil")
 	}
@@ -130,7 +130,7 @@ func TestFileAppendFileRejectsSelfAppend(t *testing.T) {
 func TestFileAppendReaderRejectsNilSource(t *testing.T) {
 	file := NewFile(filepath.Join(t.TempDir(), "payload.txt"))
 
-	err := file.AppendReader(nil, 0o755, 0o644)
+	err := file.AppendReader(nil, DefaultContext)
 	if err == nil {
 		t.Fatal("AppendReader() error = nil, want non-nil")
 	}
@@ -139,7 +139,7 @@ func TestFileAppendReaderRejectsNilSource(t *testing.T) {
 func TestFileAppendFilesWithNoSourcesIsNoOp(t *testing.T) {
 	file := NewFile(filepath.Join(t.TempDir(), "payload.txt"))
 
-	if err := file.AppendFiles(0o755, 0o644); err != nil {
+	if err := file.AppendFiles(DefaultContext); err != nil {
 		t.Fatalf("AppendFiles() error = %v", err)
 	}
 	if file.Exists() {

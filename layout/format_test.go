@@ -80,7 +80,7 @@ func TestFormatDeleteClearsContentAndMarksMissing(t *testing.T) {
 	if err := f.Save(DefaultContext); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
-	if err := f.Delete(); err != nil {
+	if err := f.Delete(DefaultContext); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 

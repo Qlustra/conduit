@@ -117,12 +117,12 @@ func (s *LinkSlot[T]) Remove(name string) {
 }
 
 // Delete removes the child symlink from disk and evicts the cached item.
-func (s *LinkSlot[T]) Delete(name string) error {
+func (s *LinkSlot[T]) Delete(name string, ctx Context) error {
 	if err := validateSlotItemName("link slot item", name); err != nil {
 		return err
 	}
 	link := NewLink(s.root.File(name).Path())
-	if err := link.Delete(); err != nil {
+	if err := link.Delete(ctx); err != nil {
 		return err
 	}
 
@@ -448,6 +448,10 @@ func (s *LinkSlot[T]) SyncDeep(ctx Context) (ResultCode, error) {
 
 // ValidateDeep validates only currently cached items.
 func (s *LinkSlot[T]) ValidateDeep(opts ValidateOptions) (ResultCode, error) {
+	if err := s.root.Validate(opts); err != nil {
+		return ValidateFailed, err
+	}
+
 	s.mu.RLock()
 	items := make(map[string]T, len(s.items))
 	for name, item := range s.items {

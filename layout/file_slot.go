@@ -112,11 +112,11 @@ func (s *FileSlot[T]) Remove(name string) {
 }
 
 // Delete removes the child file from disk and evicts the cached item.
-func (s *FileSlot[T]) Delete(name string) error {
+func (s *FileSlot[T]) Delete(name string, ctx Context) error {
 	if err := validateSlotItemName("file slot item", name); err != nil {
 		return err
 	}
-	if err := s.root.File(name).DeleteIfExists(); err != nil {
+	if err := s.root.File(name).DeleteIfExists(ctx); err != nil {
 		return err
 	}
 
@@ -508,6 +508,10 @@ func (s *FileSlot[T]) DefaultDeep() error {
 
 // ValidateDeep validates only currently cached items.
 func (s *FileSlot[T]) ValidateDeep(opts ValidateOptions) (ResultCode, error) {
+	if err := s.root.Validate(opts); err != nil {
+		return ValidateFailed, err
+	}
+
 	s.mu.RLock()
 	items := make(map[string]T, len(s.items))
 	for name, item := range s.items {

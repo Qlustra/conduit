@@ -42,6 +42,9 @@ func (e Exec) EnsureExecutable(ctx Context) error {
 	if !ctx.ensurePolicy().allowsExec() {
 		return nil
 	}
+	if err := guardPathMutation(e.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+		return err
+	}
 	ctx.FileMode = e.executableMode(ctx)
 	if err := e.File.Ensure(ctx); err != nil {
 		return err
@@ -182,13 +185,17 @@ func (e Exec) executableMode(ctx Context) os.FileMode {
 // Validate
 
 // Validate reports an error when Path exists but is not an executable regular
-// file.
-func (e Exec) Validate() error {
+// file, or when validation policy rejects the path shape.
+func (e Exec) Validate(opts ValidateOptions) error {
 	if e.Path() == "" {
 		return nil
 	}
 
-	info, err := os.Stat(e.Path())
+	if err := guardPathMutation(e.Path(), opts.PathSafetyPolicy, expectFile); err != nil {
+		return err
+	}
+
+	info, err := os.Lstat(e.Path())
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil

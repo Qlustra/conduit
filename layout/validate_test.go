@@ -14,7 +14,7 @@ type testValidatorFile struct {
 	err   error
 }
 
-func (f *testValidatorFile) Validate() error {
+func (f *testValidatorFile) Validate(opts ValidateOptions) error {
 	if f.calls != nil {
 		*f.calls = *f.calls + 1
 	}
@@ -48,7 +48,7 @@ func TestValidateDeepCallsValidatorsAndReports(t *testing.T) {
 	}
 
 	assertEntries(t, report.Entries(), []Entry{
-		{Op: OpValidate, Path: filepath.Join(base, "raw.txt"), Result: ValidateNotApplicable},
+		{Op: OpValidate, Path: filepath.Join(base, "raw.txt"), Result: ValidateOK},
 		{Op: OpValidate, Path: filepath.Join(base, "config.json"), Result: ValidateOK},
 	})
 }
@@ -190,5 +190,91 @@ func TestFileLinkValidateRejectsDirectoryTarget(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "is not a file") {
 		t.Fatalf("ValidateDeep() error = %v, want file-link validation error", err)
+	}
+}
+
+func TestValidateDeepRejectsSymlinkParentByDefault(t *testing.T) {
+	type root struct {
+		Config File `layout:"config.json"`
+	}
+
+	base := t.TempDir()
+	realDir := filepath.Join(base, "real")
+	linkBase := filepath.Join(base, "alias")
+
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(real) error = %v", err)
+	}
+	if err := os.Symlink(realDir, linkBase); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	var layout root
+	if err := Compose(linkBase, &layout); err != nil {
+		t.Fatalf("Compose() error = %v", err)
+	}
+
+	_, err := ValidateDeep(&layout, ValidateOptions{})
+	if err == nil {
+		t.Fatal("ValidateDeep() error = nil, want non-nil")
+	}
+	if !strings.Contains(err.Error(), "is a symlink") {
+		t.Fatalf("ValidateDeep() error = %v, want parent-symlink error", err)
+	}
+}
+
+func TestValidateDeepCanFollowSymlinkParentWhenEnabled(t *testing.T) {
+	type root struct {
+		Config File `layout:"config.json"`
+	}
+
+	base := t.TempDir()
+	realDir := filepath.Join(base, "real")
+	linkBase := filepath.Join(base, "alias")
+
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(real) error = %v", err)
+	}
+	if err := os.Symlink(realDir, linkBase); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	var layout root
+	if err := Compose(linkBase, &layout); err != nil {
+		t.Fatalf("Compose() error = %v", err)
+	}
+
+	opts := ValidateOptions{PathSafetyPolicy: PathSafetyFollowSymlinks}
+	if _, err := ValidateDeep(&layout, opts); err != nil {
+		t.Fatalf("ValidateDeep() error = %v", err)
+	}
+}
+
+func TestValidateDeepExecRejectsSymlinkLeaf(t *testing.T) {
+	type root struct {
+		Run Exec `layout:"run.sh"`
+	}
+
+	base := t.TempDir()
+	targetPath := filepath.Join(base, "target.sh")
+
+	if err := os.WriteFile(targetPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("os.WriteFile(target) error = %v", err)
+	}
+
+	var layout root
+	if err := Compose(base, &layout); err != nil {
+		t.Fatalf("Compose() error = %v", err)
+	}
+	if err := os.Symlink(targetPath, layout.Run.Path()); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	_, err := ValidateDeep(&layout, ValidateOptions{})
+	if err == nil {
+		t.Fatal("ValidateDeep() error = nil, want non-nil")
+	}
+	if !strings.Contains(err.Error(), "is a symlink, not a file") {
+		t.Fatalf("ValidateDeep() error = %v, want symlink-leaf error", err)
 	}
 }

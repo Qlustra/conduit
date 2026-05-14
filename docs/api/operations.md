@@ -87,17 +87,20 @@ Constants:
 ```go
 type ValidateOptions struct {
 	Reporter conduit.Reporter
+	PathSafetyPolicy conduit.PathSafetyPolicy
 }
 ```
 
 Fields:
 
 - `Reporter`: optional sink for per-path validation results
+- `PathSafetyPolicy`: controls whether built-in typed filesystem nodes reject symlink parents during validation
 
 Notable behavior:
 
 - the zero value is ready to use
 - validation reporting is separate from `Context` because validation does not need file modes or sync policy
+- the zero-value path policy is `PathSafetyRejectSymlinkParents`
 
 ### `Reporter`
 
@@ -402,12 +405,13 @@ Returns:
 
 Notable behavior:
 
-- calls `Validate() error` on nodes that implement `layout.Validator`
+- calls `Validate(opts) error` on nodes that implement `layout.Validator`
 - calls `ValidateDeep(opts)` on nodes that implement `layout.DeepValidator`
 - only visits already composed or cached children
 - does not discover new slot entries from disk
 - does not read from disk into typed memory
 - does not render templates or write to disk
+- built-in `File`, `Dir`, `Exec`, and link nodes apply `opts.PathSafetyPolicy` during validation
 - returns an error if `target` is nil
 
 ### `RenderDeep`

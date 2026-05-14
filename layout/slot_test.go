@@ -105,7 +105,7 @@ func TestSlotDeleteRemovesDiskAndCache(t *testing.T) {
 		t.Fatalf("Add() error = %v", err)
 	}
 
-	if err := slot.Delete("api"); err != nil {
+	if err := slot.Delete("api", DefaultContext); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 
@@ -230,7 +230,7 @@ func TestSlotRejectsNamesOutsideDirectChildren(t *testing.T) {
 		if _, err := slot.Require(name); err == nil {
 			t.Fatalf("Require(%q) error = nil, want non-nil", name)
 		}
-		if err := slot.Delete(name); err == nil {
+		if err := slot.Delete(name, DefaultContext); err == nil {
 			t.Fatalf("Delete(%q) error = nil, want non-nil", name)
 		}
 	}

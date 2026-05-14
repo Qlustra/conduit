@@ -84,9 +84,9 @@ Other write-side methods:
 - `Set(value T)`
 - `Clear()`
 - `Unload()`
-- `Delete() error`
+- `Delete(ctx) error`
 
-`Clear()` and `Unload()` both remove cached content from memory. `Delete()` removes the file from disk if it exists, then clears the in-memory value.
+`Clear()` and `Unload()` both remove cached content from memory. `Delete(ctx)` removes the file from disk if it exists, then clears the in-memory value.
 
 ## Persisting content
 

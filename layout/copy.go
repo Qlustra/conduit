@@ -48,6 +48,10 @@ type CopyOptions struct {
 	// Symlinks controls how symlinks in the source tree are handled.
 	Symlinks CopySymlinkPolicy
 
+	// PathSafetyPolicy controls whether destination path resolution rejects
+	// symlink parents.
+	PathSafetyPolicy PathSafetyPolicy
+
 	// PreserveMode controls whether source modes are reused on created files and
 	// directories.
 	PreserveMode bool
@@ -64,9 +68,10 @@ type CopyOptions struct {
 // DefaultCopyOptions preserves source modes and symlinks and fails if the
 // destination already exists.
 var DefaultCopyOptions = CopyOptions{
-	Overwrite:    CopyOverwriteFail,
-	Symlinks:     CopySymlinkPreserve,
-	PreserveMode: true,
+	Overwrite:        CopyOverwriteFail,
+	Symlinks:         CopySymlinkPreserve,
+	PathSafetyPolicy: PathSafetyRejectSymlinkParents,
+	PreserveMode:     true,
 }
 
 type copier struct {
@@ -128,6 +133,9 @@ func (c copier) copySymlink(src string, dst string, kind sourceKind) error {
 		if err != nil {
 			return err
 		}
+		if err := guardPathParents(dst, c.opts.PathSafetyPolicy); err != nil {
+			return err
+		}
 		if err := c.prepareDestination(dst); err != nil {
 			return err
 		}
@@ -161,6 +169,9 @@ func (c copier) copySymlink(src string, dst string, kind sourceKind) error {
 }
 
 func (c copier) copyRegularFile(src string, dst string, info os.FileInfo) (err error) {
+	if err := guardPathParents(dst, c.opts.PathSafetyPolicy); err != nil {
+		return err
+	}
 	if err := c.prepareDestination(dst); err != nil {
 		return err
 	}
@@ -210,6 +221,9 @@ func (c copier) copyDirectoryTree(src string, dst string, info os.FileInfo) erro
 	c.activeRealDirs[realPath] = struct{}{}
 	defer delete(c.activeRealDirs, realPath)
 
+	if err := guardPathParents(dst, c.opts.PathSafetyPolicy); err != nil {
+		return err
+	}
 	if err := c.prepareDestination(dst); err != nil {
 		return err
 	}

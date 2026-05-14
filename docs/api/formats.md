@@ -38,10 +38,10 @@ Inherited file methods:
 
 - `Path() string`
 - `Exists() bool`
-- `WriteBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error`
+- `WriteBytes(data []byte, ctx Context) error`
 - `ReadBytes() ([]byte, error)`
 - `ReadBytesIfExists() ([]byte, bool, error)`
-- `DeleteIfExists() error`
+- `DeleteIfExists(ctx Context) error`
 - `Ensure(ctx Context) error`
 
 Content methods:
@@ -51,7 +51,7 @@ Content methods:
 - `Set(value T)`: replaces cached content and marks memory state dirty
 - `SetDefault(value T) bool`: stores a default value only when no content is currently cached
 - `Clear()`: clears cached content and resets memory state to unknown
-- `Delete() error`: removes the file from disk if present, clears cached content, and marks disk state missing
+- `Delete(ctx Context) error`: removes the file from disk if present, clears cached content, and marks disk state missing
 - `Write(value T, ctx Context) error`: marshals and writes a supplied value directly
 - `Read() (T, error)`: reads and unmarshals from disk
 - `ReadIfExists() (T, bool, error)`: reads and unmarshals when the file exists

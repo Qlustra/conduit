@@ -2,6 +2,20 @@ package layout
 
 import "os"
 
+// PathSafetyPolicy controls how mutating operations treat symlinks encountered
+// while resolving destination paths.
+type PathSafetyPolicy uint8
+
+const (
+	// PathSafetyRejectSymlinkParents rejects existing symlink parents during
+	// mutating path resolution.
+	PathSafetyRejectSymlinkParents PathSafetyPolicy = iota
+
+	// PathSafetyFollowSymlinks preserves the library's historical path-following
+	// behavior.
+	PathSafetyFollowSymlinks
+)
+
 // EnsurePolicy is a bitmask that controls which node kinds Ensure and
 // EnsureDeep may materialize.
 //
@@ -110,6 +124,10 @@ type Context struct {
 	// SyncPolicy controls which cached values Sync and SyncDeep may write.
 	SyncPolicy SyncPolicy
 
+	// PathSafetyPolicy controls whether mutating filesystem operations reject
+	// symlink parents during path resolution.
+	PathSafetyPolicy PathSafetyPolicy
+
 	// Reporter, when non-nil, receives path-level results during deep
 	// traversal.
 	Reporter Reporter
@@ -122,11 +140,12 @@ type Context struct {
 // executables with 0o755, uses EnsureAll behavior, and uses SyncRewrite
 // behavior.
 var DefaultContext = Context{
-	DirMode:      0o755,
-	FileMode:     0o644,
-	ExecMode:     0o755,
-	EnsurePolicy: EnsureAll,
-	SyncPolicy:   SyncRewrite,
+	DirMode:          0o755,
+	FileMode:         0o644,
+	ExecMode:         0o755,
+	EnsurePolicy:     EnsureAll,
+	SyncPolicy:       SyncRewrite,
+	PathSafetyPolicy: PathSafetyRejectSymlinkParents,
 }
 
 func (ctx Context) ensurePolicy() EnsurePolicy {
@@ -205,6 +224,10 @@ func (p EnsurePolicy) allowsSyncable() bool {
 
 func (ctx Context) syncPolicy() SyncPolicy {
 	return ctx.SyncPolicy
+}
+
+func (ctx Context) pathSafetyPolicy() PathSafetyPolicy {
+	return ctx.PathSafetyPolicy
 }
 
 func (p SyncPolicy) normalizedMemory() SyncPolicy {

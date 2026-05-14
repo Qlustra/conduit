@@ -227,12 +227,16 @@ type ValidateOptions struct {
 	// Reporter, when non-nil, receives path-level results during validation
 	// traversal.
 	Reporter Reporter
+
+	// PathSafetyPolicy controls whether validation rejects symlink parents for
+	// typed filesystem nodes.
+	PathSafetyPolicy PathSafetyPolicy
 }
 
 // Validator is implemented by values that can validate their current state
 // without mutating disk or memory.
 type Validator interface {
-	Validate() error
+	Validate(opts ValidateOptions) error
 }
 
 // DeepValidator is implemented by values that handle ValidateDeep traversal

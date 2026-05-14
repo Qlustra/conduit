@@ -144,10 +144,11 @@ _, err := conduit.ValidateDeep(&ws, conduit.ValidateOptions{})
 
 What it does:
 
-- calls `Validate() error` on nodes that implement it
+- calls `Validate(opts) error` on nodes that implement it
 - calls `ValidateDeep(opts)` on nodes that own their own validation traversal
 - validates only already composed or cached children
 - optionally records per-path validation results through `opts.Reporter`
+- applies `opts.PathSafetyPolicy` when validating built-in filesystem node types
 
 What it does not do:
 

@@ -279,32 +279,24 @@ func (l Link) IsDangling() (bool, error) {
 	return !exists, nil
 }
 
-// Validate reports an error when Path exists but is not a symlink.
-func (l Link) Validate() error {
+// Validate reports an error when Path exists but is not a symlink, or when
+// validation policy rejects any symlink parent in the path.
+func (l Link) Validate(opts ValidateOptions) error {
 	if l.Path() == "" {
 		return nil
 	}
 
-	info, err := os.Lstat(l.Path())
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-
-	if info.Mode()&os.ModeSymlink == 0 {
-		return fmt.Errorf("path %s is not a symlink", l.Path())
-	}
-
-	return nil
+	return guardPathMutation(l.Path(), opts.PathSafetyPolicy, expectLink)
 }
 
 // Delete removes the symlink when it exists, clears cached target state, and
 // marks disk state missing.
 //
 // Delete fails if Path exists but is not a symlink.
-func (l *Link) Delete() error {
+func (l *Link) Delete(ctx Context) error {
+	if err := guardPathMutation(l.Path(), ctx.pathSafetyPolicy(), expectLink); err != nil {
+		return err
+	}
 	info, err := os.Lstat(l.Path())
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -378,8 +370,8 @@ func (l *FileLink) MustTargetFile() File {
 
 // Validate reports an error when Path exists but is not a symlink, or when a
 // cached resolved target exists and is not a file.
-func (l FileLink) Validate() error {
-	if err := l.Link.Validate(); err != nil {
+func (l FileLink) Validate(opts ValidateOptions) error {
+	if err := l.Link.Validate(opts); err != nil {
 		return err
 	}
 
@@ -423,8 +415,8 @@ func (l *DirLink) MustTargetDir() Dir {
 
 // Validate reports an error when Path exists but is not a symlink, or when a
 // cached resolved target exists and is not a directory.
-func (l DirLink) Validate() error {
-	if err := l.Link.Validate(); err != nil {
+func (l DirLink) Validate(opts ValidateOptions) error {
+	if err := l.Link.Validate(opts); err != nil {
 		return err
 	}
 
@@ -527,6 +519,9 @@ func (l *Link) Sync(ctx Context) (ResultCode, error) {
 	}
 	if !ctx.syncPolicy().allows(l.memory, l.disk) {
 		return SyncSkippedPolicy, nil
+	}
+	if err := guardPathMutation(l.Path(), ctx.pathSafetyPolicy(), expectLink); err != nil {
+		return SyncFailed, err
 	}
 	if err := os.MkdirAll(filepath.Dir(l.path), ctx.DirMode); err != nil {
 		return SyncFailed, err

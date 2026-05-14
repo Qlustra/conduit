@@ -181,7 +181,10 @@ func (f File) Exists() bool {
 }
 
 // Chown applies os.Chown to the file path.
-func (f File) Chown(uid int, gid int) error {
+func (f File) Chown(uid int, gid int, ctx Context) error {
+	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+		return err
+	}
 	return os.Chown(f.Path(), uid, gid)
 }
 
@@ -196,18 +199,21 @@ func (f File) IsExecutable() bool {
 }
 
 // Truncate resizes the file in place using os.Truncate.
-func (f File) Truncate(size int64) error {
+func (f File) Truncate(size int64, ctx Context) error {
+	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+		return err
+	}
 	return os.Truncate(f.Path(), size)
 }
 
 // AppendReader creates parent directories if needed and appends bytes read
 // from src.
-func (f File) AppendReader(src io.Reader, dirMode os.FileMode, fileMode os.FileMode) error {
+func (f File) AppendReader(src io.Reader, ctx Context) error {
 	if src == nil {
 		return fmt.Errorf("append source must not be nil")
 	}
 
-	out, err := f.openAppendDestination(dirMode, fileMode)
+	out, err := f.openAppendDestination(ctx)
 	if err != nil {
 		return err
 	}
@@ -221,21 +227,24 @@ func (f File) AppendReader(src io.Reader, dirMode os.FileMode, fileMode os.FileM
 }
 
 // AppendBytes creates parent directories if needed and appends raw bytes.
-func (f File) AppendBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error {
-	return f.AppendReader(bytes.NewReader(data), dirMode, fileMode)
+func (f File) AppendBytes(data []byte, ctx Context) error {
+	return f.AppendReader(bytes.NewReader(data), ctx)
 }
 
 // AppendString creates parent directories if needed and appends string
 // content.
-func (f File) AppendString(content string, dirMode os.FileMode, fileMode os.FileMode) error {
-	return f.AppendReader(strings.NewReader(content), dirMode, fileMode)
+func (f File) AppendString(content string, ctx Context) error {
+	return f.AppendReader(strings.NewReader(content), ctx)
 }
 
 // AppendFile creates parent directories if needed and appends the source file
 // payload.
-func (f File) AppendFile(src File, dirMode os.FileMode, fileMode os.FileMode) (err error) {
+func (f File) AppendFile(src File, ctx Context) (err error) {
 	if samePath(f.Path(), src.Path()) {
 		return fmt.Errorf("source and destination must differ: %s", f.Path())
+	}
+	if err := guardNodeKind(src.Path(), expectFile); err != nil {
+		return err
 	}
 
 	in, err := os.Open(src.Path())
@@ -248,15 +257,15 @@ func (f File) AppendFile(src File, dirMode os.FileMode, fileMode os.FileMode) (e
 		}
 	}()
 
-	err = f.AppendReader(in, dirMode, fileMode)
+	err = f.AppendReader(in, ctx)
 	return err
 }
 
 // AppendFiles creates parent directories if needed and appends each source
 // file payload in order.
-func (f File) AppendFiles(dirMode os.FileMode, fileMode os.FileMode, srcs ...File) error {
+func (f File) AppendFiles(ctx Context, srcs ...File) error {
 	for _, src := range srcs {
-		if err := f.AppendFile(src, dirMode, fileMode); err != nil {
+		if err := f.AppendFile(src, ctx); err != nil {
 			return err
 		}
 	}
@@ -265,11 +274,14 @@ func (f File) AppendFiles(dirMode os.FileMode, fileMode os.FileMode, srcs ...Fil
 
 // WriteBytes creates parent directories if needed and rewrites the file
 // contents.
-func (f File) WriteBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error {
-	if err := os.MkdirAll(filepath.Dir(f.path), dirMode); err != nil {
+func (f File) WriteBytes(data []byte, ctx Context) error {
+	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
 		return err
 	}
-	return os.WriteFile(f.path, data, fileMode)
+	if err := os.MkdirAll(filepath.Dir(f.path), ctx.DirMode); err != nil {
+		return err
+	}
+	return os.WriteFile(f.path, data, ctx.FileMode)
 }
 
 // ReadBytes reads the file contents.
@@ -278,10 +290,16 @@ func (f File) ReadBytes() ([]byte, error) {
 }
 
 // DeleteIfExists removes the file when it exists.
-func (f File) DeleteIfExists() error {
-	_, err := os.Stat(f.Path())
+func (f File) DeleteIfExists(ctx Context) error {
+	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+		return err
+	}
+	_, err := os.Lstat(f.Path())
 	if err != nil {
-		return nil
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
 	}
 	return os.Remove(f.Path())
 }
@@ -327,6 +345,9 @@ func (f File) Ensure(ctx Context) error {
 	if !ctx.ensurePolicy().allowsFile() {
 		return nil
 	}
+	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(f.path), ctx.DirMode); err != nil {
 		return err
 	}
@@ -337,6 +358,12 @@ func (f File) Ensure(ctx Context) error {
 	}
 
 	return handle.Close()
+}
+
+// Validate reports an error when Path exists but is not a regular file, or
+// when validation policy rejects any symlink parent in the path.
+func (f File) Validate(opts ValidateOptions) error {
+	return guardPathMutation(f.Path(), opts.PathSafetyPolicy, expectFile)
 }
 
 func splitBaseExt(base string) (stem string, ext string) {
@@ -363,11 +390,14 @@ func joinDeclaredPath(base string, parts ...string) string {
 	return filepath.Join(append([]string{base}, parts...)...)
 }
 
-func (f File) openAppendDestination(dirMode os.FileMode, fileMode os.FileMode) (*os.File, error) {
-	if err := os.MkdirAll(filepath.Dir(f.path), dirMode); err != nil {
+func (f File) openAppendDestination(ctx Context) (*os.File, error) {
+	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
 		return nil, err
 	}
-	return os.OpenFile(f.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, fileMode)
+	if err := os.MkdirAll(filepath.Dir(f.path), ctx.DirMode); err != nil {
+		return nil, err
+	}
+	return os.OpenFile(f.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, ctx.FileMode)
 }
 
 // Copy
@@ -377,6 +407,9 @@ func (f File) CopyToPath(path string, opts CopyOptions) error {
 	dst := filepath.Clean(path)
 	if samePath(f.Path(), dst) {
 		return fmt.Errorf("source and destination must differ: %s", f.Path())
+	}
+	if err := guardNodeKind(f.Path(), expectFile); err != nil {
+		return err
 	}
 
 	return newCopier(opts).copyFile(f.Path(), dst)

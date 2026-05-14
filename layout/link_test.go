@@ -209,7 +209,7 @@ func TestLinkDeleteRemovesSymlinkAndKeepsTargetKindChecksLocal(t *testing.T) {
 	if _, err := link.Sync(DefaultContext); err != nil {
 		t.Fatalf("Sync() error = %v", err)
 	}
-	if err := link.Delete(); err != nil {
+	if err := link.Delete(DefaultContext); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 	if _, err := os.Lstat(link.Path()); !os.IsNotExist(err) {

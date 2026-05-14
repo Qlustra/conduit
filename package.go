@@ -22,6 +22,12 @@ type SyncPolicy = layout.SyncPolicy
 // layout.EnsurePolicy for the full policy model and constant descriptions.
 type EnsurePolicy = layout.EnsurePolicy
 
+// PathSafetyPolicy is an alias for layout.PathSafetyPolicy.
+//
+// It controls whether mutating filesystem operations reject symlink parents
+// while resolving paths. See layout.PathSafetyPolicy for details.
+type PathSafetyPolicy = layout.PathSafetyPolicy
+
 // Reporter is an alias for layout.Reporter.
 //
 // See layout.Reporter for the reporting contract used during deep traversal.
@@ -68,6 +74,11 @@ const (
 	EnsureAll      EnsurePolicy = layout.EnsureAll
 	EnsureScaffold EnsurePolicy = layout.EnsureScaffold
 	EnsureNone     EnsurePolicy = layout.EnsureNone
+)
+
+const (
+	PathSafetyRejectSymlinkParents PathSafetyPolicy = layout.PathSafetyRejectSymlinkParents
+	PathSafetyFollowSymlinks       PathSafetyPolicy = layout.PathSafetyFollowSymlinks
 )
 
 const (

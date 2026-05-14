@@ -54,15 +54,15 @@ Useful methods:
 - `DeclaredPath()` and `JoinDeclaredPath(...)` expose the node's own declared layout fragment.
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` expose compose-base-relative paths when the handle belongs to a composed tree.
 - `Exists()` reports whether the directory currently exists on disk.
-- `Chown(uid, gid)` applies `os.Chown` to the directory path.
+- `Chown(uid, gid, ctx)` applies `os.Chown` to the directory path.
 - `Join(...)` builds a descendant path.
 - `List()` returns the directory's direct children.
 - `ChangeTo()` changes the process working directory to that path.
 - `Dir(name)` and `File(name)` derive child handles.
-- `CopyToPath(path, opts)`, `CopyToDir(dir, opts)`, and `CopyIntoDir(parent, opts)` copy directory trees with explicit overwrite, symlink, and mode policy.
+- `CopyToPath(path, opts)`, `CopyToDir(dir, opts)`, and `CopyIntoDir(parent, opts)` copy directory trees with explicit overwrite, source-symlink, destination-path-safety, and mode policy.
 - `Ensure(ctx)` creates the directory tree.
-- `Empty()` removes all children while preserving the directory itself. It rejects symlink roots and removes symlink children as entries.
-- `DeleteIfExists()` removes the directory recursively when it exists.
+- `Empty(ctx)` removes all children while preserving the directory itself. It rejects symlink roots and removes symlink children as entries.
+- `DeleteIfExists(ctx)` removes the directory recursively when it exists.
 
 ### `File`
 
@@ -78,19 +78,23 @@ Useful methods:
 - `DeclaredPath()` and `JoinDeclaredPath(...)` for local declared layout fragments
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` for compose-base-relative path fragments
 - `ReadBytes()` and `ReadBytesIfExists()`
-- `Chown(uid, gid)` for ownership changes
+- `Chown(uid, gid, ctx)` for ownership changes
 - `IsExecutable()` to check execute bits on regular files
-- `Truncate(size)` to resize the file in place
-- `AppendReader(src, dirMode, fileMode)` to stream any reader into the file in append mode
-- `AppendBytes(data, dirMode, fileMode)`, `AppendString(content, dirMode, fileMode)`, `AppendFile(src, dirMode, fileMode)`, and `AppendFiles(dirMode, fileMode, srcs...)` for append and concat workflows
-- `WriteBytes(data, dirMode, fileMode)`
+- `Truncate(size, ctx)` to resize the file in place
+- `AppendReader(src, ctx)` to stream any reader into the file in append mode
+- `AppendBytes(data, ctx)`, `AppendString(content, ctx)`, `AppendFile(src, ctx)`, and `AppendFiles(ctx, srcs...)` for append and concat workflows
+- `WriteBytes(data, ctx)`
 - `CopyToPath(path, opts)`, `CopyToFile(dst, opts)`, and `CopyIntoDir(dir, opts)` for streamed file copies
 - `Ensure(ctx)` to create the file and its parent directories
-- `DeleteIfExists()`
+- `DeleteIfExists(ctx)`
 
 Use `File` when you want raw bytes and do not need codec-backed state tracking.
 
-Copy helpers use `layout.CopyOptions`. `layout.DefaultCopyOptions` preserves source modes, preserves symlinks as symlinks, and fails when the destination already exists. Switch `Overwrite` to `layout.CopyOverwriteReplace` when you want replacement semantics, and switch `Symlinks` to `layout.CopySymlinkFollow` or `layout.CopySymlinkReject` when preserving symlinks is not what you want.
+Mutating `File`, `Dir`, and `Exec` operations are type-strict: they expect the on-disk leaf to match the handle kind and reject symlink leaves instead of following them. `Link` is the type that intentionally manages symlink leaves.
+
+`Context.PathSafetyPolicy` controls whether mutating operations reject symlink parents during path resolution. The default is `layout.PathSafetyRejectSymlinkParents`; set `layout.PathSafetyFollowSymlinks` only when following symlink parents is intentional.
+
+Copy helpers use `layout.CopyOptions`. `layout.DefaultCopyOptions` preserves source modes, preserves source symlinks as symlinks, rejects symlink parents in destination paths, and fails when the destination already exists. Switch `Overwrite` to `layout.CopyOverwriteReplace` when you want replacement semantics, switch `Symlinks` to `layout.CopySymlinkFollow` or `layout.CopySymlinkReject` for source-tree behavior, and switch `PathSafetyPolicy` to `layout.PathSafetyFollowSymlinks` when destination symlink parents are intentional.
 
 ### `Exec`
 
