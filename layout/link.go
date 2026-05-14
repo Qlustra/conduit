@@ -262,6 +262,27 @@ func (l Link) IsDangling() (bool, error) {
 	return !exists, nil
 }
 
+// Validate reports an error when Path exists but is not a symlink.
+func (l Link) Validate() error {
+	if l.Path() == "" {
+		return nil
+	}
+
+	info, err := os.Lstat(l.Path())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	if info.Mode()&os.ModeSymlink == 0 {
+		return fmt.Errorf("path %s is not a symlink", l.Path())
+	}
+
+	return nil
+}
+
 // Delete removes the symlink when it exists, clears cached target state, and
 // marks disk state missing.
 //
@@ -338,6 +359,32 @@ func (l *FileLink) MustTargetFile() File {
 	return target
 }
 
+// Validate reports an error when Path exists but is not a symlink, or when a
+// cached resolved target exists and is not a file.
+func (l FileLink) Validate() error {
+	if err := l.Link.Validate(); err != nil {
+		return err
+	}
+
+	target, ok := l.TargetFile()
+	if !ok {
+		return nil
+	}
+
+	info, err := os.Stat(target.Path())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if info.IsDir() {
+		return fmt.Errorf("resolved link target %s is not a file", target.Path())
+	}
+
+	return nil
+}
+
 // TargetDir returns the resolved link target as a Dir handle.
 func (l DirLink) TargetDir() (Dir, bool) {
 	targetPath, ok := l.ResolvedTargetPath()
@@ -355,6 +402,32 @@ func (l *DirLink) MustTargetDir() Dir {
 		panic("link target is not loaded")
 	}
 	return target
+}
+
+// Validate reports an error when Path exists but is not a symlink, or when a
+// cached resolved target exists and is not a directory.
+func (l DirLink) Validate() error {
+	if err := l.Link.Validate(); err != nil {
+		return err
+	}
+
+	target, ok := l.TargetDir()
+	if !ok {
+		return nil
+	}
+
+	info, err := os.Stat(target.Path())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("resolved link target %s is not a directory", target.Path())
+	}
+
+	return nil
 }
 
 // Compose

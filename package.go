@@ -21,6 +21,11 @@ type SyncPolicy = layout.SyncPolicy
 // See layout.Reporter for the reporting contract used during deep traversal.
 type Reporter = layout.Reporter
 
+// ValidateOptions is an alias for layout.ValidateOptions.
+//
+// See layout.ValidateOptions for the validation traversal options.
+type ValidateOptions = layout.ValidateOptions
+
 // Report is an alias for layout.Report.
 //
 // See layout.Report for the full reporting API.
@@ -68,6 +73,7 @@ const (
 	OpDiscover Operation = layout.OpDiscover
 	OpScan     Operation = layout.OpScan
 	OpSync     Operation = layout.OpSync
+	OpValidate Operation = layout.OpValidate
 )
 
 const (
@@ -98,6 +104,11 @@ const (
 	SyncSkippedNoContent ResultCode = layout.SyncSkippedNoContent
 	SyncSkippedPolicy    ResultCode = layout.SyncSkippedPolicy
 	SyncFailed           ResultCode = layout.SyncFailed
+
+	ValidateOK            ResultCode = layout.ValidateOK
+	ValidateTraversed     ResultCode = layout.ValidateTraversed
+	ValidateNotApplicable ResultCode = layout.ValidateNotApplicable
+	ValidateFailed        ResultCode = layout.ValidateFailed
 )
 
 // Ops
@@ -149,3 +160,9 @@ var DefaultDeep = layout.DefaultDeep
 //
 // See layout.RenderDeep for full behavior details.
 var RenderDeep = layout.RenderDeep
+
+// ValidateDeep aliases layout.ValidateDeep for callers that prefer the root
+// conduit facade.
+//
+// See layout.ValidateDeep for full behavior details.
+var ValidateDeep = layout.ValidateDeep

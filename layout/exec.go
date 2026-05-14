@@ -3,6 +3,7 @@ package layout
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -173,4 +174,28 @@ func (e Exec) executableMode(ctx Context) os.FileMode {
 		mode |= 0o111
 	}
 	return mode
+}
+
+// Validate
+
+// Validate reports an error when Path exists but is not an executable regular
+// file.
+func (e Exec) Validate() error {
+	if e.Path() == "" {
+		return nil
+	}
+
+	info, err := os.Stat(e.Path())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	if !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
+		return fmt.Errorf("path %s is not an executable regular file", e.Path())
+	}
+
+	return nil
 }

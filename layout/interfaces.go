@@ -215,6 +215,34 @@ type Reporter interface {
 	Record(Entry)
 }
 
+// Validate
+
+var (
+	validatorType     = reflect.TypeOf((*Validator)(nil)).Elem()
+	deepValidatorType = reflect.TypeOf((*DeepValidator)(nil)).Elem()
+)
+
+// ValidateOptions carries optional reporting hooks for ValidateDeep.
+type ValidateOptions struct {
+	// Reporter, when non-nil, receives path-level results during validation
+	// traversal.
+	Reporter Reporter
+}
+
+// Validator is implemented by values that can validate their current state
+// without mutating disk or memory.
+type Validator interface {
+	Validate() error
+}
+
+// DeepValidator is implemented by values that handle ValidateDeep traversal
+// themselves.
+type DeepValidator interface {
+	ValidateDeep(opts ValidateOptions) (ResultCode, error)
+}
+
+// Enums
+
 // Operation identifies which deep traversal operation produced a report entry
 // or root result.
 type Operation uint8
@@ -234,6 +262,9 @@ const (
 
 	// OpSync identifies SyncDeep.
 	OpSync
+
+	// OpValidate identifies ValidateDeep.
+	OpValidate
 )
 
 // String returns the lowercase operation name used in reports.
@@ -249,6 +280,8 @@ func (op Operation) String() string {
 		return "scan"
 	case OpSync:
 		return "sync"
+	case OpValidate:
+		return "validate"
 	default:
 		return "unknown"
 	}
@@ -339,4 +372,21 @@ const (
 
 	// SyncFailed reports that sync failed.
 	SyncFailed
+)
+
+const (
+	// ValidateOK reports that validation completed successfully for the visited
+	// node.
+	ValidateOK ResultCode = iota + 80
+
+	// ValidateTraversed reports that validation continued through a container
+	// node.
+	ValidateTraversed
+
+	// ValidateNotApplicable reports that validation does not apply to the
+	// visited node.
+	ValidateNotApplicable
+
+	// ValidateFailed reports that validation failed.
+	ValidateFailed
 )

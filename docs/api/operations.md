@@ -58,6 +58,23 @@ Notable behavior:
 - when `SyncPolicy` has no disk-state bits, sync operations do not restrict by disk state
 - when `Reporter` is nil, deep operations do not collect traversal reports
 
+### `ValidateOptions`
+
+```go
+type ValidateOptions struct {
+	Reporter conduit.Reporter
+}
+```
+
+Fields:
+
+- `Reporter`: optional sink for per-path validation results
+
+Notable behavior:
+
+- the zero value is ready to use
+- validation reporting is separate from `Context` because validation does not need file modes or sync policy
+
 ### `Reporter`
 
 ```go
@@ -125,6 +142,7 @@ Constants:
 - `OpDiscover`
 - `OpScan`
 - `OpSync`
+- `OpValidate`
 
 ### `ResultCode`
 
@@ -136,6 +154,13 @@ Description:
 
 - operation-specific outcome code returned by deep operations and recorded in reports
 - interpret values relative to the operation that produced them
+
+Notable validate results:
+
+- `ValidateOK`
+- `ValidateTraversed`
+- `ValidateNotApplicable`
+- `ValidateFailed`
 
 ### `SyncPolicy`
 
@@ -325,6 +350,36 @@ Notable behavior:
 - preserves current in-memory values and memory state
 - only scans cached `layout.Slot[T]` items
 - does not discover new slot entries from disk
+- returns an error if `target` is nil
+
+### `ValidateDeep`
+
+```go
+func ValidateDeep(target any, opts ValidateOptions) (conduit.ResultCode, error)
+```
+
+Description:
+
+- recursively validates an already composed or cached layout without mutating disk or memory state
+
+Arguments:
+
+- `target`: composed struct or node tree
+- `opts`: validation reporting options
+
+Returns:
+
+- `ResultCode`: semantic validation outcome for the visited root
+- `error`: first failure encountered during traversal
+
+Notable behavior:
+
+- calls `Validate() error` on nodes that implement `layout.Validator`
+- calls `ValidateDeep(opts)` on nodes that implement `layout.DeepValidator`
+- only visits already composed or cached children
+- does not discover new slot entries from disk
+- does not read from disk into typed memory
+- does not render templates or write to disk
 - returns an error if `target` is nil
 
 ### `RenderDeep`

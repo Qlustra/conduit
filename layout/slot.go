@@ -476,3 +476,23 @@ func (s *Slot[T]) DefaultDeep() error {
 
 	return nil
 }
+
+// Validate
+
+// ValidateDeep validates only currently cached items.
+func (s *Slot[T]) ValidateDeep(opts ValidateOptions) (ResultCode, error) {
+	s.mu.RLock()
+	items := make(map[string]T, len(s.items))
+	for name, item := range s.items {
+		items[name] = item
+	}
+	s.mu.RUnlock()
+
+	for name, item := range items {
+		if _, err := ValidateDeep(item, opts); err != nil {
+			return ValidateFailed, fmt.Errorf("validate slot item %q: %w", name, err)
+		}
+	}
+
+	return ValidateTraversed, nil
+}

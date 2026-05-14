@@ -126,6 +126,31 @@ What it does not do:
 
 This makes `ScanDeep` useful for "is it there?" checks, not discovery.
 
+## Validate
+
+`ValidateDeep(target, opts)` validates the already composed or cached layout without mutating it:
+
+```go
+_, err := conduit.ValidateDeep(&ws, conduit.ValidateOptions{})
+```
+
+What it does:
+
+- calls `Validate() error` on nodes that implement it
+- calls `ValidateDeep(opts)` on nodes that own their own validation traversal
+- validates only already composed or cached children
+- optionally records per-path validation results through `opts.Reporter`
+
+What it does not do:
+
+- create missing files or directories
+- discover new slot entries from disk
+- load typed content into memory
+- render templates
+- write anything back to disk
+
+This makes `ValidateDeep` the semantic-check phase that can sit between load or render and sync.
+
 Every deep operation returns `(ResultCode, error)`.
 
 - `ResultCode` summarizes what happened at the visited root.
@@ -208,6 +233,14 @@ if report.HasErrors() {
 }
 ```
 
+Validation uses a small dedicated options type:
+
+```go
+opts := conduit.ValidateOptions{
+	Reporter: &report,
+}
+```
+
 ## Typical workflows
 
 Bootstrap a new workspace:
@@ -246,6 +279,14 @@ Load an existing workspace, edit it, then persist:
 var ws Workspace
 _ = conduit.Compose("/srv/workspace", &ws)
 _, _ = conduit.DiscoverDeep(&ws, conduit.DefaultContext)
+```
+
+Validate before syncing:
+
+```go
+_ = conduit.RenderDeep(&ws)
+_, _ = conduit.ValidateDeep(&ws, conduit.ValidateOptions{})
+_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
 ```
 
 Load discovered content into memory:

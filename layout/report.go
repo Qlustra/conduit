@@ -26,7 +26,7 @@ func (e Entry) IsError() bool {
 // outcome.
 func (e Entry) IsSkipped() bool {
 	switch e.Result {
-	case LoadNotApplicable, DiscoverNotApplicable, ScanNotApplicable, SyncNotApplicable, SyncSkippedNoContent, SyncSkippedPolicy:
+	case LoadNotApplicable, DiscoverNotApplicable, ScanNotApplicable, SyncNotApplicable, SyncSkippedNoContent, SyncSkippedPolicy, ValidateNotApplicable:
 		return true
 	default:
 		return false
@@ -101,6 +101,17 @@ func (e Entry) ResultName() string {
 		case SyncSkippedPolicy:
 			return "skipped_policy"
 		case SyncFailed:
+			return "failed"
+		}
+	case OpValidate:
+		switch e.Result {
+		case ValidateOK:
+			return "ok"
+		case ValidateTraversed:
+			return "traversed"
+		case ValidateNotApplicable:
+			return "not_applicable"
+		case ValidateFailed:
 			return "failed"
 		}
 	}
@@ -281,7 +292,15 @@ func (r *Report) RenderTree() string {
 // Helpers
 
 func recordResult(ctx Context, op Operation, path string, result ResultCode, err error) (ResultCode, error) {
-	recordEntry(ctx, Entry{
+	return recordResultWithReporter(ctx.Reporter, op, path, result, err)
+}
+
+func recordValidateResult(opts ValidateOptions, op Operation, path string, result ResultCode, err error) (ResultCode, error) {
+	return recordResultWithReporter(opts.Reporter, op, path, result, err)
+}
+
+func recordResultWithReporter(reporter Reporter, op Operation, path string, result ResultCode, err error) (ResultCode, error) {
+	recordEntryWithReporter(reporter, Entry{
 		Op:     op,
 		Path:   path,
 		Result: result,
@@ -291,10 +310,14 @@ func recordResult(ctx Context, op Operation, path string, result ResultCode, err
 }
 
 func recordEntry(ctx Context, entry Entry) {
-	if ctx.Reporter == nil {
+	recordEntryWithReporter(ctx.Reporter, entry)
+}
+
+func recordEntryWithReporter(reporter Reporter, entry Entry) {
+	if reporter == nil {
 		return
 	}
-	ctx.Reporter.Record(entry)
+	reporter.Record(entry)
 }
 
 func pathOf(target any) (string, bool) {
