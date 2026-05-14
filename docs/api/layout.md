@@ -80,6 +80,11 @@ Methods:
 - `Chown(uid, gid int) error`: applies `os.Chown` to the file path
 - `IsExecutable() bool`: reports whether the current target is an executable regular file
 - `Truncate(size int64) error`: resizes the file using `os.Truncate`
+- `AppendReader(src io.Reader, dirMode os.FileMode, fileMode os.FileMode) error`: creates parent directories if needed and appends bytes read from a reader
+- `AppendBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error`: creates parent directories if needed and appends raw bytes
+- `AppendString(content string, dirMode os.FileMode, fileMode os.FileMode) error`: creates parent directories if needed and appends string content
+- `AppendFile(src File, dirMode os.FileMode, fileMode os.FileMode) error`: creates parent directories if needed and appends another file's payload
+- `AppendFiles(dirMode os.FileMode, fileMode os.FileMode, srcs ...File) error`: appends multiple file payloads in order
 - `WriteBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error`: creates parent directories and writes raw bytes
 - `ReadBytes() ([]byte, error)`: reads the file contents
 - `ReadBytesIfExists() ([]byte, bool, error)`: reads the file if present and returns `ok == false` for missing files
@@ -92,6 +97,10 @@ Methods:
 Notable behavior:
 
 - `Ensure` uses `os.O_CREATE` and does not truncate existing file contents
+- `AppendReader`, `AppendFile`, and `AppendFiles` stream through `io.Copy`; they do not read the whole source into memory first
+- `AppendFiles` appends sources in argument order and may leave already-appended content in place if a later source fails
+- append helpers create parent directories and the destination file when missing
+- concurrent append calls rely on OS append mode for destination offset management, but no whole-call atomicity is guaranteed
 - `WriteBytes` always rewrites the file contents
 - `IsExecutable` returns false for missing paths and non-regular filesystem entries
 - `CopyTo*` uses streamed I/O through `io.Copy`; it does not read the whole file into memory first

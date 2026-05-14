@@ -1,8 +1,10 @@
 package layout
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -171,6 +173,64 @@ func (f File) Truncate(size int64) error {
 	return os.Truncate(f.Path(), size)
 }
 
+// AppendReader creates parent directories if needed and appends bytes read
+// from src.
+func (f File) AppendReader(src io.Reader, dirMode os.FileMode, fileMode os.FileMode) error {
+	if src == nil {
+		return fmt.Errorf("append source must not be nil")
+	}
+
+	out, err := f.openAppendDestination(dirMode, fileMode)
+	if err != nil {
+		return err
+	}
+
+	_, copyErr := io.Copy(out, src)
+	closeErr := out.Close()
+	if copyErr != nil {
+		return copyErr
+	}
+	return closeErr
+}
+
+// AppendBytes creates parent directories if needed and appends raw bytes.
+func (f File) AppendBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error {
+	return f.AppendReader(bytes.NewReader(data), dirMode, fileMode)
+}
+
+// AppendString creates parent directories if needed and appends string
+// content.
+func (f File) AppendString(content string, dirMode os.FileMode, fileMode os.FileMode) error {
+	return f.AppendReader(strings.NewReader(content), dirMode, fileMode)
+}
+
+// AppendFile creates parent directories if needed and appends the source file
+// payload.
+func (f File) AppendFile(src File, dirMode os.FileMode, fileMode os.FileMode) error {
+	if samePath(f.Path(), src.Path()) {
+		return fmt.Errorf("source and destination must differ: %s", f.Path())
+	}
+
+	in, err := os.Open(src.Path())
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	return f.AppendReader(in, dirMode, fileMode)
+}
+
+// AppendFiles creates parent directories if needed and appends each source
+// file payload in order.
+func (f File) AppendFiles(dirMode os.FileMode, fileMode os.FileMode, srcs ...File) error {
+	for _, src := range srcs {
+		if err := f.AppendFile(src, dirMode, fileMode); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // WriteBytes creates parent directories if needed and rewrites the file
 // contents.
 func (f File) WriteBytes(data []byte, dirMode os.FileMode, fileMode os.FileMode) error {
@@ -266,6 +326,13 @@ func joinDeclaredPath(base string, parts ...string) string {
 		return filepath.Join(parts...)
 	}
 	return filepath.Join(append([]string{base}, parts...)...)
+}
+
+func (f File) openAppendDestination(dirMode os.FileMode, fileMode os.FileMode) (*os.File, error) {
+	if err := os.MkdirAll(filepath.Dir(f.path), dirMode); err != nil {
+		return nil, err
+	}
+	return os.OpenFile(f.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, fileMode)
 }
 
 // Copy

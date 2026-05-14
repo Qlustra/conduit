@@ -75,6 +75,8 @@ Useful methods:
 - `Chown(uid, gid)` for ownership changes
 - `IsExecutable()` to check execute bits on regular files
 - `Truncate(size)` to resize the file in place
+- `AppendReader(src, dirMode, fileMode)` to stream any reader into the file in append mode
+- `AppendBytes(data, dirMode, fileMode)`, `AppendString(content, dirMode, fileMode)`, `AppendFile(src, dirMode, fileMode)`, and `AppendFiles(dirMode, fileMode, srcs...)` for append and concat workflows
 - `WriteBytes(data, dirMode, fileMode)`
 - `CopyToPath(path, opts)`, `CopyToFile(dst, opts)`, and `CopyIntoDir(dir, opts)` for streamed file copies
 - `Ensure(ctx)` to create the file and its parent directories
