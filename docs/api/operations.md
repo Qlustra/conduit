@@ -16,11 +16,12 @@ Default value:
 
 ```go
 conduit.Context{
-	DirMode:      0o755,
-	FileMode:     0o644,
-	ExecMode:     0o755,
-	EnsurePolicy: conduit.EnsureAll,
-	SyncPolicy:   conduit.SyncRewrite,
+	DirMode:          0o755,
+	FileMode:         0o644,
+	ExecMode:         0o755,
+	EnsurePolicy:     conduit.EnsureAll,
+	SyncPolicy:       conduit.SyncRewrite,
+	PathSafetyPolicy: conduit.PathSafetyRejectSymlinkParents,
 }
 ```
 
@@ -29,6 +30,7 @@ Notable behavior:
 - used as the default permission set in most examples
 - `ExecMode` is applied by `Exec` operations
 - `SyncPolicy` defaults to `SyncRewrite`
+- `PathSafetyPolicy` defaults to rejecting symlink parents during mutating path resolution
 
 ## Types
 
@@ -36,12 +38,13 @@ Notable behavior:
 
 ```go
 type Context struct {
-	DirMode      os.FileMode
-	FileMode     os.FileMode
-	ExecMode     os.FileMode
-	EnsurePolicy conduit.EnsurePolicy
-	SyncPolicy   conduit.SyncPolicy
-	Reporter     conduit.Reporter
+	DirMode          os.FileMode
+	FileMode         os.FileMode
+	ExecMode         os.FileMode
+	EnsurePolicy     conduit.EnsurePolicy
+	SyncPolicy       conduit.SyncPolicy
+	PathSafetyPolicy conduit.PathSafetyPolicy
+	Reporter         conduit.Reporter
 }
 ```
 
@@ -52,6 +55,7 @@ Fields:
 - `ExecMode`: mode used when creating or ensuring `Exec` files
 - `EnsurePolicy`: selects which node kinds `Ensure` and `EnsureDeep` may materialize
 - `SyncPolicy`: selects which typed memory states `Sync` and `SyncDeep` may write, with optional disk-state filters
+- `PathSafetyPolicy`: controls whether mutating typed filesystem operations reject symlink parents during path resolution
 - `Reporter`: optional sink for per-path deep-operation results
 
 Notable behavior:
@@ -60,6 +64,7 @@ Notable behavior:
 - when `EnsurePolicy` is zero, ensure operations fall back to `EnsureAll`
 - when `SyncPolicy` has no memory-state bits, sync operations fall back to `SyncRewrite`
 - when `SyncPolicy` has no disk-state bits, sync operations do not restrict by disk state
+- when `PathSafetyPolicy` is zero, mutating typed filesystem operations reject symlink parents
 - when `Reporter` is nil, deep operations do not collect traversal reports
 
 ### `EnsurePolicy`
@@ -81,6 +86,27 @@ Constants:
 - `EnsureAll`: historical ensure behavior
 - `EnsureScaffold`: raw `Dir`, `File`, and `Exec` scaffolding only
 - `EnsureNone`: explicit no-op ensure policy
+
+Methods:
+
+- `Allow(bits EnsurePolicy) EnsurePolicy`: enables public ensure-policy bits
+- `Deny(bits EnsurePolicy) EnsurePolicy`: disables public ensure-policy bits
+- `Has(bits EnsurePolicy) bool`: reports whether all requested public bits are enabled
+
+### `PathSafetyPolicy`
+
+```go
+type PathSafetyPolicy uint8
+```
+
+Description:
+
+- policy that controls how mutating typed filesystem operations treat symlinks encountered while resolving destination paths
+
+Constants:
+
+- `PathSafetyRejectSymlinkParents`: reject existing symlink parents during mutating path resolution
+- `PathSafetyFollowSymlinks`: preserve path-following behavior for mutating operations
 
 ### `ValidateOptions`
 
@@ -152,6 +178,13 @@ Description:
 
 - one reported path-level outcome for a deep operation
 
+Methods:
+
+- `IsError() bool`: reports whether the entry carries an error
+- `IsSkipped() bool`: reports whether the result represents a visited-but-not-applied outcome
+- `IsSuccess() bool`: reports whether the entry completed without error
+- `ResultName() string`: returns a stable lowercase result name relative to `Op`
+
 Notable behavior:
 
 - `Result` is interpreted relative to `Op`
@@ -172,6 +205,10 @@ Constants:
 - `OpSync`
 - `OpValidate`
 
+Methods:
+
+- `String() string`: returns the lowercase operation name used in reports
+
 ### `ResultCode`
 
 ```go
@@ -183,13 +220,14 @@ Description:
 - operation-specific outcome code returned by deep operations and recorded in reports
 - interpret values relative to the operation that produced them
 
-Notable validate results:
+Constants:
 
-- `EnsureSkippedPolicy`
-- `ValidateOK`
-- `ValidateTraversed`
-- `ValidateNotApplicable`
-- `ValidateFailed`
+- ensure results: `EnsureEnsured`, `EnsureSkippedPolicy`, `EnsureFailed`
+- load results: `LoadLoaded`, `LoadMissing`, `LoadTraversed`, `LoadNotApplicable`, `LoadFailed`
+- discover results: `DiscoverPresent`, `DiscoverMissing`, `DiscoverTraversed`, `DiscoverNotApplicable`, `DiscoverFailed`
+- scan results: `ScanPresent`, `ScanMissing`, `ScanTraversed`, `ScanNotApplicable`, `ScanFailed`
+- sync results: `SyncWritten`, `SyncTraversed`, `SyncNotApplicable`, `SyncSkippedNoContent`, `SyncSkippedPolicy`, `SyncFailed`
+- validate results: `ValidateOK`, `ValidateTraversed`, `ValidateNotApplicable`, `ValidateFailed`
 
 ### `SyncPolicy`
 

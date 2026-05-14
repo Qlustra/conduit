@@ -32,6 +32,7 @@ Methods:
 - `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the handle belongs to a composed tree
 - `ComposedRelativePath() (string, bool)`: returns the path relative to the compose base directory
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
+- `ComposePath(path string)`: binds the handle to a concrete path and resets composition metadata
 - `Exists() bool`: reports whether the path currently exists
 - `Chown(uid, gid int, ctx Context) error`: applies `os.Chown` to the directory path
 - `Join(parts ...string) string`: joins descendant path segments onto the directory path
@@ -91,6 +92,7 @@ Methods:
 - `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the handle belongs to a composed tree
 - `ComposedRelativePath() (string, bool)`: returns the path relative to the compose base directory
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
+- `ComposePath(path string)`: binds the handle to a concrete path and resets composition metadata
 - `Exists() bool`: reports whether the path currently exists
 - `Chown(uid, gid int, ctx Context) error`: applies `os.Chown` to the file path
 - `IsExecutable() bool`: reports whether the current target is an executable regular file
@@ -193,6 +195,8 @@ Methods:
 - `Base() string`
 - `Ext() string`
 - `Stem() string`
+- `ParentPath() string`
+- `ParentDir() Dir`
 - `RelTo(base Pather) (string, error)`
 - `JoinRelTo(base Pather, parts ...string) (string, error)`
 - `RelToPath(base string) (string, error)`
@@ -204,11 +208,22 @@ Methods:
 - `ComposedBaseDir() (Dir, bool)`
 - `ComposedRelativePath() (string, bool)`
 - `JoinComposedPath(parts ...string) (string, bool)`
+- `ComposePath(path string)`
 - `Exists() bool`
+- `Chown(uid, gid int, ctx Context) error`
+- `Truncate(size int64, ctx Context) error`
+- `AppendReader(src io.Reader, ctx Context) error`
+- `AppendBytes(data []byte, ctx Context) error`
+- `AppendString(content string, ctx Context) error`
+- `AppendFile(src File, ctx Context) error`
+- `AppendFiles(ctx Context, srcs ...File) error`
 - `ReadBytes() ([]byte, error)`
 - `ReadBytesIfExists() ([]byte, bool, error)`
 - `WriteBytes(data []byte, ctx Context) error`
 - `DeleteIfExists(ctx Context) error`
+- `CopyToPath(path string, opts CopyOptions) error`
+- `CopyToFile(dst File, opts CopyOptions) error`
+- `CopyIntoDir(dir Dir, opts CopyOptions) error`
 - `Validate(opts ValidateOptions) error`: validates executable file shape and validation-path policy
 - `Ensure(ctx Context) error`: creates the file and ensures executable permissions
 - `EnsureExecutable(ctx Context) error`: same executable materialization behavior as `Ensure`
@@ -217,6 +232,7 @@ Methods:
 - `Run(ctx context.Context, opts RunOptions) error`: runs the executable
 - `Output(ctx context.Context, opts RunOptions) ([]byte, error)`: runs and captures stdout
 - `CombinedOutput(ctx context.Context, opts RunOptions) ([]byte, error)`: runs and captures combined stdout and stderr
+- `EnsureDeep(ctx Context) (ResultCode, error)`: ensures the executable node during deep traversal
 
 Notable behavior:
 
@@ -254,6 +270,7 @@ Methods:
 - `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the handle belongs to a composed tree
 - `ComposedRelativePath() (string, bool)`: returns the path relative to the compose base directory
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
+- `ComposePath(path string)`: binds the link to a concrete path and resets cached target and state
 - `Exists() bool`: reports whether a symlink exists at the path
 - `Target() (string, bool)`: returns the cached raw symlink target string
 - `MustTarget() string`: returns the cached target string or panics when it is absent
@@ -454,6 +471,7 @@ Methods:
 - `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the slot belongs to a composed tree
 - `ComposedRelativePath() (string, bool)`: returns the slot root path relative to the compose base directory
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the slot's composed-relative path
+- `ComposePath(path string)`: binds the slot root and clears the cache
 - `Exists() bool`: reports whether the slot root exists on disk
 - `Root() Dir`: returns the slot root as a `Dir`
 - `Len() int`: returns the number of cached items
@@ -461,7 +479,7 @@ Methods:
 - `Get(name string) (T, bool)`: returns a cached item only
 - `Put(name string, item T)`: inserts or replaces a cached item
 - `Remove(name string)`: removes a cached item
-- `Delete(name string) error`: removes the child tree from disk if present and evicts the cached item
+- `Delete(name string, ctx Context) error`: removes the child tree from disk if present and evicts the cached item
 - `Clear()`: clears the cache
 - `Entries() []SlotEntry[T]`: returns a sorted snapshot of cached entries
 - `All() iter.Seq2[string, T]`: iterates cached entries in sorted key order
@@ -476,6 +494,9 @@ Methods:
 - `LoadDeep(ctx Context) (ResultCode, error)`: discovers child directories on disk and loads them
 - `ScanDeep(ctx Context) (ResultCode, error)`: scans only cached items
 - `SyncDeep(ctx Context) (ResultCode, error)`: ensures cached items, then syncs typed content within those items
+- `RenderDeep() error`: renders only currently cached items
+- `DefaultDeep() error`: applies defaults only to currently cached items
+- `ValidateDeep(opts ValidateOptions) (ResultCode, error)`: validates only currently cached items
 
 Notable behavior:
 
@@ -518,6 +539,7 @@ Methods:
 - `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the slot belongs to a composed tree
 - `ComposedRelativePath() (string, bool)`: returns the slot root path relative to the compose base directory
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the slot's composed-relative path
+- `ComposePath(path string)`: binds the slot root and clears the cache
 - `Exists() bool`: reports whether the slot root exists on disk
 - `Root() Dir`: returns the slot root as a `Dir`
 - `Len() int`: returns the number of cached items
@@ -525,7 +547,7 @@ Methods:
 - `Get(name string) (T, bool)`: returns a cached item only
 - `Put(name string, item T)`: inserts or replaces a cached item
 - `Remove(name string)`: removes a cached item
-- `Delete(name string) error`: removes the child file from disk if present and evicts the cached item
+- `Delete(name string, ctx Context) error`: removes the child file from disk if present and evicts the cached item
 - `Clear()`: clears the cache
 - `Entries() []FileSlotEntry[T]`: returns a sorted snapshot of cached entries
 - `All() iter.Seq2[string, T]`: iterates cached entries in sorted key order
@@ -540,6 +562,9 @@ Methods:
 - `LoadDeep(ctx Context) (ResultCode, error)`: discovers child files on disk and loads them
 - `ScanDeep(ctx Context) (ResultCode, error)`: scans only cached items
 - `SyncDeep(ctx Context) (ResultCode, error)`: ensures cached items, then syncs typed content within those items
+- `RenderDeep() error`: renders only currently cached items
+- `DefaultDeep() error`: applies defaults only to currently cached items
+- `ValidateDeep(opts ValidateOptions) (ResultCode, error)`: validates only currently cached items
 
 Notable behavior:
 
@@ -583,6 +608,7 @@ Methods:
 - `ComposedBaseDir() (Dir, bool)`: returns the compose base directory when the slot belongs to a composed tree
 - `ComposedRelativePath() (string, bool)`: returns the slot root path relative to the compose base directory
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the slot's composed-relative path
+- `ComposePath(path string)`: binds the slot root and clears the cache
 - `Exists() bool`: reports whether the slot root exists on disk
 - `Root() Dir`: returns the slot root as a `Dir`
 - `Len() int`: returns the number of cached items
@@ -590,7 +616,7 @@ Methods:
 - `Get(name string) (T, bool)`: returns a cached item only
 - `Put(name string, item T)`: inserts or replaces a cached item
 - `Remove(name string)`: removes a cached item
-- `Delete(name string) error`: removes the child symlink from disk if present and evicts the cached item
+- `Delete(name string, ctx Context) error`: removes the child symlink from disk if present and evicts the cached item
 - `Clear()`: clears the cache
 - `Entries() []LinkSlotEntry[T]`: returns a sorted snapshot of cached entries
 - `All() iter.Seq2[string, T]`: iterates cached entries in sorted key order
@@ -605,6 +631,7 @@ Methods:
 - `LoadDeep(ctx Context) (ResultCode, error)`: discovers child symlinks on disk and loads them
 - `ScanDeep(ctx Context) (ResultCode, error)`: scans only cached items
 - `SyncDeep(ctx Context) (ResultCode, error)`: ensures cached items, then syncs link entries within those items
+- `ValidateDeep(opts ValidateOptions) (ResultCode, error)`: validates only currently cached items
 
 Notable behavior:
 
@@ -654,3 +681,483 @@ Notable behavior:
 - `SetDefaultContext` returns `false` and leaves context unchanged when context is already cached
 - provides the built-in templated render path used by `Templatable`
 - leaves custom render validation and semantics to the user-defined `Render()` implementation
+
+## Additional Reference
+
+### `Context`
+
+```go
+type Context struct {
+	DirMode          os.FileMode
+	FileMode         os.FileMode
+	ExecMode         os.FileMode
+	EnsurePolicy     EnsurePolicy
+	SyncPolicy       SyncPolicy
+	PathSafetyPolicy PathSafetyPolicy
+	Reporter         Reporter
+}
+```
+
+Fields:
+
+- `DirMode`: mode used when creating directories
+- `FileMode`: mode used when creating regular files
+- `ExecMode`: mode used when creating or ensuring `Exec` files
+- `EnsurePolicy`: selects which node kinds `Ensure` and `EnsureDeep` may materialize
+- `SyncPolicy`: selects which typed memory states `Sync` and `SyncDeep` may write, with optional disk-state filters
+- `PathSafetyPolicy`: controls whether mutating typed filesystem operations reject symlink parents during path resolution
+- `Reporter`: optional sink for per-path deep-operation results
+
+### `DefaultContext`
+
+Type:
+
+```go
+var DefaultContext Context
+```
+
+Default value:
+
+```go
+Context{
+	DirMode:          0o755,
+	FileMode:         0o644,
+	ExecMode:         0o755,
+	EnsurePolicy:     EnsureAll,
+	SyncPolicy:       SyncRewrite,
+	PathSafetyPolicy: PathSafetyRejectSymlinkParents,
+}
+```
+
+### `DefaultCopyOptions`
+
+Type:
+
+```go
+var DefaultCopyOptions CopyOptions
+```
+
+Default value:
+
+```go
+CopyOptions{
+	Overwrite:        CopyOverwriteFail,
+	Symlinks:         CopySymlinkPreserve,
+	PathSafetyPolicy: PathSafetyRejectSymlinkParents,
+	PreserveMode:     true,
+}
+```
+
+### `PathSafetyPolicy`
+
+```go
+type PathSafetyPolicy uint8
+```
+
+Constants:
+
+- `PathSafetyRejectSymlinkParents`: reject existing symlink parents during mutating path resolution
+- `PathSafetyFollowSymlinks`: preserve path-following behavior for mutating operations
+
+### `EnsurePolicy`
+
+```go
+type EnsurePolicy uint8
+```
+
+Constants:
+
+- `EnsureDirs`: include raw directories
+- `EnsureFiles`: include raw files
+- `EnsureExecs`: include executable files
+- `EnsureSyncables`: include syncable stateful wrappers such as `Format`
+- `EnsureAll`: historical ensure behavior
+- `EnsureScaffold`: raw `Dir`, `File`, and `Exec` scaffolding only
+- `EnsureNone`: explicit no-op ensure policy
+
+Methods:
+
+- `Allow(bits EnsurePolicy) EnsurePolicy`: enables public ensure-policy bits
+- `Deny(bits EnsurePolicy) EnsurePolicy`: disables public ensure-policy bits
+- `Has(bits EnsurePolicy) bool`: reports whether all requested public bits are enabled
+
+### `SyncPolicy`
+
+```go
+type SyncPolicy uint8
+```
+
+Constants:
+
+- `SyncOnLoaded`: include `MemoryLoaded`
+- `SyncOnSynced`: include `MemorySynced`
+- `SyncOnDirty`: include `MemoryDirty`
+- `SyncOnDiskUnknown`: include `DiskUnknown`
+- `SyncOnDiskMissing`: include `DiskMissing`
+- `SyncOnDiskPresent`: include `DiskPresent`
+- `SyncRewrite`: include loaded, synced, and dirty states
+- `SyncIfDirty`: include only dirty state
+- `SyncIfUnsynced`: include loaded and dirty states
+- `SyncIfMissing`: include any writable memory state, but only when the last known disk state is missing
+
+### `DiskState`
+
+```go
+type DiskState uint8
+```
+
+Constants:
+
+- `DiskUnknown`: disk state has not been observed, or known state was discarded during composition
+- `DiskMissing`: the entry was checked and was absent on disk
+- `DiskPresent`: the entry was checked and was present on disk
+
+### `MemoryState`
+
+```go
+type MemoryState uint8
+```
+
+Constants:
+
+- `MemoryUnknown`: no meaningful in-memory content is currently loaded
+- `MemoryLoaded`: in-memory content reflects what was loaded from disk
+- `MemorySynced`: in-memory content was written to disk by Conduit
+- `MemoryDirty`: in-memory content was set or changed after load or sync
+
+### `ValidateOptions`
+
+```go
+type ValidateOptions struct {
+	Reporter Reporter
+	PathSafetyPolicy PathSafetyPolicy
+}
+```
+
+Fields:
+
+- `Reporter`: optional sink for per-path validation results
+- `PathSafetyPolicy`: controls whether built-in typed filesystem nodes reject symlink parents during validation
+
+### `Report`
+
+```go
+type Report struct { ... }
+```
+
+Description:
+
+- in-memory collector for operation entries recorded during deep traversal
+
+Methods:
+
+- `Record(Entry)`: appends one entry to the report
+- `Entries() []Entry`: returns a snapshot copy of recorded entries
+- `Len() int`: returns the number of recorded entries
+- `HasErrors() bool`: reports whether any recorded entry carries an error
+- `Filter(func(Entry) bool) []Entry`: returns a filtered snapshot
+- `Sort(func(Entry, Entry) bool)`: reorders the recorded entries in place
+- `SortByPath()`: sorts entries by path, then operation, then result
+- `RenderTree() string`: renders recorded entries as a path-oriented tree
+
+### `Entry`
+
+```go
+type Entry struct {
+	Op     Operation
+	Path   string
+	Result ResultCode
+	Err    error
+}
+```
+
+Methods:
+
+- `IsError() bool`: reports whether the entry carries an error
+- `IsSkipped() bool`: reports whether the result represents a visited-but-not-applied outcome
+- `IsSuccess() bool`: reports whether the entry completed without error
+- `ResultName() string`: returns a stable lowercase result name relative to `Op`
+
+### `Operation`
+
+```go
+type Operation uint8
+```
+
+Constants:
+
+- `OpEnsure`
+- `OpLoad`
+- `OpDiscover`
+- `OpScan`
+- `OpSync`
+- `OpValidate`
+
+Methods:
+
+- `String() string`: returns the lowercase operation name used in reports
+
+### `ResultCode`
+
+```go
+type ResultCode uint8
+```
+
+Constants:
+
+- ensure results: `EnsureEnsured`, `EnsureSkippedPolicy`, `EnsureFailed`
+- load results: `LoadLoaded`, `LoadMissing`, `LoadTraversed`, `LoadNotApplicable`, `LoadFailed`
+- discover results: `DiscoverPresent`, `DiscoverMissing`, `DiscoverTraversed`, `DiscoverNotApplicable`, `DiscoverFailed`
+- scan results: `ScanPresent`, `ScanMissing`, `ScanTraversed`, `ScanNotApplicable`, `ScanFailed`
+- sync results: `SyncWritten`, `SyncTraversed`, `SyncNotApplicable`, `SyncSkippedNoContent`, `SyncSkippedPolicy`, `SyncFailed`
+- validate results: `ValidateOK`, `ValidateTraversed`, `ValidateNotApplicable`, `ValidateFailed`
+
+### `Codec[T]`
+
+```go
+type Codec[T any] interface {
+	Marshal(T) ([]byte, error)
+	Unmarshal([]byte) (T, error)
+}
+```
+
+Description:
+
+- codec contract used by `Format[T, C]`
+
+### `Format[T, C]`
+
+```go
+type Format[T any, C Codec[T]] struct{}
+```
+
+Description:
+
+- codec-backed typed file with explicit disk and memory state
+
+Exposed API:
+
+- all promoted `File` methods from the embedded raw file handle
+- `ComposePath(path string)`: binds the format to a path and resets cached content and state
+- `Get() (T, bool)`: returns the cached typed value, if any
+- `MustGet() T`: returns the cached value or panics when absent
+- `Set(value T)`: replaces cached content and marks memory state dirty
+- `SetDefault(value T) bool`: stores a default value only when no content is cached
+- `Clear()`: clears cached content and resets memory state to unknown
+- `Delete(ctx Context) error`: removes the file from disk, clears cached content, and marks disk state missing
+- `Write(value T, ctx Context) error`: marshals and writes a supplied value directly without changing cached state
+- `Read() (T, error)`: reads and unmarshals from disk without changing cached state
+- `ReadIfExists() (T, bool, error)`: reads and unmarshals when the file exists
+- `LoadOrInit(defaultValue T) error`: loads existing content or stores a default value in memory when missing
+- `EnsureDeep(ctx Context) (ResultCode, error)`: ensures the backing file when `ctx.EnsurePolicy` includes syncable nodes
+- `Save(ctx Context) error`: writes the cached value and marks memory state synced
+- `Load() (bool, error)`: loads content into memory and reports whether the file existed
+- `HasContent() bool`: reports whether a value is currently cached
+- `Unload()`: clears cached content and resets memory state to unknown
+- `Discover() (DiskState, error)`: refreshes disk-state metadata without replacing cached content
+- `Sync(ctx Context) (ResultCode, error)`: writes cached content when present and allowed by `ctx.SyncPolicy`
+- `DiskState() DiskState`: returns current disk-state metadata
+- `MemoryState() MemoryState`: returns current memory-state metadata
+- `HasKnownDiskState() bool`: reports whether disk state is not unknown
+- `WasObservedOnDisk() bool`: reports whether the last known disk state is present
+- `HasBeenLoaded() bool`: reports whether memory state has reached loaded, synced, or dirty
+- `IsDirty() bool`: reports whether memory state is dirty
+- `Scan() (DiskState, error)`: refreshes disk-state metadata without replacing cached content
+
+### `Interfaces`
+
+```go
+type Node interface {
+	Path() string
+	Exists() bool
+}
+```
+
+```go
+type Composable interface {
+	ComposePath(string)
+}
+```
+
+```go
+type Reporter interface {
+	Record(Entry)
+}
+```
+
+```go
+type Loadable interface {
+	Load() (bool, error)
+	HasContent() bool
+	Unload()
+}
+```
+
+```go
+type Discoverable interface {
+	Discover() (DiskState, error)
+}
+```
+
+```go
+type Syncer interface {
+	Sync(ctx Context) (ResultCode, error)
+}
+```
+
+```go
+type Scannable interface {
+	Scan() (DiskState, error)
+}
+```
+
+```go
+type Validator interface {
+	Validate(opts ValidateOptions) error
+}
+```
+
+```go
+type DeepEnsurer interface {
+	EnsureDeep(ctx Context) (ResultCode, error)
+}
+```
+
+```go
+type DeepLoader interface {
+	LoadDeep(ctx Context) (ResultCode, error)
+}
+```
+
+```go
+type DeepDiscoverer interface {
+	DiscoverDeep(ctx Context) (ResultCode, error)
+}
+```
+
+```go
+type DeepSyncer interface {
+	SyncDeep(ctx Context) (ResultCode, error)
+}
+```
+
+```go
+type DeepScanner interface {
+	ScanDeep(ctx Context) (ResultCode, error)
+}
+```
+
+```go
+type DeepRenderer interface {
+	RenderDeep() error
+}
+```
+
+```go
+type DeepDefaulter interface {
+	DefaultDeep() error
+}
+```
+
+```go
+type DeepValidator interface {
+	ValidateDeep(opts ValidateOptions) (ResultCode, error)
+}
+```
+
+## Functions
+
+### `NewDir`
+
+```go
+func NewDir(path string) Dir
+```
+
+Description:
+
+- returns a standalone `Dir` handle for `path`
+
+### `NewFile`
+
+```go
+func NewFile(path string) File
+```
+
+Description:
+
+- returns a standalone `File` handle for `path`
+
+### `NewExec`
+
+```go
+func NewExec(path string) Exec
+```
+
+Description:
+
+- returns a standalone `Exec` handle for `path`
+
+### `NewLink`
+
+```go
+func NewLink(path string) Link
+```
+
+Description:
+
+- returns a standalone `Link` handle for `path`
+
+### `NewSlot[T]`
+
+```go
+func NewSlot[T any](root Dir) Slot[T]
+```
+
+Description:
+
+- returns a slot rooted at `root` with an empty cache
+
+### `NewFileSlot[T]`
+
+```go
+func NewFileSlot[T any](root Dir) FileSlot[T]
+```
+
+Description:
+
+- returns a file slot rooted at `root` with an empty cache
+
+### `NewLinkSlot[T]`
+
+```go
+func NewLinkSlot[T LinkSlotItem](root Dir) LinkSlot[T]
+```
+
+Description:
+
+- returns a link slot rooted at `root` with an empty cache
+
+### `ComposeAs[T]`
+
+```go
+func ComposeAs[T any](root Dir) (T, error)
+```
+
+Description:
+
+- composes a new value of `T` rooted at `root`
+
+Notable behavior:
+
+- `T` must be a struct or pointer to a struct that follows Conduit composition rules
+- especially useful when creating slot-backed children lazily from an already composed `Dir`
+
+### `ValidateDeep`
+
+```go
+func ValidateDeep(target any, opts ValidateOptions) (ResultCode, error)
+```
+
+Description:
+
+- recursively validates an already composed or cached layout without mutating disk or memory state
