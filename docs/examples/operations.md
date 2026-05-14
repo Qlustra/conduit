@@ -182,7 +182,7 @@ Why the sequence matters:
 
 ## Collect a traversal report
 
-Goal: inspect what a deep operation actually visited and whether it skipped, wrote, or failed per path.
+Goal: inspect what a deep operation actually visited and whether it skipped, wrote, validated, or failed per path.
 
 ```go
 var report conduit.Report
@@ -202,5 +202,17 @@ _ = tree
 Why this is useful:
 
 - `ResultCode` on the root only tells you the top-level outcome
-- the report lets you inspect per-path results after `EnsureDeep`, `LoadDeep`, `DiscoverDeep`, `ScanDeep`, or `SyncDeep`
+- the report lets you inspect per-path results after `EnsureDeep`, `LoadDeep`, `DiscoverDeep`, `ScanDeep`, `SyncDeep`, or `ValidateDeep`
 - `RenderTree()` is useful when you want one human-readable summary for logs or tests
+
+Validation uses the same `Report` type through `ValidateOptions`:
+
+```go
+var report conduit.Report
+
+opts := conduit.ValidateOptions{
+	Reporter: &report,
+}
+
+_, _ = conduit.ValidateDeep(&ws, opts)
+```

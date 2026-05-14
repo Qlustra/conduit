@@ -109,7 +109,8 @@ type Reporter interface {
 
 Description:
 
-- optional sink carried on `Context` for deep-operation reporting
+- optional sink used by `Context.Reporter` and `ValidateOptions.Reporter` for
+  path-level reporting
 - built-in `conduit.Report` implements this interface
 
 ### `Report`

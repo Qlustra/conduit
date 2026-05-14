@@ -263,6 +263,8 @@ Validation uses a small dedicated options type:
 opts := conduit.ValidateOptions{
 	Reporter: &report,
 }
+
+_, _ = conduit.ValidateDeep(&ws, opts)
 ```
 
 ## Typical workflows
