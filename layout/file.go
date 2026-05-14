@@ -59,6 +59,16 @@ func (f File) Stem() string {
 	return stem
 }
 
+// ParentPath returns filepath.Dir(Path()).
+func (f File) ParentPath() string {
+	return filepath.Dir(f.Path())
+}
+
+// ParentDir returns the parent directory handle.
+func (f File) ParentDir() Dir {
+	return newDirWithCompose(f.ParentPath(), f.composeBase, f.composedBase)
+}
+
 // ComposedBaseDir returns the root directory that anchored composition, when
 // the handle belongs to a composed tree.
 func (f File) ComposedBaseDir() (Dir, bool) {

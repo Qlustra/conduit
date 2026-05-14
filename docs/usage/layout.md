@@ -46,6 +46,8 @@ Useful methods:
 - `Path()` returns the cleaned path bound during composition.
 - `Base()` returns the final path element.
 - `Stem()` returns the final path element without its final extension.
+- `ParentPath()` returns the parent path string.
+- `ParentDir()` returns the parent as a `Dir` handle.
 - `RelTo(...)` and `JoinRelTo(...)` build paths relative to another path-bearing node.
 - `RelToPath(...)` and `JoinRelToPath(...)` do the same against a raw string base.
 - `DeclaredPath()` and `JoinDeclaredPath(...)` expose the node's own declared layout fragment.
@@ -69,6 +71,7 @@ Useful methods:
 
 - `Path()` and `Exists()`
 - `Base()`, `Ext()`, and `Stem()` for path fragments
+- `ParentPath()` and `ParentDir()` for filesystem parent lookup
 - `RelTo(...)`, `JoinRelTo(...)`, `RelToPath(...)`, and `JoinRelToPath(...)` for ordinary relative path math
 - `DeclaredPath()` and `JoinDeclaredPath(...)` for local declared layout fragments
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` for compose-base-relative path fragments

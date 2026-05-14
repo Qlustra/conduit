@@ -18,6 +18,12 @@ func TestDirPathHelpers(t *testing.T) {
 	if got := dir.Stem(); got != "api" {
 		t.Fatalf("Stem() = %q, want %q", got, "api")
 	}
+	if got := dir.ParentPath(); got != filepath.Join("workspace", "services") {
+		t.Fatalf("ParentPath() = %q, want %q", got, filepath.Join("workspace", "services"))
+	}
+	if got := dir.ParentDir().Path(); got != filepath.Join("workspace", "services") {
+		t.Fatalf("ParentDir().Path() = %q, want %q", got, filepath.Join("workspace", "services"))
+	}
 }
 
 func TestFilePathHelpers(t *testing.T) {
@@ -31,6 +37,12 @@ func TestFilePathHelpers(t *testing.T) {
 	}
 	if got := file.Stem(); got != "archive.tar" {
 		t.Fatalf("Stem() = %q, want %q", got, "archive.tar")
+	}
+	if got := file.ParentPath(); got != filepath.Join("workspace", "configs") {
+		t.Fatalf("ParentPath() = %q, want %q", got, filepath.Join("workspace", "configs"))
+	}
+	if got := file.ParentDir().Path(); got != filepath.Join("workspace", "configs") {
+		t.Fatalf("ParentDir().Path() = %q, want %q", got, filepath.Join("workspace", "configs"))
 	}
 }
 
@@ -108,6 +120,10 @@ func TestComposedPathsTrackComposeBaseAcrossTree(t *testing.T) {
 	if got, ok := logs.ComposedRelativePath(); !ok || got != filepath.Join("services", "api", "logs") {
 		t.Fatalf("derived logs.ComposedRelativePath() = (%q, %t), want (%q, true)", got, ok, filepath.Join("services", "api", "logs"))
 	}
+	parent := svc.Config.ParentDir()
+	if got, ok := parent.ComposedRelativePath(); !ok || got != filepath.Join("services", "api") {
+		t.Fatalf("Config.ParentDir().ComposedRelativePath() = (%q, %t), want (%q, true)", got, ok, filepath.Join("services", "api"))
+	}
 	if got, ok := svc.Config.JoinComposedPath("bak"); !ok || got != filepath.Join("services", "api", "config.yaml", "bak") {
 		t.Fatalf("Config.JoinComposedPath() = (%q, %t), want (%q, true)", got, ok, filepath.Join("services", "api", "config.yaml", "bak"))
 	}
@@ -142,6 +158,9 @@ func TestComposedPathsAreUnavailableWithoutComposition(t *testing.T) {
 	}
 	if _, ok := file.JoinComposedPath("child"); ok {
 		t.Fatal("File.JoinComposedPath() ok = true, want false")
+	}
+	if _, ok := file.ParentDir().ComposedRelativePath(); ok {
+		t.Fatal("File.ParentDir().ComposedRelativePath() ok = true, want false")
 	}
 
 	if _, ok := slot.ComposedBaseDir(); ok {

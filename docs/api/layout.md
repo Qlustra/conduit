@@ -19,6 +19,8 @@ Methods:
 - `Path() string`: returns the bound path
 - `Base() string`: returns the final path element
 - `Stem() string`: returns the final path element without its final extension
+- `ParentPath() string`: returns `filepath.Dir(Path())`
+- `ParentDir() Dir`: returns the parent directory handle
 - `RelTo(base Pather) (string, error)`: returns the path relative to another node with a `Path()`
 - `JoinRelTo(base Pather, parts ...string) (string, error)`: joins path parts onto the relative path from another node
 - `RelToPath(base string) (string, error)`: returns the path relative to a raw base path
@@ -48,6 +50,7 @@ Notable behavior:
 - `Empty` removes symlink children as entries and does not follow them
 - `Exists` only checks current filesystem state; it does not validate that the path is a directory
 - `List` returns entries sorted by filename, matching `os.ReadDir`
+- `ParentDir` preserves compose-base metadata when the receiver belongs to a composed tree
 - the declared-path helpers return `ok == false` when the handle was not attached through `Compose`
 - for a root field declared as `layout:"."`, `DeclaredPath()` returns `.`
 - the composed-path helpers return `ok == false` when the handle was not attached through `Compose`
@@ -69,6 +72,8 @@ Methods:
 - `Base() string`: returns the final path element
 - `Ext() string`: returns the final extension including the leading dot
 - `Stem() string`: returns the final path element without its final extension
+- `ParentPath() string`: returns `filepath.Dir(Path())`
+- `ParentDir() Dir`: returns the parent directory handle
 - `RelTo(base Pather) (string, error)`: returns the path relative to another node with a `Path()`
 - `JoinRelTo(base Pather, parts ...string) (string, error)`: joins path parts onto the relative path from another node
 - `RelToPath(base string) (string, error)`: returns the path relative to a raw base path
@@ -109,6 +114,7 @@ Notable behavior:
 - `Exists` only checks that some filesystem entry exists at the path
 - the declared-path helpers return `ok == false` when the handle was not attached through `Compose`
 - the composed-path helpers return `ok == false` when the handle was not attached through `Compose`
+- `ParentDir` preserves compose-base metadata when the receiver belongs to a composed tree
 - dotfiles such as `.env` report an empty extension and keep the full basename as the stem
 
 ### `CopyOptions`
