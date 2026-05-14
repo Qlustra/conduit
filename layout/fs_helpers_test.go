@@ -115,6 +115,30 @@ func TestDirEmptyRejectsNonDirectoryPath(t *testing.T) {
 	}
 }
 
+func TestDirEmptyRejectsSymlinkRoot(t *testing.T) {
+	base := t.TempDir()
+	target := NewDir(filepath.Join(base, "target"))
+	root := NewDir(filepath.Join(base, "workspace"))
+
+	if err := os.MkdirAll(target.Path(), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(target) error = %v", err)
+	}
+	if err := os.WriteFile(target.File("payload.txt").Path(), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile(target payload) error = %v", err)
+	}
+	if err := os.Symlink(target.Path(), root.Path()); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	if err := root.Empty(); err == nil {
+		t.Fatal("Empty() on symlink root error = nil, want non-nil")
+	}
+
+	if _, err := os.Stat(target.File("payload.txt").Path()); err != nil {
+		t.Fatalf("os.Stat(target payload) error = %v", err)
+	}
+}
+
 func TestDirEmptyRemovesSymlinkEntriesWithoutFollowingThem(t *testing.T) {
 	base := t.TempDir()
 	root := NewDir(filepath.Join(base, "workspace"))

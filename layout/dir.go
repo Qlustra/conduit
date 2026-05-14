@@ -214,15 +214,18 @@ func (d Dir) DeleteIfExists() error {
 // directory itself.
 //
 // Empty returns nil when the directory is missing. If Path exists but is not a
-// directory, Empty returns an error. Symlink children are removed as entries
-// and are never followed.
+// directory, Empty returns an error. Symlink roots are rejected. Symlink
+// children are removed as entries and are never followed.
 func (d Dir) Empty() error {
-	info, err := os.Stat(d.Path())
+	info, err := os.Lstat(d.Path())
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
 		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("path %s is a symlink, not a directory", d.Path())
 	}
 	if !info.IsDir() {
 		return fmt.Errorf("path %s is not a directory", d.Path())

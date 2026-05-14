@@ -49,7 +49,7 @@ Methods:
 Notable behavior:
 
 - `DeleteIfExists` uses recursive removal
-- `Empty` removes symlink children as entries and does not follow them
+- `Empty` rejects symlink roots and removes symlink children as entries without following them
 - `Exists` only checks current filesystem state; it does not validate that the path is a directory
 - `List` returns entries sorted by filename, matching `os.ReadDir`
 - `ParentDir` preserves compose-base metadata when the receiver belongs to a composed tree
