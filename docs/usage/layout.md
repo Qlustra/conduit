@@ -232,8 +232,8 @@ Useful methods mirror `Slot[T]`, but with file semantics:
 - `At(name)` composes and caches an item lazily at `slotRoot/<name>`.
 - `Add(name, ctx)` ensures the slot root, composes the file-backed item, and ensures it.
 - `Delete(name)` removes the child file from disk when it exists and evicts the cached item.
-- `Require(name)` fails unless the child file already exists on disk.
-- `LoadDeep(ctx)` and `DiscoverDeep(ctx)` enumerate direct child files and ignore subdirectories.
+- `Require(name)` fails unless the child path already exists on disk as a regular file.
+- `LoadDeep(ctx)` and `DiscoverDeep(ctx)` enumerate direct child regular files and ignore subdirectories and symlinks.
 
 As with `Slot[T]`, `Entries()`, `All()`, `Len()`, and `Keys()` are cache-based only.
 

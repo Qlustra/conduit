@@ -129,6 +129,9 @@ func TestLoadDeepLoadsFileSlotEntries(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(base, "configs", "nested"), 0o755); err != nil {
 		t.Fatalf("os.MkdirAll() error = %v", err)
 	}
+	if err := os.Symlink(filepath.Join(base, "configs", "api.json"), filepath.Join(base, "configs", "linked.json")); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
 
 	if _, err := LoadDeep(&layout, DefaultContext); err != nil {
 		t.Fatalf("LoadDeep() error = %v", err)
@@ -154,5 +157,8 @@ func TestLoadDeepLoadsFileSlotEntries(t *testing.T) {
 	}
 	if _, ok := layout.Configs.Get("nested"); ok {
 		t.Fatalf("Configs.Get(\"nested\") = true, want false")
+	}
+	if _, ok := layout.Configs.Get("linked.json"); ok {
+		t.Fatalf("Configs.Get(\"linked.json\") = true, want false")
 	}
 }

@@ -195,6 +195,29 @@ func TestFileSlotRequireNeedsExistingFile(t *testing.T) {
 	}
 }
 
+func TestFileSlotHasAndRequireRejectSymlinkChildren(t *testing.T) {
+	var slot FileSlot[*testMapFile]
+	base := t.TempDir()
+	slot.ComposePath(filepath.Join(base, "configs"))
+
+	if err := os.MkdirAll(slot.Path(), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(slot root) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(base, "target.json"), []byte(`{"name":"target"}`), 0o644); err != nil {
+		t.Fatalf("os.WriteFile(target) error = %v", err)
+	}
+	if err := os.Symlink(filepath.Join(base, "target.json"), filepath.Join(slot.Path(), "linked.json")); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	if slot.Has("linked.json") {
+		t.Fatal("Has(linked.json) = true, want false for symlink")
+	}
+	if _, err := slot.Require("linked.json"); err == nil {
+		t.Fatal("Require(linked.json) error = nil, want non-nil")
+	}
+}
+
 func TestFileSlotRejectsNamesOutsideDirectChildren(t *testing.T) {
 	var slot FileSlot[*testMapFile]
 	slot.ComposePath(filepath.Join(t.TempDir(), "configs"))

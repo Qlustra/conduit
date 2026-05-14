@@ -143,6 +143,9 @@ func TestDiscoverDeepDiscoversFileSlotEntriesWithoutLoadingContent(t *testing.T)
 	if err := os.MkdirAll(filepath.Join(base, "configs", "nested"), 0o755); err != nil {
 		t.Fatalf("os.MkdirAll() error = %v", err)
 	}
+	if err := os.Symlink(cached.Path(), filepath.Join(base, "configs", "linked.json")); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
 
 	if _, err := DiscoverDeep(&layout, DefaultContext); err != nil {
 		t.Fatalf("DiscoverDeep() error = %v", err)
@@ -181,5 +184,8 @@ func TestDiscoverDeepDiscoversFileSlotEntriesWithoutLoadingContent(t *testing.T)
 	}
 	if _, ok := layout.Configs.Get("nested"); ok {
 		t.Fatalf("Configs.Get(\"nested\") = true, want false")
+	}
+	if _, ok := layout.Configs.Get("linked.json"); ok {
+		t.Fatalf("Configs.Get(\"linked.json\") = true, want false")
 	}
 }

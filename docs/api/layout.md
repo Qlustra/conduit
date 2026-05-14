@@ -535,11 +535,12 @@ Notable behavior:
 - `Add` ensures the slot root and calls `EnsureDeep` on the item
 - `Delete` removes both the on-disk child file and the cached entry
 - item names must identify a single direct child; empty, absolute, dot, dot-dot, and separator-containing names are rejected
+- `Has` and `Require` treat only regular files as valid child entries; symlinks are rejected
 - `Len`, `Entries`, `All`, and `Keys` are cache-based; they do not list the filesystem directly
 - `Entries` and `All` return cached items as-is, preserving pointer or value semantics chosen by `T`
 - the declared-path helpers delegate to the slot root and expose the slot field's own declared fragment
 - the composed-path helpers delegate to the slot root and return `ok == false` until the slot has been attached through `Compose`
-- `DiscoverDeep` and `LoadDeep` discover file-backed entries from disk and ignore subdirectories
+- `DiscoverDeep` and `LoadDeep` discover direct child regular files from disk and ignore subdirectories and symlinks
 - `ScanDeep` and `SyncDeep` do not discover uncached entries
 - `FileSlot.SyncDeep` ensures cached children before syncing them, and that preparation ensure pass respects `Context.EnsurePolicy`
 

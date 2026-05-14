@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"iter"
 	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 )
@@ -78,8 +79,8 @@ func (s *FileSlot[T]) Has(name string) bool {
 	if err := validateSlotItemName("file slot item", name); err != nil {
 		return false
 	}
-	info, err := os.Stat(s.root.File(name).Path())
-	return err == nil && !info.IsDir()
+	info, err := os.Lstat(s.root.File(name).Path())
+	return err == nil && info.Mode().IsRegular()
 }
 
 // Get returns the cached item for name without composing a missing one.
@@ -276,10 +277,14 @@ func (s *FileSlot[T]) Require(name string) (T, error) {
 		return zero, err
 	}
 	child := s.root.File(name)
-	info, err := os.Stat(child.Path())
+	info, err := os.Lstat(child.Path())
 	if err != nil {
 		var zero T
 		return zero, fmt.Errorf("file slot item %q not found under %s: %w", name, s.Path(), err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		var zero T
+		return zero, fmt.Errorf("file slot item %q not found under %s: path is a symlink", name, s.Path())
 	}
 	if info.IsDir() {
 		var zero T
@@ -350,7 +355,12 @@ func (s *FileSlot[T]) LoadDeep(ctx Context) (ResultCode, error) {
 	}
 
 	for _, entry := range entries {
-		if entry.IsDir() {
+		childPath := filepath.Join(s.root.Path(), entry.Name())
+		info, err := os.Lstat(childPath)
+		if err != nil {
+			return LoadFailed, err
+		}
+		if !info.Mode().IsRegular() {
 			continue
 		}
 
@@ -404,7 +414,12 @@ func (s *FileSlot[T]) DiscoverDeep(ctx Context) (ResultCode, error) {
 	}
 
 	for _, entry := range entries {
-		if entry.IsDir() {
+		childPath := filepath.Join(s.root.Path(), entry.Name())
+		info, err := os.Lstat(childPath)
+		if err != nil {
+			return DiscoverFailed, err
+		}
+		if !info.Mode().IsRegular() {
 			continue
 		}
 
