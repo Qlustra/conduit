@@ -27,7 +27,7 @@ What it does:
 - creates files declared by `File`
 - creates executable files declared by `Exec`
 - creates backing files for syncable stateful nodes when `ctx.EnsurePolicy` includes them
-- ensures already cached `Slot` items
+- ensures already cached slot items
 
 What it does not do:
 
@@ -35,7 +35,7 @@ What it does not do:
 - discover new slot entries from disk
 - delete anything
 
-For `Slot[T]`, only cached items are ensured. Use `slot.Add(name, ctx)` when you want to create a new dynamic child explicitly.
+For slot types such as `Slot[T]`, `FileSlot[T]`, and `LinkSlot[T]`, only cached items are ensured. Use `slot.Add(name, ctx)` when you want to create a new dynamic child explicitly.
 
 `ctx.EnsurePolicy` lets you narrow the pass. For example:
 

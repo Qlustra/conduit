@@ -5,7 +5,7 @@ Conduit layouts are plain Go structs with `layout` tags. `Compose` walks the str
 In code, that usually means:
 
 - import `github.com/qlustra/conduit` for operations such as `Compose`
-- import `github.com/qlustra/conduit/layout` for `Dir`, `File`, `Link`, `FileLink`, `DirLink`, `Exec`, `Slot[T]`, `FileSlot[T]`, and `TextTemplate[C]`
+- import `github.com/qlustra/conduit/layout` for `Dir`, `File`, `Link`, `FileLink`, `DirLink`, `Exec`, `Slot[T]`, `FileSlot[T]`, `LinkSlot[T]`, and `TextTemplate[C]`
 - import `github.com/qlustra/conduit/formats` for `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`
 
 ## Defining a layout
@@ -234,6 +234,40 @@ Useful methods mirror `Slot[T]`, but with file semantics:
 - `LoadDeep(ctx)` and `DiscoverDeep(ctx)` enumerate direct child files and ignore subdirectories.
 
 As with `Slot[T]`, `Entries()`, `All()`, `Len()`, and `Keys()` are cache-based only.
+
+### `LinkSlot[T]`
+
+`LinkSlot[T]` models repeated direct-child symlink entries under one directory:
+
+```go
+type Workspace struct {
+	Context layout.LinkSlot[layout.Link] `layout:"context"`
+}
+```
+
+Each key becomes one symlink path directly under the slot path:
+
+```text
+context/
+  README
+  assets
+```
+
+Useful methods mirror `FileSlot[T]`, but with symlink-entry semantics:
+
+- `At(name)` composes and caches a link item lazily at `slotRoot/<name>`.
+- `Add(name, ctx)` ensures the slot root, composes the link item, and caches it. The link itself is still materialized by `Sync` or `SyncDeep`.
+- `Delete(name)` removes the child symlink from disk when it exists and evicts the cached item.
+- `Require(name)` fails unless a symlink already exists at the child path.
+- `LoadDeep(ctx)` and `DiscoverDeep(ctx)` enumerate direct child symlink entries and ignore regular files and directories.
+
+`LinkSlot[T]` is restricted to the built-in link family:
+
+- `layout.Link`
+- `layout.FileLink`
+- `layout.DirLink`
+
+Use `LinkSlot[layout.Link]` when targets may vary between files and directories.
 
 ## Composition rules
 

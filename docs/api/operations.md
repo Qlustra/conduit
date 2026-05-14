@@ -259,7 +259,7 @@ Notable behavior:
 - creates `layout.Dir`, `layout.File`, and `layout.Exec` nodes as required by the layout
 - ensures syncable stateful wrappers only when `ctx.EnsurePolicy` includes them
 - records `EnsureSkippedPolicy` for visited nodes skipped by `ctx.EnsurePolicy`
-- only ensures cached `layout.Slot[T]` items
+- only ensures cached slot items such as `layout.Slot[T]`, `layout.FileSlot[T]`, and `layout.LinkSlot[T]`
 - does not load typed file content
 - does not discover new slot items from disk
 - returns an error if `target` is nil
@@ -287,7 +287,7 @@ Returns:
 Notable behavior:
 
 - loads `layout.Format`-backed files such as `formats.JSONFile[T]`, `formats.YAMLFile[T]`, and `formats.TOMLFile[T]`
-- discovers `layout.Slot[T]` entries by reading child directories from disk
+- discovers slot-backed entries from disk according to slot kind
 - does not create missing files
 - leaves uncached missing slot entries undiscovered until they exist on disk
 - returns an error if `target` is nil
@@ -314,7 +314,7 @@ Returns:
 
 Notable behavior:
 
-- discovers `layout.Slot[T]` entries by reading child directories from disk
+- discovers slot-backed entries from disk according to slot kind
 - composes discovered children recursively
 - updates typed-file disk state without loading bytes into memory
 - preserves existing in-memory values and memory state
@@ -345,8 +345,8 @@ Notable behavior:
 
 - only writes typed files that currently have content loaded in memory
 - applies `ctx.SyncPolicy` to typed memory state and optional disk-state filters before writing
-- only syncs cached `layout.Slot[T]` items
-- `layout.Slot[T]` and `layout.FileSlot[T]` ensure cached children before syncing them, and that ensure pass respects `ctx.EnsurePolicy`
+- only syncs cached slot items
+- `layout.Slot[T]`, `layout.FileSlot[T]`, and `layout.LinkSlot[T]` ensure cached children before syncing them, and that ensure pass respects `ctx.EnsurePolicy`
 - does not materialize standalone raw `layout.Dir` or `layout.File` nodes
 - does not delete files or directories
 - returns an error if `target` is nil
@@ -375,7 +375,7 @@ Notable behavior:
 
 - updates disk state without loading file content
 - preserves current in-memory values and memory state
-- only scans cached `layout.Slot[T]` items
+- only scans cached slot items
 - does not discover new slot entries from disk
 - returns an error if `target` is nil
 

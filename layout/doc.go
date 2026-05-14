@@ -6,6 +6,6 @@
 // ScanDeep, SyncDeep, DefaultDeep, RenderDeep, and ValidateDeep.
 //
 // The package exposes raw node types such as Dir, File, Exec, and Link, along
-// with higher-level stateful wrappers such as Format, Slot, FileSlot, and
-// TextTemplate.
+// with higher-level stateful wrappers such as Format, Slot, FileSlot,
+// LinkSlot, and TextTemplate.
 package layout
