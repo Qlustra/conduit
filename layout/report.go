@@ -309,10 +309,6 @@ func recordResultWithReporter(reporter Reporter, op Operation, path string, resu
 	return result, err
 }
 
-func recordEntry(ctx Context, entry Entry) {
-	recordEntryWithReporter(ctx.Reporter, entry)
-}
-
 func recordEntryWithReporter(reporter Reporter, entry Entry) {
 	if reporter == nil {
 		return
