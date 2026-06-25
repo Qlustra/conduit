@@ -1,5 +1,5 @@
 version: 1
-project: pgshell
+project: conduit
 defaults:
   workspace:
     host: "."
@@ -7,14 +7,21 @@ defaults:
 
 shells:
   opencode:
-    image: ghcr.io/anomalyco/opencode
+    image: bench.local/go:latest
     compatibility: augment
+    entrypoint_policy: preserve
     default_command: ["opencode"]
+    env:
+      inline:
+        SHELLSHADE_DEBUG: 1
   go:
-    image: conduit-dev:go-latest
+    image: bench.local/go:latest
     compatibility: augment
-    default_command: ["opencode"]
+    entrypoint_policy: preserve
 #    toolSearchPaths: ["."]
+    env:
+      inline:
+        SHELLSHADE_DEBUG: 1
 
 # =============================================================================
 # ShellShade Configuration Reference
