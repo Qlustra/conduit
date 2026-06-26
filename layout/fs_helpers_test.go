@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 )
 
 func TestDirListReturnsSortedEntries(t *testing.T) {
@@ -307,5 +308,188 @@ func TestDirChownCanFollowSymlinkParentWhenEnabled(t *testing.T) {
 
 	if err := dir.Chown(-1, -1, ctx); err != nil {
 		t.Fatalf("Dir.Chown() error = %v", err)
+	}
+}
+
+func TestFileStatAndLstatWrapOS(t *testing.T) {
+	file := NewFile(filepath.Join(t.TempDir(), "payload.txt"))
+	if err := os.WriteFile(file.Path(), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	stat, err := file.Stat()
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
+	if stat.Size() != int64(len("payload")) {
+		t.Fatalf("Stat().Size() = %d, want %d", stat.Size(), len("payload"))
+	}
+
+	lstat, err := file.Lstat()
+	if err != nil {
+		t.Fatalf("Lstat() error = %v", err)
+	}
+	if !lstat.Mode().IsRegular() {
+		t.Fatalf("Lstat().Mode() = %v, want regular file", lstat.Mode())
+	}
+}
+
+func TestFileChmodAndChtimesWrapOS(t *testing.T) {
+	file := NewFile(filepath.Join(t.TempDir(), "payload.txt"))
+	if err := os.WriteFile(file.Path(), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	if err := file.Chmod(0o600, DefaultContext); err != nil {
+		t.Fatalf("Chmod() error = %v", err)
+	}
+	info, err := os.Stat(file.Path())
+	if err != nil {
+		t.Fatalf("os.Stat() error = %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("mode = %#o, want %#o", got, os.FileMode(0o600))
+	}
+
+	mtime := time.Unix(1_700_000_000, 0)
+	if err := file.Chtimes(mtime, mtime, DefaultContext); err != nil {
+		t.Fatalf("Chtimes() error = %v", err)
+	}
+	info, err = os.Stat(file.Path())
+	if err != nil {
+		t.Fatalf("os.Stat() after Chtimes error = %v", err)
+	}
+	if !info.ModTime().Equal(mtime) {
+		t.Fatalf("ModTime() = %v, want %v", info.ModTime(), mtime)
+	}
+}
+
+func TestDirStatOpenAndOpenRoot(t *testing.T) {
+	dir := NewDir(filepath.Join(t.TempDir(), "workspace"))
+	if err := os.MkdirAll(dir.Path(), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(dir.File("payload.txt").Path(), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(filepath.Dir(dir.Path()), "outside.txt"), []byte("outside"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile(outside) error = %v", err)
+	}
+
+	stat, err := dir.Stat()
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
+	if !stat.IsDir() {
+		t.Fatalf("Stat().IsDir() = false, want true")
+	}
+	lstat, err := dir.Lstat()
+	if err != nil {
+		t.Fatalf("Lstat() error = %v", err)
+	}
+	if !lstat.IsDir() {
+		t.Fatalf("Lstat().IsDir() = false, want true")
+	}
+
+	handle, err := dir.Open(DefaultContext)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	if err := handle.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	root, err := dir.OpenRoot(DefaultContext)
+	if err != nil {
+		t.Fatalf("OpenRoot() error = %v", err)
+	}
+	defer root.Close()
+
+	data, err := root.ReadFile("payload.txt")
+	if err != nil {
+		t.Fatalf("Root.ReadFile() error = %v", err)
+	}
+	if string(data) != "payload" {
+		t.Fatalf("Root.ReadFile() = %q, want %q", data, "payload")
+	}
+	if _, err := root.ReadFile("../outside.txt"); err == nil {
+		t.Fatal("Root.ReadFile(../outside.txt) error = nil, want non-nil")
+	}
+}
+
+func TestDirChmodAndChtimesWrapOS(t *testing.T) {
+	dir := NewDir(filepath.Join(t.TempDir(), "workspace"))
+	if err := os.MkdirAll(dir.Path(), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll() error = %v", err)
+	}
+
+	if err := dir.Chmod(0o700, DefaultContext); err != nil {
+		t.Fatalf("Chmod() error = %v", err)
+	}
+	info, err := os.Stat(dir.Path())
+	if err != nil {
+		t.Fatalf("os.Stat() error = %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o700 {
+		t.Fatalf("mode = %#o, want %#o", got, os.FileMode(0o700))
+	}
+
+	mtime := time.Unix(1_700_000_001, 0)
+	if err := dir.Chtimes(mtime, mtime, DefaultContext); err != nil {
+		t.Fatalf("Chtimes() error = %v", err)
+	}
+	info, err = os.Stat(dir.Path())
+	if err != nil {
+		t.Fatalf("os.Stat() after Chtimes error = %v", err)
+	}
+	if !info.ModTime().Equal(mtime) {
+		t.Fatalf("ModTime() = %v, want %v", info.ModTime(), mtime)
+	}
+}
+
+func TestLinkLstatAndReadlinkWrapOS(t *testing.T) {
+	base := t.TempDir()
+	target := "target.txt"
+	link := NewLink(filepath.Join(base, "payload.link"))
+
+	if err := os.WriteFile(filepath.Join(base, target), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile(target) error = %v", err)
+	}
+	if err := os.Symlink(target, link.Path()); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	info, err := link.Lstat()
+	if err != nil {
+		t.Fatalf("Lstat() error = %v", err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("Lstat().Mode() = %v, want symlink", info.Mode())
+	}
+
+	got, err := link.Readlink()
+	if err != nil {
+		t.Fatalf("Readlink() error = %v", err)
+	}
+	if got != target {
+		t.Fatalf("Readlink() = %q, want %q", got, target)
+	}
+}
+
+func TestDirOpenRejectsSymlinkRoot(t *testing.T) {
+	base := t.TempDir()
+	realDir := filepath.Join(base, "real")
+	linkDir := NewDir(filepath.Join(base, "alias"))
+
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(real) error = %v", err)
+	}
+	if err := os.Symlink(realDir, linkDir.Path()); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	if handle, err := linkDir.Open(DefaultContext); err == nil {
+		handle.Close()
+		t.Fatal("Open() error = nil, want non-nil for symlink root")
 	}
 }

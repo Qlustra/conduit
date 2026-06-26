@@ -28,6 +28,12 @@ type EnsurePolicy = layout.EnsurePolicy
 // while resolving paths. See layout.PathSafetyPolicy for details.
 type PathSafetyPolicy = layout.PathSafetyPolicy
 
+// OpenPolicy is an alias for layout.OpenPolicy.
+//
+// It controls creation flags added by File open helpers. See layout.OpenPolicy
+// for details.
+type OpenPolicy = layout.OpenPolicy
+
 // Reporter is an alias for layout.Reporter.
 //
 // See layout.Reporter for the reporting contract used during deep traversal.
@@ -79,6 +85,12 @@ const (
 const (
 	PathSafetyRejectSymlinkParents PathSafetyPolicy = layout.PathSafetyRejectSymlinkParents
 	PathSafetyFollowSymlinks       PathSafetyPolicy = layout.PathSafetyFollowSymlinks
+)
+
+const (
+	OpenExisting          OpenPolicy = layout.OpenExisting
+	OpenOrCreate          OpenPolicy = layout.OpenOrCreate
+	OpenOrCreateExclusive OpenPolicy = layout.OpenOrCreateExclusive
 )
 
 const (
