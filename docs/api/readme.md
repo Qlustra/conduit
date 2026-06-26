@@ -2,7 +2,7 @@
 
 This section documents the exported surface across the public packages:
 
-- `github.com/qlustra/conduit` for operations, `Context`, and sync policy
+- `github.com/qlustra/conduit` for operations, `Context`, sync policy, open policy, validation, and reporting types
 - `github.com/qlustra/conduit/layout` for structural node types
 - `github.com/qlustra/conduit/formats` for codec-backed typed files
 

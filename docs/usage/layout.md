@@ -54,7 +54,11 @@ Useful methods:
 - `DeclaredPath()` and `JoinDeclaredPath(...)` expose the node's own declared layout fragment.
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` expose compose-base-relative paths when the handle belongs to a composed tree.
 - `Exists()` reports whether the directory currently exists on disk.
+- `Stat()` and `Lstat()` expose `os.Stat` and `os.Lstat` for the directory path.
 - `Chown(uid, gid, ctx)` applies `os.Chown` to the directory path.
+- `Chmod(mode, ctx)` and `Chtimes(atime, mtime, ctx)` apply mode and timestamp changes.
+- `Open(ctx)` opens the directory as an `*os.File`.
+- `OpenRoot(ctx)` opens the directory as an `*os.Root` for rooted filesystem operations.
 - `Join(...)` builds a descendant path.
 - `List()` returns the directory's direct children.
 - `ChangeTo()` changes the process working directory to that path.
@@ -78,17 +82,33 @@ Useful methods:
 - `DeclaredPath()` and `JoinDeclaredPath(...)` for local declared layout fragments
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` for compose-base-relative path fragments
 - `ReadBytes()` and `ReadBytesIfExists()`
+- `Stat()` and `Lstat()` expose `os.Stat` and `os.Lstat` for the file path
 - `Chown(uid, gid, ctx)` for ownership changes
+- `Chmod(mode, ctx)` and `Chtimes(atime, mtime, ctx)` for mode and timestamp changes
 - `IsExecutable()` to check execute bits on regular files
 - `Truncate(size, ctx)` to resize the file in place
+- `OpenRead(ctx, op)`, `OpenWrite(ctx, op)`, `OpenRewrite(ctx, op)`, `OpenReadWrite(ctx, op)`, and append/rewrite variants for lower-level `*os.File` access
 - `AppendReader(src, ctx)` to stream any reader into the file in append mode
 - `AppendBytes(data, ctx)`, `AppendString(content, ctx)`, `AppendFile(src, ctx)`, and `AppendFiles(ctx, srcs...)` for append and concat workflows
+- `ConcatReaders(ctx, opts, srcs...)`, `ConcatBytes(ctx, opts, srcs...)`, `ConcatStrings(ctx, opts, srcs...)`, and `ConcatFiles(ctx, opts, srcs...)` for buffered all-or-nothing rewrites from multiple inputs
+- `TransformReader(ctx, src, fn)`, `TransformBytes(ctx, data, fn)`, `TransformString(ctx, data, fn)`, `TransformFile(ctx, src, fn)`, and `Transform(ctx, fn)` for buffered rewrites after a transform succeeds
+- `Hash(ctx, h)` and `HashHex(ctx, h)` to digest file content through a supplied `hash.Hash`
 - `WriteBytes(data, ctx)`
 - `CopyToPath(path, opts)`, `CopyToFile(dst, opts)`, and `CopyIntoDir(dir, opts)` for streamed file copies
 - `Ensure(ctx)` to create the file and its parent directories
 - `DeleteIfExists(ctx)`
 
 Use `File` when you want raw bytes and do not need codec-backed state tracking.
+
+`layout.OpenPolicy` controls whether file open helpers require an existing file or add creation flags:
+
+- `OpenExisting` adds no creation flags.
+- `OpenOrCreate` adds `os.O_CREATE`.
+- `OpenOrCreateExclusive` adds `os.O_CREATE | os.O_EXCL`.
+
+When creation is enabled, the open helpers create parent directories with `Context.DirMode`. Existing symlink leaves are rejected, and symlink parents follow `Context.PathSafetyPolicy`.
+
+The package-level helpers `layout.ConcatReaders`, `layout.ConcatBytes`, `layout.ConcatStrings`, `layout.TransformReader`, `layout.TransformBytes`, `layout.TransformString`, and the `layout.Hash*` functions are useful when you want the same processing behavior without writing through a `File` handle.
 
 Mutating `File`, `Dir`, and `Exec` operations are type-strict: they expect the on-disk leaf to match the handle kind and reject symlink leaves instead of following them. `Link` is the type that intentionally manages symlink leaves.
 
@@ -103,6 +123,7 @@ Copy helpers use `layout.CopyOptions`. `layout.DefaultCopyOptions` preserves sou
 Useful methods:
 
 - `Ensure(ctx)` and `EnsureExecutable(ctx)` create the file with executable permissions.
+- raw `File` helpers such as `Stat`, `Lstat`, `Chmod`, `Chtimes`, `Open*`, `Append*`, `Concat*`, `Transform*`, `Hash`, `HashHex`, `ReadBytes`, `WriteBytes`, and `CopyTo*` are promoted from the embedded `File`.
 - `Base()`, `Ext()`, and `Stem()` are inherited from `File`.
 - `RelTo(...)`, `JoinRelTo(...)`, `RelToPath(...)`, `JoinRelToPath(...)`, `RelPathTo(...)`, and `JoinRelPathTo(...)` are inherited from `File`.
 - `DeclaredPath()` and `JoinDeclaredPath(...)` are inherited from `File`.
@@ -132,6 +153,8 @@ Useful methods on `Link`:
 - `DeclaredPath()` and `JoinDeclaredPath(...)` expose the node's own declared layout fragment.
 - `ComposedBaseDir()`, `ComposedRelativePath()`, and `JoinComposedPath(...)` expose compose-base-relative path fragments.
 - `Exists()` reports whether a symlink exists at the path. It does not require the target to resolve.
+- `Lstat()` exposes `os.Lstat` for the symlink path.
+- `Readlink()` exposes `os.Readlink` for the symlink path.
 - `Target()`, `MustTarget()`, `SetTarget(...)`, `SetDefaultTarget(...)`, `HasTarget()`, and `ClearTarget()` manage the in-memory target string.
 - `ResolvedTargetPath()` resolves relative targets from the link's parent directory.
 - `TargetExists()` and `IsDangling()` inspect the current in-memory target.

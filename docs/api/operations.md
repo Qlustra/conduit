@@ -108,6 +108,22 @@ Constants:
 - `PathSafetyRejectSymlinkParents`: reject existing symlink parents during mutating path resolution
 - `PathSafetyFollowSymlinks`: preserve path-following behavior for mutating operations
 
+### `OpenPolicy`
+
+```go
+type OpenPolicy uint8
+```
+
+Description:
+
+- root-package alias for `layout.OpenPolicy`, used by `layout.File` open helpers
+
+Constants:
+
+- `OpenExisting`: add no creation flags
+- `OpenOrCreate`: add `os.O_CREATE`
+- `OpenOrCreateExclusive`: add `os.O_CREATE | os.O_EXCL`
+
 ### `ValidateOptions`
 
 ```go

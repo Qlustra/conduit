@@ -34,7 +34,13 @@ Methods:
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
 - `ComposePath(path string)`: binds the handle to a concrete path and resets composition metadata
 - `Exists() bool`: reports whether the path currently exists
+- `Stat() (os.FileInfo, error)`: returns `os.Stat` for the directory path
+- `Lstat() (os.FileInfo, error)`: returns `os.Lstat` for the directory path
 - `Chown(uid, gid int, ctx Context) error`: applies `os.Chown` to the directory path
+- `Chmod(mode os.FileMode, ctx Context) error`: applies `os.Chmod` to the directory path
+- `Chtimes(atime, mtime time.Time, ctx Context) error`: applies `os.Chtimes` to the directory path
+- `Open(ctx Context) (*os.File, error)`: opens the directory path
+- `OpenRoot(ctx Context) (*os.Root, error)`: opens the directory as an `os.Root`
 - `Join(parts ...string) string`: joins descendant path segments onto the directory path
 - `List() ([]os.DirEntry, error)`: returns the directory's direct children using `os.ReadDir`
 - `ChangeTo() error`: changes the process working directory to this path
@@ -94,14 +100,39 @@ Methods:
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
 - `ComposePath(path string)`: binds the handle to a concrete path and resets composition metadata
 - `Exists() bool`: reports whether the path currently exists
+- `Stat() (os.FileInfo, error)`: returns `os.Stat` for the file path
+- `Lstat() (os.FileInfo, error)`: returns `os.Lstat` for the file path
 - `Chown(uid, gid int, ctx Context) error`: applies `os.Chown` to the file path
+- `Chmod(mode os.FileMode, ctx Context) error`: applies `os.Chmod` to the file path
+- `Chtimes(atime, mtime time.Time, ctx Context) error`: applies `os.Chtimes` to the file path
 - `IsExecutable() bool`: reports whether the current target is an executable regular file
 - `Truncate(size int64, ctx Context) error`: resizes the file using `os.Truncate`
+- `OpenRead(ctx Context, op OpenPolicy) (*os.File, error)`: opens the file read-only
+- `OpenWrite(ctx Context, op OpenPolicy) (*os.File, error)`: opens the file write-only without truncating or appending
+- `OpenRewrite(ctx Context, op OpenPolicy) (*os.File, error)`: opens the file write-only and truncates it
+- `OpenReadWrite(ctx Context, op OpenPolicy) (*os.File, error)`: opens the file for reading and writing without truncating or appending
+- `OpenReadRewrite(ctx Context, op OpenPolicy) (*os.File, error)`: opens the file for reading and writing and truncates it
+- `OpenAppend(ctx Context, op OpenPolicy) (*os.File, error)`: opens the file write-only in append mode
+- `OpenReadAppend(ctx Context, op OpenPolicy) (*os.File, error)`: opens the file read-write in append mode
+- `OpenRewriteAppend(ctx Context, op OpenPolicy) (*os.File, error)`: opens the file write-only, truncates it, and appends writes
+- `OpenReadRewriteAppend(ctx Context, op OpenPolicy) (*os.File, error)`: opens the file read-write, truncates it, and appends writes
+- `OpenFile(ctx Context, flag int, perm os.FileMode) (*os.File, error)`: opens the file with explicit `os.OpenFile` flags and mode
 - `AppendReader(src io.Reader, ctx Context) error`: creates parent directories if needed and appends bytes read from a reader
 - `AppendBytes(data []byte, ctx Context) error`: creates parent directories if needed and appends raw bytes
 - `AppendString(content string, ctx Context) error`: creates parent directories if needed and appends string content
 - `AppendFile(src File, ctx Context) error`: creates parent directories if needed and appends another file's payload
 - `AppendFiles(ctx Context, srcs ...File) error`: appends multiple file payloads in order
+- `ConcatReaders(ctx Context, opts ConcatOptions, srcs ...io.Reader) error`: concatenates readers in memory, then rewrites the file
+- `ConcatBytes(ctx Context, opts ConcatOptions, srcs ...[]byte) error`: concatenates byte slices in memory, then rewrites the file
+- `ConcatStrings(ctx Context, opts ConcatOptions, srcs ...string) error`: concatenates strings in memory, then rewrites the file
+- `ConcatFiles(ctx Context, opts ConcatOptions, srcs ...File) error`: reads source files, concatenates them in memory, then rewrites the file
+- `TransformReader(ctx Context, src io.Reader, transform TransformFunc) error`: transforms a reader in memory, then rewrites the file
+- `TransformBytes(ctx Context, data []byte, transform TransformFunc) error`: transforms bytes in memory, then rewrites the file
+- `TransformString(ctx Context, data string, transform TransformFunc) error`: transforms a string in memory, then rewrites the file
+- `TransformFile(ctx Context, src File, transform TransformFunc) error`: reads a source file, transforms it in memory, then rewrites the file
+- `Transform(ctx Context, transform TransformFunc) error`: transforms the file's current content in memory, then rewrites the same file
+- `Hash(ctx Context, h hash.Hash) ([]byte, error)`: hashes the file content through `h` and returns digest bytes
+- `HashHex(ctx Context, h hash.Hash) (string, error)`: hashes the file content through `h` and returns lowercase hex
 - `WriteBytes(data []byte, ctx Context) error`: creates parent directories and writes raw bytes
 - `ReadBytes() ([]byte, error)`: reads the file contents
 - `ReadBytesIfExists() ([]byte, bool, error)`: reads the file if present and returns `ok == false` for missing files
@@ -118,7 +149,9 @@ Notable behavior:
 - `AppendReader`, `AppendFile`, and `AppendFiles` stream through `io.Copy`; they do not read the whole source into memory first
 - `AppendFiles` appends sources in argument order and may leave already-appended content in place if a later source fails
 - append helpers create parent directories and the destination file when missing
+- `Open*` helpers create parent directories only when the selected `OpenPolicy` adds `os.O_CREATE`
 - concurrent append calls rely on OS append mode for destination offset management, but no whole-call atomicity is guaranteed
+- `Concat*` and `Transform*` helpers buffer complete output before rewriting the destination, so failed reads or transforms leave the destination untouched
 - `WriteBytes` always rewrites the file contents
 - mutating `File` operations reject symlink leaves; `Link` is the type that manages symlink entries intentionally
 - mutating `File` operations reject symlink parents by default; set `Context.PathSafetyPolicy` to `PathSafetyFollowSymlinks` to opt in to path-following behavior
@@ -179,6 +212,74 @@ Constants:
 - `CopySymlinkFollow`: copy the symlink target payload instead of the symlink entry
 - `CopySymlinkReject`: fail when a symlink is encountered
 
+### `OpenPolicy`
+
+```go
+type OpenPolicy uint8
+```
+
+Description:
+
+- creation policy used by `File` open helpers
+
+Constants:
+
+- `OpenExisting`: add no creation flags; the file must already exist unless the explicit open flags allow otherwise
+- `OpenOrCreate`: add `os.O_CREATE`
+- `OpenOrCreateExclusive`: add `os.O_CREATE | os.O_EXCL`
+
+Notable behavior:
+
+- `OpenRead`, `OpenWrite`, `OpenRewrite`, `OpenReadWrite`, `OpenReadRewrite`, `OpenAppend`, `OpenReadAppend`, `OpenRewriteAppend`, and `OpenReadRewriteAppend` combine their fixed access flags with the flags selected by `OpenPolicy`
+- `OpenFile` accepts explicit flags and is the lower-level escape hatch for open modes not covered by the named helpers
+- when the final flags include `os.O_CREATE`, parent directories are created with `Context.DirMode` before opening the file
+
+### `ConcatOptions`
+
+```go
+type ConcatOptions struct {
+    Header         []byte
+    Footer         []byte
+    Separator      []byte
+    FinalSeparator bool
+    EntryPrefix    []byte
+    EntrySuffix    []byte
+}
+```
+
+Description:
+
+- policy object for package-level and `File` concat helpers
+
+Fields:
+
+- `Header`: bytes written once before any entries
+- `Footer`: bytes written once after all entries and any final separator
+- `Separator`: bytes written between entries
+- `FinalSeparator`: also writes `Separator` after the final entry when at least one entry exists
+- `EntryPrefix`: bytes written before each entry payload
+- `EntrySuffix`: bytes written after each entry payload
+
+Notable behavior:
+
+- package-level `Concat*` helpers return buffered output in memory
+- `File.Concat*` helpers write only after all inputs have been read and concatenated successfully
+
+### `TransformFunc`
+
+```go
+type TransformFunc func(dst io.Writer, src io.Reader) error
+```
+
+Description:
+
+- streaming callback used by package-level and `File` transform helpers
+
+Notable behavior:
+
+- package-level `Transform*` helpers buffer complete transformed output in memory and return it
+- `File.Transform*` helpers rewrite the destination only after the transform succeeds
+
 ### `Exec`
 
 ```go
@@ -210,6 +311,7 @@ Methods:
 - `JoinComposedPath(parts ...string) (string, bool)`
 - `ComposePath(path string)`
 - `Exists() bool`
+- promoted raw `File` helpers such as `Stat`, `Lstat`, `Chmod`, `Chtimes`, `Open*`, `Append*`, `Concat*`, `Transform*`, `Hash`, `HashHex`, `ReadBytes`, `WriteBytes`, and `CopyTo*`
 - `Chown(uid, gid int, ctx Context) error`
 - `Truncate(size int64, ctx Context) error`
 - `AppendReader(src io.Reader, ctx Context) error`
@@ -272,6 +374,8 @@ Methods:
 - `JoinComposedPath(parts ...string) (string, bool)`: joins path parts onto the composed-relative path
 - `ComposePath(path string)`: binds the link to a concrete path and resets cached target and state
 - `Exists() bool`: reports whether a symlink exists at the path
+- `Lstat() (os.FileInfo, error)`: returns `os.Lstat` for the symlink path
+- `Readlink() (string, error)`: returns `os.Readlink` for the symlink path
 - `Target() (string, bool)`: returns the cached raw symlink target string
 - `MustTarget() string`: returns the cached target string or panics when it is absent
 - `SetTarget(target string)`: stores a raw symlink target string in memory and marks it dirty
@@ -1066,6 +1170,146 @@ type DeepValidator interface {
 ```
 
 ## Functions
+
+### `ConcatReaders`
+
+```go
+func ConcatReaders(opts ConcatOptions, srcs ...io.Reader) ([]byte, error)
+```
+
+Description:
+
+- reads sources in order and returns the complete concatenated output in memory
+
+Notable behavior:
+
+- returns an error when any source reader is nil or fails while reading
+- applies `Header`, `Footer`, `Separator`, `FinalSeparator`, `EntryPrefix`, and `EntrySuffix` from `ConcatOptions`
+
+### `ConcatBytes`
+
+```go
+func ConcatBytes(opts ConcatOptions, srcs ...[]byte) []byte
+```
+
+Description:
+
+- returns the complete concatenated byte output in memory
+
+### `ConcatStrings`
+
+```go
+func ConcatStrings(opts ConcatOptions, srcs ...string) string
+```
+
+Description:
+
+- returns the complete concatenated string output in memory
+
+### `TransformReader`
+
+```go
+func TransformReader(src io.Reader, transform TransformFunc) ([]byte, error)
+```
+
+Description:
+
+- applies `transform` to `src` and returns the complete transformed output in memory
+
+Notable behavior:
+
+- returns an error when `src` or `transform` is nil
+- the transform receives streaming interfaces, but the helper buffers all output before returning
+
+### `TransformBytes`
+
+```go
+func TransformBytes(data []byte, transform TransformFunc) ([]byte, error)
+```
+
+Description:
+
+- applies `transform` to byte data and returns transformed bytes in memory
+
+### `TransformString`
+
+```go
+func TransformString(data string, transform TransformFunc) (string, error)
+```
+
+Description:
+
+- applies `transform` to string data and returns transformed text in memory
+
+### `HashReader`
+
+```go
+func HashReader(src io.Reader, h hash.Hash) ([]byte, error)
+```
+
+Description:
+
+- reads `src` into `h` and returns digest bytes
+
+Notable behavior:
+
+- resets `h` before hashing
+- returns an error when `src` or `h` is nil
+
+### `HashBytes`
+
+```go
+func HashBytes(data []byte, h hash.Hash) []byte
+```
+
+Description:
+
+- returns digest bytes for `data`
+
+Notable behavior:
+
+- resets `h` before hashing
+- `h` must not be nil
+
+### `HashString`
+
+```go
+func HashString(data string, h hash.Hash) []byte
+```
+
+Description:
+
+- returns digest bytes for `data`
+
+### `HashHexReader`
+
+```go
+func HashHexReader(src io.Reader, h hash.Hash) (string, error)
+```
+
+Description:
+
+- reads `src` into `h` and returns the digest as lowercase hex
+
+### `HashHexBytes`
+
+```go
+func HashHexBytes(data []byte, h hash.Hash) string
+```
+
+Description:
+
+- returns the digest for `data` as lowercase hex
+
+### `HashHexString`
+
+```go
+func HashHexString(data string, h hash.Hash) string
+```
+
+Description:
+
+- returns the digest for `data` as lowercase hex
 
 ### `NewDir`
 
