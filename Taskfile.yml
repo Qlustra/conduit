@@ -23,16 +23,15 @@ tasks:
       - go test ./layout ./formats
       - go vet ./layout ./formats
 
-  # =======
-  # TOOLING
-  # =======
+  # ========
+  # Workflow
+  # ========
 
-  build:devimage:
-    desc: Build the local development image
+  go:
+    desc: Enter an interactive dev shell
     cmds:
-      - docker compose -f tooling/docker-compose.yaml build dev
-
-  enter:dev:
-    desc: Enter the dev image
+      - shade enter go
+  code:
+    desc: Open OpenCode in the devshell
     cmds:
-      - shade enter go -- bash
+      - shade enter opencode

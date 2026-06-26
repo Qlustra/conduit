@@ -1,7 +1,0 @@
-name: conduit-tooling
-
-services:
-  dev:
-    image: conduit-dev:go-latest
-    build:
-      context: ./go-dev
