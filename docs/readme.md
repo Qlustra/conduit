@@ -5,6 +5,7 @@ The module is split by package:
 - `github.com/qlustra/conduit`: operations, `Context`, sync policy, open policy, validation, and reporting types
 - `github.com/qlustra/conduit/layout`: structural nodes, directory slots, file slots, executable files, text templates
 - `github.com/qlustra/conduit/formats`: JSON, YAML, and TOML typed files
+- `github.com/qlustra/conduit/pipeline`: buffered file-processing tasks over layout nodes
 
 The docs are split by intent:
 
@@ -18,6 +19,7 @@ The docs are split by intent:
 - [Operations usage](usage/operations.md)
 - [Formats usage](usage/formats.md)
 - [States usage](usage/states.md)
+- [Pipeline usage](usage/pipeline.md)
 
 ## API reference
 
@@ -25,9 +27,11 @@ The docs are split by intent:
 - [Operations API](api/operations.md)
 - [Layout API](api/layout.md)
 - [Formats API](api/formats.md)
+- [Pipeline API](api/pipeline.md)
 
 ## Examples
 
 - [Layout examples](examples/layout.md)
 - [Operations examples](examples/operations.md)
 - [Formats examples](examples/formats.md)
+- [Pipeline examples](examples/pipeline.md)

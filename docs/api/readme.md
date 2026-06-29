@@ -5,11 +5,13 @@ This section documents the exported surface across the public packages:
 - `github.com/qlustra/conduit` for operations, `Context`, sync policy, open policy, validation, and reporting types
 - `github.com/qlustra/conduit/layout` for structural node types
 - `github.com/qlustra/conduit/formats` for codec-backed typed files
+- `github.com/qlustra/conduit/pipeline` for buffered file-processing tasks over layout nodes
 
 It is intentionally reference-oriented:
 
 - [Operations API](operations.md) covers the root `conduit` package.
 - [Layout API](layout.md) covers the `layout` package.
 - [Formats API](formats.md) covers the `formats` package.
+- [Pipeline API](pipeline.md) covers the `pipeline` package.
 
 For conceptual guidance, use the [usage docs](../usage/layout.md). For longer walkthroughs, use the [examples](../examples/layout.md).
