@@ -47,6 +47,7 @@ func Expand[O, T any](name string, origin Entries[O], target Entries[T]) *Expand
 	return &ExpandTask[O, T]{name: name, origin: origin, target: target}
 }
 
+// Name returns the task name.
 func (t *ExpandTask[O, T]) Name() string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -54,6 +55,7 @@ func (t *ExpandTask[O, T]) Name() string {
 	return t.name
 }
 
+// Run executes the expand task.
 func (t *ExpandTask[O, T]) Run(ctx context.Context, opts RunOptions) (TaskResult, error) {
 	return t.run(ctx, opts)
 }
@@ -71,6 +73,7 @@ func (s expandTaskRunSnapshot[O, T]) Run(ctx context.Context, opts RunOptions) (
 	return runExpandTask(ctx, opts, s.task)
 }
 
+// Filter keeps only origin items for which fn returns true.
 func (t *ExpandTask[O, T]) Filter(lctx layout.Context, fn TypedFilterFunc[O]) *ExpandTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -79,6 +82,7 @@ func (t *ExpandTask[O, T]) Filter(lctx layout.Context, fn TypedFilterFunc[O]) *E
 	return t
 }
 
+// Sort orders origin items before Extract receives them.
 func (t *ExpandTask[O, T]) Sort(fn TypedSortFunc[O]) *ExpandTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -87,6 +91,8 @@ func (t *ExpandTask[O, T]) Sort(fn TypedSortFunc[O]) *ExpandTask[O, T] {
 	return t
 }
 
+// Extract installs the required callback that emits zero or more target items
+// for each origin item.
 func (t *ExpandTask[O, T]) Extract(lctx layout.Context, fn ExtractFunc[O, T]) *ExpandTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -103,6 +109,7 @@ func (t *ExpandTask[O, T]) Extract(lctx layout.Context, fn ExtractFunc[O, T]) *E
 	return t
 }
 
+// EnsureDeep runs layout.EnsureDeep on each extracted target item.
 func (t *ExpandTask[O, T]) EnsureDeep(lctx layout.Context) *ExpandTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -110,6 +117,8 @@ func (t *ExpandTask[O, T]) EnsureDeep(lctx layout.Context) *ExpandTask[O, T] {
 	addTypedSink(t.name, &t.configErr, &t.sinks, typedSink{kind: typedSinkEnsureDeep, lctx: lctx})
 	return t
 }
+
+// DefaultDeep runs layout.DefaultDeep on each extracted target item.
 func (t *ExpandTask[O, T]) DefaultDeep() *ExpandTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -117,6 +126,8 @@ func (t *ExpandTask[O, T]) DefaultDeep() *ExpandTask[O, T] {
 	addTypedSink(t.name, &t.configErr, &t.sinks, typedSink{kind: typedSinkDefaultDeep})
 	return t
 }
+
+// RenderDeep runs layout.RenderDeep on each extracted target item.
 func (t *ExpandTask[O, T]) RenderDeep() *ExpandTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -124,6 +135,8 @@ func (t *ExpandTask[O, T]) RenderDeep() *ExpandTask[O, T] {
 	addTypedSink(t.name, &t.configErr, &t.sinks, typedSink{kind: typedSinkRenderDeep})
 	return t
 }
+
+// SyncDeep runs layout.SyncDeep on each extracted target item.
 func (t *ExpandTask[O, T]) SyncDeep(lctx layout.Context) *ExpandTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -131,6 +144,8 @@ func (t *ExpandTask[O, T]) SyncDeep(lctx layout.Context) *ExpandTask[O, T] {
 	addTypedSink(t.name, &t.configErr, &t.sinks, typedSink{kind: typedSinkSyncDeep, lctx: lctx})
 	return t
 }
+
+// ValidateDeep runs layout.ValidateDeep on each extracted target item.
 func (t *ExpandTask[O, T]) ValidateDeep(opts layout.ValidateOptions) *ExpandTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()

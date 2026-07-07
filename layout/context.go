@@ -130,8 +130,8 @@ const (
 	syncPolicyDiskMask   = SyncOnDiskUnknown | SyncOnDiskMissing | SyncOnDiskPresent
 )
 
-// Context carries per-operation filesystem modes, ensure and sync policy, and
-// optional reporting hooks.
+// Context carries per-operation filesystem modes, traversal policies, write
+// behavior, and optional reporting hooks.
 type Context struct {
 	// DirMode is used when creating directories.
 	DirMode os.FileMode
@@ -172,8 +172,9 @@ type Context struct {
 // library examples.
 //
 // It creates directories with mode 0o755, regular files with 0o644,
-// executables with 0o755, uses EnsureAll behavior, and uses SyncRewrite
-// behavior.
+// executables with 0o755, uses EnsureAll behavior, uses SyncRewrite behavior,
+// rejects symlink parents during mutating path resolution, and rewrites files
+// directly through WriteDirect.
 var DefaultContext = Context{
 	DirMode:          0o755,
 	FileMode:         0o644,

@@ -13,20 +13,32 @@ import (
 type DestinationMode uint8
 
 const (
+	// DestinationFlatten writes each item under the destination root using only
+	// the item's final path element.
 	DestinationFlatten DestinationMode = iota + 1
+
+	// DestinationPreserveStructure writes each item under the destination root
+	// using its relative item path.
 	DestinationPreserveStructure
 )
 
 // Destination describes a directory sink root and path shaping mode.
 type Destination struct {
+	// Root is the directory under which ToDir writes outputs.
 	Root layout.Dir
+
+	// Mode controls whether item paths are flattened or preserved.
 	Mode DestinationMode
 }
 
 // DestinationOption configures a ToDir destination.
 type DestinationOption func(*Destination)
 
+// Flatten configures ToDir to discard item path structure.
 func Flatten() DestinationOption { return func(dest *Destination) { dest.Mode = DestinationFlatten } }
+
+// PreserveStructure configures ToDir to keep each item's relative path under
+// the destination root.
 func PreserveStructure() DestinationOption {
 	return func(dest *Destination) { dest.Mode = DestinationPreserveStructure }
 }

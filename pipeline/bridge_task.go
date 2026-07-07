@@ -52,6 +52,7 @@ func Bridge[O, T any](name string, origin Entries[O], target Entries[T]) *Bridge
 	return &BridgeTask[O, T]{name: name, origin: origin, target: target}
 }
 
+// Name returns the task name.
 func (t *BridgeTask[O, T]) Name() string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -59,6 +60,7 @@ func (t *BridgeTask[O, T]) Name() string {
 	return t.name
 }
 
+// Run executes the bridge task.
 func (t *BridgeTask[O, T]) Run(ctx context.Context, opts RunOptions) (TaskResult, error) {
 	return t.run(ctx, opts)
 }
@@ -76,6 +78,7 @@ func (s bridgeTaskRunSnapshot[O, T]) Run(ctx context.Context, opts RunOptions) (
 	return runBridgeTask(ctx, opts, s.task)
 }
 
+// Filter keeps only origin items for which fn returns true.
 func (t *BridgeTask[O, T]) Filter(lctx layout.Context, fn TypedFilterFunc[O]) *BridgeTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -84,6 +87,7 @@ func (t *BridgeTask[O, T]) Filter(lctx layout.Context, fn TypedFilterFunc[O]) *B
 	return t
 }
 
+// Sort orders origin items before target planning.
 func (t *BridgeTask[O, T]) Sort(fn TypedSortFunc[O]) *BridgeTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -92,6 +96,8 @@ func (t *BridgeTask[O, T]) Sort(fn TypedSortFunc[O]) *BridgeTask[O, T] {
 	return t
 }
 
+// Rekey maps each origin item to a target key. Without Rekey, origin keys are
+// used unchanged.
 func (t *BridgeTask[O, T]) Rekey(lctx layout.Context, fn HandoverKeyFunc[O]) *BridgeTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -108,6 +114,8 @@ func (t *BridgeTask[O, T]) Rekey(lctx layout.Context, fn HandoverKeyFunc[O]) *Br
 	return t
 }
 
+// Populate installs the required callback that fills each target from its
+// matching origin.
 func (t *BridgeTask[O, T]) Populate(lctx layout.Context, fn BridgeFunc[O, T]) *BridgeTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -124,6 +132,7 @@ func (t *BridgeTask[O, T]) Populate(lctx layout.Context, fn BridgeFunc[O, T]) *B
 	return t
 }
 
+// EnsureDeep runs layout.EnsureDeep on each populated target item.
 func (t *BridgeTask[O, T]) EnsureDeep(lctx layout.Context) *BridgeTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -131,6 +140,8 @@ func (t *BridgeTask[O, T]) EnsureDeep(lctx layout.Context) *BridgeTask[O, T] {
 	addTypedSink(t.name, &t.configErr, &t.sinks, typedSink{kind: typedSinkEnsureDeep, lctx: lctx})
 	return t
 }
+
+// DefaultDeep runs layout.DefaultDeep on each populated target item.
 func (t *BridgeTask[O, T]) DefaultDeep() *BridgeTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -138,6 +149,8 @@ func (t *BridgeTask[O, T]) DefaultDeep() *BridgeTask[O, T] {
 	addTypedSink(t.name, &t.configErr, &t.sinks, typedSink{kind: typedSinkDefaultDeep})
 	return t
 }
+
+// RenderDeep runs layout.RenderDeep on each populated target item.
 func (t *BridgeTask[O, T]) RenderDeep() *BridgeTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -145,6 +158,8 @@ func (t *BridgeTask[O, T]) RenderDeep() *BridgeTask[O, T] {
 	addTypedSink(t.name, &t.configErr, &t.sinks, typedSink{kind: typedSinkRenderDeep})
 	return t
 }
+
+// SyncDeep runs layout.SyncDeep on each populated target item.
 func (t *BridgeTask[O, T]) SyncDeep(lctx layout.Context) *BridgeTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -152,6 +167,8 @@ func (t *BridgeTask[O, T]) SyncDeep(lctx layout.Context) *BridgeTask[O, T] {
 	addTypedSink(t.name, &t.configErr, &t.sinks, typedSink{kind: typedSinkSyncDeep, lctx: lctx})
 	return t
 }
+
+// ValidateDeep runs layout.ValidateDeep on each populated target item.
 func (t *BridgeTask[O, T]) ValidateDeep(opts layout.ValidateOptions) *BridgeTask[O, T] {
 	t.mu.Lock()
 	defer t.mu.Unlock()

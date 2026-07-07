@@ -9,16 +9,28 @@ import (
 // Entries describes a slot-backed set of typed entries.
 type Entries[T any] interface {
 	entrySet()
+
+	// snapshot returns the current cached entries as pipeline items.
 	snapshot() []Item[T]
+
+	// target composes or retrieves a target item for key.
 	target(key string) (Item[T], error)
+
+	// put updates the backing cache for key without writing to disk.
 	put(key string, value T)
 }
 
 // Entry describes one fixed slot-backed typed entry.
 type Entry[T any] interface {
 	entryRef()
+
+	// target composes or retrieves the target item.
 	target() (Item[T], error)
+
+	// put updates the backing cache without writing to disk.
 	put(value T)
+
+	// key returns the fixed entry key.
 	key() string
 }
 

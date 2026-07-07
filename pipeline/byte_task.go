@@ -115,71 +115,88 @@ func (t *byteTask) Name() string {
 
 	return t.name
 }
-func (t *ByteSingleTask) Name() string { return t.task.Name() }
-func (t *ByteMultiTask) Name() string  { return t.task.Name() }
 
+// Name returns the task name.
+func (t *ByteSingleTask) Name() string { return t.task.Name() }
+
+// Name returns the task name.
+func (t *ByteMultiTask) Name() string { return t.task.Name() }
+
+// Run executes the byte task.
 func (t *ByteSingleTask) Run(ctx context.Context, opts RunOptions) (TaskResult, error) {
 	return t.task.run(ctx, opts)
 }
 
 func (t *ByteSingleTask) snapshotRunnable() Runnable { return t.task.snapshotRunnable() }
 
+// Run executes the byte task.
 func (t *ByteMultiTask) Run(ctx context.Context, opts RunOptions) (TaskResult, error) {
 	return t.task.run(ctx, opts)
 }
 
 func (t *ByteMultiTask) snapshotRunnable() Runnable { return t.task.snapshotRunnable() }
 
+// Transform rewrites the single byte subject in memory using fn.
 func (t *ByteSingleTask) Transform(lctx layout.Context, fn TransformFunc) *ByteSingleTask {
 	t.task.addStep(byteStep{kind: byteStepTransform, lctx: lctx, transform: fn})
 	return t
 }
 
+// Split expands the single byte subject into a multi-subject byte task.
 func (t *ByteSingleTask) Split(lctx layout.Context, fn SplitFunc) *ByteMultiTask {
 	t.task.addStep(byteStep{kind: byteStepSplit, lctx: lctx, split: fn})
 	return &ByteMultiTask{task: t.task}
 }
 
+// WriteBack writes the final byte subject back to its source file.
 func (t *ByteSingleTask) WriteBack(lctx layout.Context) *ByteSingleTask {
 	t.task.setSink(byteSink{kind: byteSinkWriteBack, lctx: lctx})
 	return t
 }
 
+// To writes the final single byte subject to dest.
 func (t *ByteSingleTask) To(lctx layout.Context, dest layout.File) *ByteSingleTask {
 	t.task.setSink(byteSink{kind: byteSinkToFile, lctx: lctx, file: dest})
 	return t
 }
 
+// Transform rewrites each byte subject in memory using fn.
 func (t *ByteMultiTask) Transform(lctx layout.Context, fn TransformFunc) *ByteMultiTask {
 	t.task.addStep(byteStep{kind: byteStepTransform, lctx: lctx, transform: fn})
 	return t
 }
 
+// Filter keeps only byte subjects for which fn returns true.
 func (t *ByteMultiTask) Filter(lctx layout.Context, fn FilterFunc) *ByteMultiTask {
 	t.task.addStep(byteStep{kind: byteStepFilter, lctx: lctx, filter: fn})
 	return t
 }
 
+// Sort orders byte subjects using fn.
 func (t *ByteMultiTask) Sort(fn SortFunc) *ByteMultiTask {
 	t.task.addStep(byteStep{kind: byteStepSort, sort: fn})
 	return t
 }
 
+// Concat reduces all byte subjects into one single byte subject.
 func (t *ByteMultiTask) Concat(lctx layout.Context, opts layout.ConcatOptions) *ByteSingleTask {
 	t.task.addStep(byteStep{kind: byteStepConcat, lctx: lctx, concatOptions: opts})
 	return &ByteSingleTask{task: t.task}
 }
 
+// WriteBack writes each final byte subject back to its source file.
 func (t *ByteMultiTask) WriteBack(lctx layout.Context) *ByteMultiTask {
 	t.task.setSink(byteSink{kind: byteSinkWriteBack, lctx: lctx})
 	return t
 }
 
+// ToDir writes final byte subjects under dest according to opt.
 func (t *ByteMultiTask) ToDir(lctx layout.Context, dest layout.Dir, opt DestinationOption) *ByteMultiTask {
 	t.task.setSink(byteSink{kind: byteSinkToDir, lctx: lctx, destination: newDestination(dest, opt)})
 	return t
 }
 
+// ToFiles writes final byte subjects to files returned by mapper.
 func (t *ByteMultiTask) ToFiles(lctx layout.Context, mapper FileMapper) *ByteMultiTask {
 	t.task.setSink(byteSink{kind: byteSinkToFiles, lctx: lctx, mapper: mapper})
 	return t
@@ -246,11 +263,23 @@ func (s byteTaskRunSnapshot) Run(ctx context.Context, opts RunOptions) (TaskResu
 
 // Split is the operation-scoped helper passed to SplitFunc callbacks.
 type Split interface {
+	// Read returns the current item bytes, materializing file-backed data when
+	// necessary.
 	Read() ([]byte, error)
+
+	// Emit appends item to the split output.
 	Emit(item Item[Blob])
+
+	// EmitBytes appends an in-memory byte blob named name.
 	EmitBytes(name string, data []byte)
+
+	// EmitString appends an in-memory string blob named name.
 	EmitString(name string, data string)
+
+	// EmitFile appends a file-backed byte item.
 	EmitFile(file layout.File)
+
+	// EmitBlob appends blob as an in-memory byte item.
 	EmitBlob(blob Blob)
 }
 
@@ -276,7 +305,11 @@ func (s *byteSplitCollector) EmitBlob(blob Blob)                  { s.Emit(itemF
 // Filter
 
 // Filter is the operation-scoped helper passed to FilterFunc callbacks.
-type Filter interface{ Read() ([]byte, error) }
+type Filter interface {
+	// Read returns the current item bytes, materializing file-backed data when
+	// necessary.
+	Read() ([]byte, error)
+}
 
 type byteFilterScope struct {
 	ctx  context.Context

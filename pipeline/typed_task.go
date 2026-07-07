@@ -99,97 +99,129 @@ func (t *TypedTask[T]) Name() string {
 
 	return t.name
 }
-func (t *TypedSingleTask[T]) Name() string { return t.task.Name() }
-func (t *TypedMultiTask[T]) Name() string  { return t.task.Name() }
 
+// Name returns the task name.
+func (t *TypedSingleTask[T]) Name() string { return t.task.Name() }
+
+// Name returns the task name.
+func (t *TypedMultiTask[T]) Name() string { return t.task.Name() }
+
+// Run executes the typed task.
 func (t *TypedTask[T]) Run(ctx context.Context, opts RunOptions) (TaskResult, error) {
 	return t.run(ctx, opts)
 }
 
+// Run executes the typed task.
 func (t *TypedSingleTask[T]) Run(ctx context.Context, opts RunOptions) (TaskResult, error) {
 	return t.task.run(ctx, opts)
 }
 
 func (t *TypedSingleTask[T]) snapshotRunnable() Runnable { return t.task.snapshotRunnable() }
 
+// Run executes the typed task.
 func (t *TypedMultiTask[T]) Run(ctx context.Context, opts RunOptions) (TaskResult, error) {
 	return t.task.run(ctx, opts)
 }
 
 func (t *TypedMultiTask[T]) snapshotRunnable() Runnable { return t.task.snapshotRunnable() }
 
+// Process updates the single typed item while preserving its type.
 func (t *TypedSingleTask[T]) Process(lctx layout.Context, fn ProcessFunc[T]) *TypedSingleTask[T] {
 	t.task.addStep(typedStep[T]{kind: typedStepProcess, lctx: lctx, process: fn})
 	return t
 }
 
+// Split expands the single typed item into a multi-subject typed task.
 func (t *TypedSingleTask[T]) Split(lctx layout.Context, fn TypedSplitFunc[T]) *TypedMultiTask[T] {
 	t.task.addStep(typedStep[T]{kind: typedStepSplit, lctx: lctx, split: fn})
 	return &TypedMultiTask[T]{task: t.task}
 }
 
+// EnsureDeep runs layout.EnsureDeep on the final typed item.
 func (t *TypedSingleTask[T]) EnsureDeep(lctx layout.Context) *TypedSingleTask[T] {
 	t.task.addSink(typedSink{kind: typedSinkEnsureDeep, lctx: lctx})
 	return t
 }
+
+// DefaultDeep runs layout.DefaultDeep on the final typed item.
 func (t *TypedSingleTask[T]) DefaultDeep() *TypedSingleTask[T] {
 	t.task.addSink(typedSink{kind: typedSinkDefaultDeep})
 	return t
 }
+
+// RenderDeep runs layout.RenderDeep on the final typed item.
 func (t *TypedSingleTask[T]) RenderDeep() *TypedSingleTask[T] {
 	t.task.addSink(typedSink{kind: typedSinkRenderDeep})
 	return t
 }
+
+// SyncDeep runs layout.SyncDeep on the final typed item.
 func (t *TypedSingleTask[T]) SyncDeep(lctx layout.Context) *TypedSingleTask[T] {
 	t.task.addSink(typedSink{kind: typedSinkSyncDeep, lctx: lctx})
 	return t
 }
+
+// ValidateDeep runs layout.ValidateDeep on the final typed item.
 func (t *TypedSingleTask[T]) ValidateDeep(opts layout.ValidateOptions) *TypedSingleTask[T] {
 	t.task.addSink(typedSink{kind: typedSinkValidateDeep, validate: opts})
 	return t
 }
 
+// Process updates each typed item while preserving its type.
 func (t *TypedMultiTask[T]) Process(lctx layout.Context, fn ProcessFunc[T]) *TypedMultiTask[T] {
 	t.task.addStep(typedStep[T]{kind: typedStepProcess, lctx: lctx, process: fn})
 	return t
 }
 
+// Filter keeps only typed items for which fn returns true.
 func (t *TypedMultiTask[T]) Filter(lctx layout.Context, fn TypedFilterFunc[T]) *TypedMultiTask[T] {
 	t.task.addStep(typedStep[T]{kind: typedStepFilter, lctx: lctx, filter: fn})
 	return t
 }
 
+// Sort orders typed items using fn.
 func (t *TypedMultiTask[T]) Sort(fn TypedSortFunc[T]) *TypedMultiTask[T] {
 	t.task.addStep(typedStep[T]{kind: typedStepSort, sort: fn})
 	return t
 }
 
+// Split expands each typed item into zero or more same-typed items.
 func (t *TypedMultiTask[T]) Split(lctx layout.Context, fn TypedSplitFunc[T]) *TypedMultiTask[T] {
 	t.task.addStep(typedStep[T]{kind: typedStepSplit, lctx: lctx, split: fn})
 	return t
 }
 
+// Concat reduces all typed items into one single typed item.
 func (t *TypedMultiTask[T]) Concat(lctx layout.Context, fn TypedConcatFunc[T]) *TypedSingleTask[T] {
 	t.task.addStep(typedStep[T]{kind: typedStepConcat, lctx: lctx, concat: fn})
 	return &TypedSingleTask[T]{task: t.task}
 }
 
+// EnsureDeep runs layout.EnsureDeep on each final typed item.
 func (t *TypedMultiTask[T]) EnsureDeep(lctx layout.Context) *TypedMultiTask[T] {
 	t.task.addSink(typedSink{kind: typedSinkEnsureDeep, lctx: lctx})
 	return t
 }
+
+// DefaultDeep runs layout.DefaultDeep on each final typed item.
 func (t *TypedMultiTask[T]) DefaultDeep() *TypedMultiTask[T] {
 	t.task.addSink(typedSink{kind: typedSinkDefaultDeep})
 	return t
 }
+
+// RenderDeep runs layout.RenderDeep on each final typed item.
 func (t *TypedMultiTask[T]) RenderDeep() *TypedMultiTask[T] {
 	t.task.addSink(typedSink{kind: typedSinkRenderDeep})
 	return t
 }
+
+// SyncDeep runs layout.SyncDeep on each final typed item.
 func (t *TypedMultiTask[T]) SyncDeep(lctx layout.Context) *TypedMultiTask[T] {
 	t.task.addSink(typedSink{kind: typedSinkSyncDeep, lctx: lctx})
 	return t
 }
+
+// ValidateDeep runs layout.ValidateDeep on each final typed item.
 func (t *TypedMultiTask[T]) ValidateDeep(opts layout.ValidateOptions) *TypedMultiTask[T] {
 	t.task.addSink(typedSink{kind: typedSinkValidateDeep, validate: opts})
 	return t
@@ -362,7 +394,10 @@ func runTypedSteps[T any](ctx context.Context, fallback layout.Context, kind sub
 
 // TypedSplit emits same-typed items from a typed split callback.
 type TypedSplit[T any] interface {
+	// Emit appends item to the split output.
 	Emit(item Item[T])
+
+	// EmitValue appends value using key for item metadata.
 	EmitValue(key string, value T)
 }
 

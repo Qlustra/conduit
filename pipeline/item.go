@@ -11,21 +11,33 @@ import (
 
 // Blob is an opaque byte subject with pipeline metadata.
 type Blob struct {
-	Key  string
+	// Key is the logical identity used by duplicate handling and results.
+	Key string
+	// Name is the display or basename-style name for the blob.
 	Name string
+	// Path is the relative path used by directory sinks when preserving structure.
 	Path string
+	// Data is the in-memory byte payload. When empty, file-backed items may read
+	// from File instead.
 	Data []byte
 }
 
 // Item is one typed unit flowing through a task.
 type Item[T any] struct {
-	Key   string
-	Name  string
-	Path  string
-	File  layout.File
-	Dir   layout.Dir
+	// Key is the logical identity used by duplicate handling and results.
+	Key string
+	// Name is the display or basename-style name for the item.
+	Name string
+	// Path is the relative path used by directory sinks and results.
+	Path string
+	// File is the backing file for file-backed items.
+	File layout.File
+	// Dir is the backing directory for directory-backed typed items.
+	Dir layout.Dir
+	// Value is the typed payload flowing through typed tasks.
 	Value T
-	Data  []byte
+	// Data is the in-memory byte payload for byte tasks.
+	Data []byte
 }
 
 type subjectKind uint8

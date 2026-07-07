@@ -24,7 +24,12 @@ const (
 
 // Context configures pipeline execution.
 type Context struct {
-	Layout           layout.Context
+	// Layout is the fallback layout context used by operations that do not provide
+	// a complete operation-level layout.Context.
+	Layout layout.Context
+
+	// DuplicateOutputs controls how byte sinks and handover tasks handle multiple
+	// planned writes or target keys for the same destination.
 	DuplicateOutputs DuplicateOutputPolicy
 }
 

@@ -272,8 +272,12 @@ func (f File) AppendFiles(ctx Context, srcs ...File) error {
 	return nil
 }
 
-// WriteBytes creates parent directories if needed and rewrites the file
-// contents.
+// WriteBytes creates parent directories if needed and rewrites the file contents.
+//
+// With WriteDirect it rewrites the destination path directly. With
+// WriteAtomicReplace it writes data to a temporary file in the configured
+// TempFilePlacement and renames that file over the destination only when the
+// filesystem can guarantee atomic replacement.
 func (f File) WriteBytes(data []byte, ctx Context) error {
 	switch ctx.writePolicy() {
 	case WriteDirect:

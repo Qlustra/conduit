@@ -7,7 +7,10 @@ import (
 
 // Runnable is a task that can be executed by a Pipeline.
 type Runnable interface {
+	// Name returns the task name used in results and errors.
 	Name() string
+
+	// Run executes the task with the supplied options.
 	Run(ctx context.Context, opts RunOptions) (TaskResult, error)
 }
 
@@ -71,5 +74,6 @@ func (p *Pipeline) snapshotTasks() []Runnable {
 
 // RunOptions configures pipeline execution.
 type RunOptions struct {
+	// Context is required and supplies layout and duplicate-output policy.
 	Context Context
 }

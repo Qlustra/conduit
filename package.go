@@ -106,13 +106,19 @@ const (
 )
 
 const (
-	WriteDirect        WritePolicy = layout.WriteDirect
+	// WriteDirect rewrites destination file contents directly.
+	WriteDirect WritePolicy = layout.WriteDirect
+	// WriteAtomicReplace stages content in a temp file and atomically replaces
+	// the destination when the filesystem can guarantee it.
 	WriteAtomicReplace WritePolicy = layout.WriteAtomicReplace
 )
 
 const (
-	TempFileSystem   TempFilePlacement = layout.TempFileSystem
-	TempFileDir      TempFilePlacement = layout.TempFileDir
+	// TempFileSystem creates atomic-write temp files in the system temp directory.
+	TempFileSystem TempFilePlacement = layout.TempFileSystem
+	// TempFileDir creates atomic-write temp files in Context.TempDir.
+	TempFileDir TempFilePlacement = layout.TempFileDir
+	// TempFileAdjacent creates atomic-write temp files next to the destination.
 	TempFileAdjacent TempFilePlacement = layout.TempFileAdjacent
 )
 
