@@ -4,6 +4,12 @@ import (
 	"github.com/qlustra/conduit/layout"
 )
 
+// Dir is an alias for layout.Dir.
+type Dir = layout.Dir
+
+// File is an alias for layout.File.
+type File = layout.File
+
 // Context is an alias for layout.Context.
 //
 // Use it from the root conduit package when you want the convenience facade.
@@ -27,6 +33,18 @@ type EnsurePolicy = layout.EnsurePolicy
 // It controls whether mutating filesystem operations reject symlink parents
 // while resolving paths. See layout.PathSafetyPolicy for details.
 type PathSafetyPolicy = layout.PathSafetyPolicy
+
+// WritePolicy is an alias for layout.WritePolicy.
+//
+// It controls whether File.WriteBytes rewrites directly or uses per-file atomic
+// replacement. See layout.WritePolicy for details.
+type WritePolicy = layout.WritePolicy
+
+// TempFilePlacement is an alias for layout.TempFilePlacement.
+//
+// It controls where atomic writes stage their temporary file. See
+// layout.TempFilePlacement for details.
+type TempFilePlacement = layout.TempFilePlacement
 
 // OpenPolicy is an alias for layout.OpenPolicy.
 //
@@ -85,6 +103,17 @@ const (
 const (
 	PathSafetyRejectSymlinkParents PathSafetyPolicy = layout.PathSafetyRejectSymlinkParents
 	PathSafetyFollowSymlinks       PathSafetyPolicy = layout.PathSafetyFollowSymlinks
+)
+
+const (
+	WriteDirect        WritePolicy = layout.WriteDirect
+	WriteAtomicReplace WritePolicy = layout.WriteAtomicReplace
+)
+
+const (
+	TempFileSystem   TempFilePlacement = layout.TempFileSystem
+	TempFileDir      TempFilePlacement = layout.TempFileDir
+	TempFileAdjacent TempFilePlacement = layout.TempFileAdjacent
 )
 
 const (

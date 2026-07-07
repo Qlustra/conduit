@@ -152,7 +152,9 @@ Notable behavior:
 - `Open*` helpers create parent directories only when the selected `OpenPolicy` adds `os.O_CREATE`
 - concurrent append calls rely on OS append mode for destination offset management, but no whole-call atomicity is guaranteed
 - `Concat*` and `Transform*` helpers buffer complete output before rewriting the destination, so failed reads or transforms leave the destination untouched
-- `WriteBytes` always rewrites the file contents
+- `WriteBytes` rewrites file contents directly by default; set `Context.WritePolicy` to `WriteAtomicReplace` for per-file atomic replacement
+- atomic replacement stages temporary files in the system temp directory by default and fails rather than creating adjacent watcher noise when an atomic rename cannot be guaranteed
+- set `Context.TempFilePlacement` to `TempFileAdjacent` to opt into adjacent temp files, or `TempFileDir` plus `Context.TempDir` to use a specific staging directory
 - mutating `File` operations reject symlink leaves; `Link` is the type that manages symlink entries intentionally
 - mutating `File` operations reject symlink parents by default; set `Context.PathSafetyPolicy` to `PathSafetyFollowSymlinks` to opt in to path-following behavior
 - `IsExecutable` returns false for missing paths and non-regular filesystem entries
@@ -798,6 +800,9 @@ type Context struct {
 	EnsurePolicy     EnsurePolicy
 	SyncPolicy       SyncPolicy
 	PathSafetyPolicy PathSafetyPolicy
+	WritePolicy       WritePolicy
+	TempFilePlacement TempFilePlacement
+	TempDir           Dir
 	Reporter         Reporter
 }
 ```
@@ -810,6 +815,9 @@ Fields:
 - `EnsurePolicy`: selects which node kinds `Ensure` and `EnsureDeep` may materialize
 - `SyncPolicy`: selects which typed memory states `Sync` and `SyncDeep` may write, with optional disk-state filters
 - `PathSafetyPolicy`: controls whether mutating typed filesystem operations reject symlink parents during path resolution
+- `WritePolicy`: selects direct rewrites or per-file atomic replacement for `File.WriteBytes`
+- `TempFilePlacement`: selects where atomic writes create their temporary file
+- `TempDir`: custom staging directory used when `TempFilePlacement` is `TempFileDir`
 - `Reporter`: optional sink for per-path deep-operation results
 
 ### `DefaultContext`
@@ -830,6 +838,7 @@ Context{
 	EnsurePolicy:     EnsureAll,
 	SyncPolicy:       SyncRewrite,
 	PathSafetyPolicy: PathSafetyRejectSymlinkParents,
+	WritePolicy:      WriteDirect,
 }
 ```
 
@@ -862,6 +871,37 @@ Constants:
 
 - `PathSafetyRejectSymlinkParents`: reject existing symlink parents during mutating path resolution
 - `PathSafetyFollowSymlinks`: preserve path-following behavior for mutating operations
+
+### `WritePolicy`
+
+```go
+type WritePolicy uint8
+```
+
+Constants:
+
+- `WriteDirect`: rewrite the destination path directly
+- `WriteAtomicReplace`: write to a temporary file, then atomically replace the destination when the filesystem can guarantee an atomic rename
+
+Atomic replacement is per-file only. It is not a multi-file transaction and does
+not roll back earlier successful writes when a later write fails.
+
+### `TempFilePlacement`
+
+```go
+type TempFilePlacement uint8
+```
+
+Constants:
+
+- `TempFileSystem`: create temporary files in the system temp directory
+- `TempFileDir`: create temporary files in `Context.TempDir`
+- `TempFileAdjacent`: create temporary files next to the destination file
+
+`TempFileSystem` is the zero-value default. It avoids temp files beside watched
+destinations. If the temp file cannot be atomically renamed over the destination,
+the write fails with corrective actions instead of falling back to adjacent temp
+files.
 
 ### `EnsurePolicy`
 

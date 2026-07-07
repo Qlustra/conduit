@@ -58,6 +58,10 @@ type Context struct {
 `Context` is required. `DefaultContext` embeds `layout.DefaultContext` and uses
 `DuplicateOutputFail`.
 
+Byte sinks and typed `SyncDeep` use their operation-level `layout.Context` for
+filesystem write behavior. Set `layout.Context.WritePolicy` to
+`layout.WriteAtomicReplace` to request per-file atomic replacement.
+
 Duplicate policies:
 
 - `DuplicateOutputUnset`: invalid for execution.

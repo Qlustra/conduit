@@ -24,9 +24,6 @@ features.
 2. Review `TaskResult.Handover` after real examples and tests. Keep one general
    field unless separate `Bridge`, `Compile`, and `Expand` result fields prove
    clearer.
-3. Add atomic write support after the thread-safety contract. Start with
-   per-file atomic replacement semantics rather than promising a multi-file
-   transaction.
 
 ## Handover Follow-Ups
 

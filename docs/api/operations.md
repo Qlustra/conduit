@@ -22,6 +22,7 @@ conduit.Context{
 	EnsurePolicy:     conduit.EnsureAll,
 	SyncPolicy:       conduit.SyncRewrite,
 	PathSafetyPolicy: conduit.PathSafetyRejectSymlinkParents,
+	WritePolicy:      conduit.WriteDirect,
 }
 ```
 
@@ -31,6 +32,8 @@ Notable behavior:
 - `ExecMode` is applied by `Exec` operations
 - `SyncPolicy` defaults to `SyncRewrite`
 - `PathSafetyPolicy` defaults to rejecting symlink parents during mutating path resolution
+- `WritePolicy` defaults to direct rewrites
+- atomic writes stage temporary files in the system temp directory by default
 
 ## Types
 
@@ -44,6 +47,9 @@ type Context struct {
 	EnsurePolicy     conduit.EnsurePolicy
 	SyncPolicy       conduit.SyncPolicy
 	PathSafetyPolicy conduit.PathSafetyPolicy
+	WritePolicy       conduit.WritePolicy
+	TempFilePlacement conduit.TempFilePlacement
+	TempDir           conduit.Dir
 	Reporter         conduit.Reporter
 }
 ```
@@ -56,6 +62,9 @@ Fields:
 - `EnsurePolicy`: selects which node kinds `Ensure` and `EnsureDeep` may materialize
 - `SyncPolicy`: selects which typed memory states `Sync` and `SyncDeep` may write, with optional disk-state filters
 - `PathSafetyPolicy`: controls whether mutating typed filesystem operations reject symlink parents during path resolution
+- `WritePolicy`: selects direct rewrites or per-file atomic replacement for `File.WriteBytes`
+- `TempFilePlacement`: selects where atomic writes create their temporary file
+- `TempDir`: custom staging directory used when `TempFilePlacement` is `TempFileDir`
 - `Reporter`: optional sink for per-path deep-operation results
 
 Notable behavior:
@@ -65,6 +74,8 @@ Notable behavior:
 - when `SyncPolicy` has no memory-state bits, sync operations fall back to `SyncRewrite`
 - when `SyncPolicy` has no disk-state bits, sync operations do not restrict by disk state
 - when `PathSafetyPolicy` is zero, mutating typed filesystem operations reject symlink parents
+- when `WritePolicy` is zero, `File.WriteBytes` rewrites directly
+- when `TempFilePlacement` is zero, atomic writes use the system temp directory
 - when `Reporter` is nil, deep operations do not collect traversal reports
 
 ### `EnsurePolicy`
@@ -107,6 +118,41 @@ Constants:
 
 - `PathSafetyRejectSymlinkParents`: reject existing symlink parents during mutating path resolution
 - `PathSafetyFollowSymlinks`: preserve path-following behavior for mutating operations
+
+### `WritePolicy`
+
+```go
+type WritePolicy uint8
+```
+
+Description:
+
+- controls how `File.WriteBytes`, typed file `Save`, and sync operations replace destination file content
+
+Constants:
+
+- `WriteDirect`: rewrite the destination path directly
+- `WriteAtomicReplace`: write to a temporary file, then atomically replace the destination when the filesystem can guarantee an atomic rename
+
+### `TempFilePlacement`
+
+```go
+type TempFilePlacement uint8
+```
+
+Description:
+
+- controls where atomic writes stage their temporary file
+
+Constants:
+
+- `TempFileSystem`: create temporary files in the system temp directory
+- `TempFileDir`: create temporary files in `Context.TempDir`
+- `TempFileAdjacent`: create temporary files next to the destination file
+
+`TempFileSystem` avoids watcher noise near destination paths. If the staged temp
+file cannot be atomically renamed over the destination, the operation fails with
+corrective actions instead of falling back to adjacent temp files.
 
 ### `OpenPolicy`
 

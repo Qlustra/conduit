@@ -41,6 +41,11 @@ pctx := pipeline.DefaultContext
 pctx.DuplicateOutputs = pipeline.DuplicateOutputLastWins
 ```
 
+Pipeline writes inherit `layout.Context` write behavior. To request per-file
+atomic replacement for byte sinks or typed `SyncDeep`, set
+`pctx.Layout.WritePolicy = layout.WriteAtomicReplace` or pass an operation-level
+layout context with that policy.
+
 ## Byte tasks
 
 Use file tasks when inputs are `layout.File` handles:

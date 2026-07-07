@@ -275,6 +275,17 @@ func (f File) AppendFiles(ctx Context, srcs ...File) error {
 // WriteBytes creates parent directories if needed and rewrites the file
 // contents.
 func (f File) WriteBytes(data []byte, ctx Context) error {
+	switch ctx.writePolicy() {
+	case WriteDirect:
+		return f.writeBytesDirect(data, ctx)
+	case WriteAtomicReplace:
+		return f.writeBytesAtomic(data, ctx)
+	default:
+		return fmt.Errorf("unsupported write policy %d", ctx.writePolicy())
+	}
+}
+
+func (f File) writeBytesDirect(data []byte, ctx Context) error {
 	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
 		return err
 	}
@@ -282,6 +293,50 @@ func (f File) WriteBytes(data []byte, ctx Context) error {
 		return err
 	}
 	return os.WriteFile(f.path, data, ctx.FileMode)
+}
+
+func (f File) writeBytesAtomic(data []byte, ctx Context) error {
+	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+		return err
+	}
+	parent := filepath.Dir(f.Path())
+	if err := os.MkdirAll(parent, ctx.DirMode); err != nil {
+		return err
+	}
+
+	temp, err := f.createAtomicTemp(ctx)
+	if err != nil {
+		return err
+	}
+	tempPath := temp.Name()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = os.Remove(tempPath)
+		}
+	}()
+
+	if _, err := temp.Write(data); err != nil {
+		_ = temp.Close()
+		return err
+	}
+	if err := temp.Chmod(ctx.FileMode); err != nil {
+		_ = temp.Close()
+		return err
+	}
+	if err := temp.Sync(); err != nil {
+		_ = temp.Close()
+		return err
+	}
+	if err := temp.Close(); err != nil {
+		return err
+	}
+
+	if err := os.Rename(tempPath, f.Path()); err != nil {
+		return atomicReplaceError(f.Path(), tempPath, err)
+	}
+	cleanup = false
+	return nil
 }
 
 // ReadBytes reads the file contents.
@@ -398,6 +453,37 @@ func (f File) openAppendDestination(ctx Context) (*os.File, error) {
 		return nil, err
 	}
 	return os.OpenFile(f.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, ctx.FileMode)
+}
+
+func (f File) createAtomicTemp(ctx Context) (*os.File, error) {
+	prefix := "conduit-" + filepath.Base(f.Path()) + "-"
+	switch ctx.tempFilePlacement() {
+	case TempFileSystem:
+		return os.CreateTemp("", prefix)
+	case TempFileDir:
+		if ctx.TempDir.Path() == "" {
+			return nil, fmt.Errorf("atomic write temp directory is required when TempFilePlacement is TempFileDir")
+		}
+		if err := guardPathMutation(ctx.TempDir.Path(), ctx.pathSafetyPolicy(), expectDir); err != nil {
+			return nil, err
+		}
+		if err := os.MkdirAll(ctx.TempDir.Path(), ctx.DirMode); err != nil {
+			return nil, err
+		}
+		return os.CreateTemp(ctx.TempDir.Path(), prefix)
+	case TempFileAdjacent:
+		return os.CreateTemp(filepath.Dir(f.Path()), "."+prefix)
+	default:
+		return nil, fmt.Errorf("unsupported temp file placement %d", ctx.tempFilePlacement())
+	}
+}
+
+func atomicReplaceError(dest string, temp string, err error) error {
+	reason := "rename could not atomically replace the destination"
+	if isCrossDeviceRenameError(err) {
+		reason = "temp file is not on the same filesystem as destination"
+	}
+	return fmt.Errorf("atomic replace failed for %s: %s: %w\ncorrective actions:\n- set Context.TempFilePlacement = TempFileAdjacent if watcher noise is acceptable\n- set Context.TempFilePlacement = TempFileDir and Context.TempDir to a directory on the same filesystem\n- set Context.WritePolicy = WriteDirect if atomic replacement is not required\ntemp file: %s", dest, reason, err, temp)
 }
 
 // Copy

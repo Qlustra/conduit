@@ -330,6 +330,23 @@ func TestPipelineOperationContexts(t *testing.T) {
 	}
 }
 
+func TestPipelineByteSinkUsesOperationWritePolicy(t *testing.T) {
+	dst := layout.NewFile(filepath.Join(t.TempDir(), "out.txt"))
+	writeTestFile(t, dst, "original")
+	atomicCtx := layout.DefaultContext
+	atomicCtx.WritePolicy = layout.WriteAtomicReplace
+	atomicCtx.TempFilePlacement = layout.TempFileDir
+
+	p := New(TaskFromBlob("atomic", Blob{Name: "in.txt", Data: []byte("new")}).To(atomicCtx, dst))
+	_, err := p.Run(context.Background(), RunOptions{Context: DefaultContext})
+	if err == nil || !strings.Contains(err.Error(), "TempFileDir") {
+		t.Fatalf("Run() error = %v, want TempFileDir error", err)
+	}
+	if got := readTestFile(t, dst); got != "original" {
+		t.Fatalf("output after failed atomic write = %q, want original", got)
+	}
+}
+
 func TestPipelineRunSnapshotsTaskList(t *testing.T) {
 	first := &blockingRunnable{name: "first", started: make(chan struct{}), release: make(chan struct{})}
 	second := &blockingRunnable{name: "second"}

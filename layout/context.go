@@ -16,6 +16,32 @@ const (
 	PathSafetyFollowSymlinks
 )
 
+// WritePolicy controls how File.WriteBytes replaces destination content.
+type WritePolicy uint8
+
+const (
+	// WriteDirect rewrites the destination path directly.
+	WriteDirect WritePolicy = iota
+
+	// WriteAtomicReplace writes to a temporary file, then atomically replaces the
+	// destination when the filesystem can guarantee an atomic rename.
+	WriteAtomicReplace
+)
+
+// TempFilePlacement controls where atomic writes create their temporary file.
+type TempFilePlacement uint8
+
+const (
+	// TempFileSystem creates temporary files in the system temp directory.
+	TempFileSystem TempFilePlacement = iota
+
+	// TempFileDir creates temporary files in Context.TempDir.
+	TempFileDir
+
+	// TempFileAdjacent creates temporary files next to the destination file.
+	TempFileAdjacent
+)
+
 // EnsurePolicy is a bitmask that controls which node kinds Ensure and
 // EnsureDeep may materialize.
 //
@@ -128,6 +154,15 @@ type Context struct {
 	// symlink parents during path resolution.
 	PathSafetyPolicy PathSafetyPolicy
 
+	// WritePolicy controls how File.WriteBytes replaces destination content.
+	WritePolicy WritePolicy
+
+	// TempFilePlacement controls where atomic writes create their temporary file.
+	TempFilePlacement TempFilePlacement
+
+	// TempDir is used by atomic writes when TempFilePlacement is TempFileDir.
+	TempDir Dir
+
 	// Reporter, when non-nil, receives path-level results during deep
 	// traversal.
 	Reporter Reporter
@@ -228,6 +263,14 @@ func (ctx Context) syncPolicy() SyncPolicy {
 
 func (ctx Context) pathSafetyPolicy() PathSafetyPolicy {
 	return ctx.PathSafetyPolicy
+}
+
+func (ctx Context) writePolicy() WritePolicy {
+	return ctx.WritePolicy
+}
+
+func (ctx Context) tempFilePlacement() TempFilePlacement {
+	return ctx.TempFilePlacement
 }
 
 func (p SyncPolicy) normalizedMemory() SyncPolicy {
