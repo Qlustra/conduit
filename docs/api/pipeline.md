@@ -87,6 +87,8 @@ type TaskResult struct {
 	ValidateDeep DeepOperationResult
 
 	WriteBack ByteWriteResult
+	ToTarget  ByteWriteResult
+	ToTargets ByteWriteResult
 	To        ByteWriteResult
 	ToDir     ByteWriteResult
 	ToFiles   ByteWriteResult
@@ -182,12 +184,29 @@ type Blob struct {
 }
 ```
 
+Shared byte subjects:
+
+- `type BlobSubject struct { ... }`
+- `BlobSubjectFromBlob(blob Blob) *BlobSubject`
+- `BlobSubjectForFile(file layout.File) *BlobSubject`
+- `(*BlobSubject).Snapshot() Item[Blob]`
+- `(*BlobSubject).Clear()`
+- `type BlobSubjectSet struct { ... }`
+- `BlobSubjects() *BlobSubjectSet`
+- `(*BlobSubjectSet).At(key string) *BlobSubject`
+- `(*BlobSubjectSet).Get(key string) (*BlobSubject, bool)`
+- `(*BlobSubjectSet).Keys() []string`
+- `(*BlobSubjectSet).Subjects() []*BlobSubject`
+
 Providers:
 
 - `TaskFromFile(name string, file layout.File) *ByteSingleTask`
 - `TaskFromFiles(name string, files ...layout.File) *ByteMultiTask`
 - `TaskFromBlob(name string, blob Blob) *ByteSingleTask`
 - `TaskFromBlobs(name string, blobs ...Blob) *ByteMultiTask`
+- `TaskFromBlobSubject(name string, subject *BlobSubject) *ByteSingleTask`
+- `TaskFromBlobSubjects(name string, subjects ...*BlobSubject) *ByteMultiTask`
+- `TaskFromBlobSubjectSet(name string, subjects *BlobSubjectSet) *ByteMultiTask`
 
 Byte callbacks:
 
@@ -316,6 +335,27 @@ fails with a configuration error. Runtime order is:
 - `Bridge`: snapshot origins, `Filter`, `Sort`, `Rekey`, duplicate-key policy, compose targets, `Populate`, update target cache, deep operations.
 - `Expand`: snapshot origins, `Filter`, `Sort`, `Extract`, duplicate-key policy, compose targets, emitted populate callbacks, update target cache, deep operations.
 - `Compile`: snapshot origins, `Filter`, `Sort`, compose target, `Build`, update target cache, deep operations.
+
+## Byte-Producing Handover Tasks
+
+Constructors:
+
+- `CompileToFile[O](name string, origin Entries[O], target *BlobSubject) *CompileToFileTask[O]`
+- `BridgeToFiles[O](name string, origin Entries[O], target *BlobSubjectSet) *BridgeToFilesTask[O]`
+- `ExpandToFiles[O](name string, origin Entries[O], target *BlobSubjectSet) *ExpandToFilesTask[O]`
+
+Task verbs:
+
+- `CompileToFile`: `Filter`, `Sort`, required `Build`, optional `ToTarget` or `To`.
+- `BridgeToFiles`: `Filter`, `Sort`, `Rekey`, required `Populate`, optional `ToTargets`, `ToDir`, or `ToFiles`.
+- `ExpandToFiles`: `Filter`, `Sort`, required `Extract`, optional `ToTargets`, `ToDir`, or `ToFiles`.
+
+These tasks reuse the typed origin-entry model but produce `BlobSubject`-backed
+byte items. They update target subjects in memory even when no byte sink is
+attached, so later byte tasks can consume those subjects within the same
+pipeline run. `ToTarget` and `ToTargets` write to files attached to the
+produced subjects. Redirected sinks use the same destination planning and
+duplicate-output rules as byte tasks.
 
 ## Output Shaping
 

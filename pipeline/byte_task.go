@@ -40,6 +40,8 @@ type byteSinkKind uint8
 const (
 	byteSinkUnknown byteSinkKind = iota
 	byteSinkWriteBack
+	byteSinkToTarget
+	byteSinkToTargets
 	byteSinkToFile
 	byteSinkToDir
 	byteSinkToFiles
@@ -66,15 +68,20 @@ type byteSink struct {
 	mapper      FileMapper
 }
 
+type byteItemSource interface {
+	snapshotItems() []Item[Blob]
+}
+
 type byteTask struct {
 	mu    sync.RWMutex
 	runMu sync.Mutex
 
-	name  string
-	kind  subjectKind
-	items []Item[Blob]
-	steps []byteStep
-	sink  byteSink
+	name   string
+	kind   subjectKind
+	items  []Item[Blob]
+	source byteItemSource
+	steps  []byteStep
+	sink   byteSink
 
 	configErr error
 }
@@ -83,6 +90,7 @@ type byteTaskSnapshot struct {
 	name      string
 	kind      subjectKind
 	items     []Item[Blob]
+	source    byteItemSource
 	steps     []byteStep
 	sink      byteSink
 	configErr error
@@ -240,6 +248,7 @@ func (t *byteTask) snapshot() byteTaskSnapshot {
 		name:      t.name,
 		kind:      t.kind,
 		items:     cloneItems(t.items),
+		source:    t.source,
 		steps:     steps,
 		sink:      t.sink,
 		configErr: t.configErr,

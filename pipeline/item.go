@@ -52,9 +52,14 @@ func cloneItems[T any](items []Item[T]) []Item[T] {
 	cloned := make([]Item[T], len(items))
 	copy(cloned, items)
 	for i := range cloned {
-		cloned[i].Data = cloneBytes(cloned[i].Data)
+		cloned[i] = cloneItem(cloned[i])
 	}
 	return cloned
+}
+
+func cloneItem[T any](item Item[T]) Item[T] {
+	item.Data = cloneBytes(item.Data)
+	return item
 }
 
 func cloneBytes(data []byte) []byte {

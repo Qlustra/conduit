@@ -293,3 +293,42 @@ Why this is useful:
 - handover tasks update target slot caches in memory
 - they do not create directories or write files unless deep operations are added
 - a later task can inspect or validate the populated target references
+
+## Produce byte artifacts for later tasks
+
+Goal: derive byte artifacts from typed entries, then hand them to a later byte
+task before choosing the final destination.
+
+```go
+routes := pipeline.BlobSubjects()
+
+p := pipeline.New(
+	pipeline.ExpandToFiles("routes",
+		pipeline.SlotEntries(&ws.Services),
+		routes,
+	).
+		Extract(layout.DefaultContext, func(ctx context.Context, lctx layout.Context, service pipeline.Item[*Service], emit pipeline.EntryEmitter[pipeline.Blob]) error {
+			cfg := service.Value.Config.MustGet()
+			for _, routePath := range cfg.Routes {
+				key := cfg.Name + strings.ReplaceAll(routePath, "/", "-") + ".json"
+				emit.Emit(key, func(target *pipeline.Item[pipeline.Blob]) error {
+					target.Path = filepath.Join(cfg.Name, key)
+					target.Data = mustJSON(Route{Service: cfg.Name, Path: routePath})
+					return nil
+				})
+			}
+			return nil
+		}),
+
+	pipeline.TaskFromBlobSubjectSet("pretty-routes", routes).
+		Transform(layout.DefaultContext, prettyJSON).
+		ToDir(layout.DefaultContext, ws.Output, pipeline.PreserveStructure()),
+)
+```
+
+Why `ExpandToFiles` fits:
+
+- origins are still typed slot entries
+- produced targets are bytes, not typed file-slot entries
+- the extracted blobs stay available in memory for later byte tasks
+- final persistence still uses explicit byte-task sink semantics

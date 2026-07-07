@@ -22,7 +22,11 @@ func runByteTask(ctx context.Context, opts RunOptions, task byteTaskSnapshot) (T
 		return failTask(result, fmt.Errorf("task %q has no sink", task.name))
 	}
 
-	items, kind, err := runByteSteps(ctx, opts.Context.Layout, task.kind, cloneItems(task.items), task.steps)
+	items := task.items
+	if task.source != nil {
+		items = task.source.snapshotItems()
+	}
+	items, kind, err := runByteSteps(ctx, opts.Context.Layout, task.kind, cloneItems(items), task.steps)
 	if err != nil {
 		return failTask(result, fmt.Errorf("task %q: %w", task.name, err))
 	}

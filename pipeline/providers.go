@@ -30,6 +30,21 @@ func TaskFromBlobs(name string, blobs ...Blob) *ByteMultiTask {
 	return newByteMultiTask(name, items)
 }
 
+// TaskFromBlobSubject returns a single-subject byte task backed by subject.
+func TaskFromBlobSubject(name string, subject *BlobSubject) *ByteSingleTask {
+	return &ByteSingleTask{task: &byteTask{name: name, kind: subjectSingle, source: blobSubjectSource{subject: subject}}}
+}
+
+// TaskFromBlobSubjects returns a multi-subject byte task backed by subjects.
+func TaskFromBlobSubjects(name string, subjects ...*BlobSubject) *ByteMultiTask {
+	return &ByteMultiTask{task: &byteTask{name: name, kind: subjectMulti, source: blobSubjectsSource{subjects: subjects}}}
+}
+
+// TaskFromBlobSubjectSet returns a multi-subject byte task backed by subjects.
+func TaskFromBlobSubjectSet(name string, subjects *BlobSubjectSet) *ByteMultiTask {
+	return &ByteMultiTask{task: &byteTask{name: name, kind: subjectMulti, source: blobSubjectSetSource{subjects: subjects}}}
+}
+
 // TaskFromSlot returns a single-subject typed task for slot itself.
 func TaskFromSlot[T any](name string, slot *layout.Slot[T]) *TypedSingleTask[*layout.Slot[T]] {
 	return newTypedSingleTask(name, itemFromSlot(slot))

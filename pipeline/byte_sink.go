@@ -82,6 +82,28 @@ func planByteSinkDestinations(ctx context.Context, kind subjectKind, items []Ite
 		}
 		return plans, nil
 
+	case byteSinkToTarget:
+		if kind != subjectSingle || len(items) != 1 {
+			return nil, fmt.Errorf("attached-target sink requires a single subject")
+		}
+		if !hasFile(items[0].File) {
+			return nil, fmt.Errorf("item %q has no target file", items[0].Name)
+		}
+		return []byteWritePlan{{file: items[0].File, item: items[0]}}, nil
+
+	case byteSinkToTargets:
+		if kind != subjectMulti {
+			return nil, fmt.Errorf("attached-target sink requires a multi subject")
+		}
+		plans := make([]byteWritePlan, 0, len(items))
+		for _, item := range items {
+			if !hasFile(item.File) {
+				return nil, fmt.Errorf("item %q has no target file", item.Name)
+			}
+			plans = append(plans, byteWritePlan{file: item.File, item: item})
+		}
+		return plans, nil
+
 	case byteSinkToFile:
 		if kind != subjectSingle || len(items) != 1 {
 			return nil, fmt.Errorf("single-file sink requires a single subject")
@@ -150,6 +172,10 @@ func (r *TaskResult) recordByteWrite(kind byteSinkKind, entry ByteWriteItemResul
 	switch kind {
 	case byteSinkWriteBack:
 		r.WriteBack.Items = append(r.WriteBack.Items, entry)
+	case byteSinkToTarget:
+		r.ToTarget.Items = append(r.ToTarget.Items, entry)
+	case byteSinkToTargets:
+		r.ToTargets.Items = append(r.ToTargets.Items, entry)
 	case byteSinkToFile:
 		r.To.Items = append(r.To.Items, entry)
 	case byteSinkToDir:

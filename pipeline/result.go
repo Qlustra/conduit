@@ -30,6 +30,10 @@ type TaskResult struct {
 
 	// WriteBack records byte WriteBack sink outcomes.
 	WriteBack ByteWriteResult
+	// ToTarget records byte writes to one attached target file.
+	ToTarget ByteWriteResult
+	// ToTargets records byte writes to attached target files.
+	ToTargets ByteWriteResult
 	// To records byte To sink outcomes.
 	To ByteWriteResult
 	// ToDir records byte ToDir sink outcomes.

@@ -71,6 +71,25 @@ p := pipeline.New(
 )
 ```
 
+Use shared blob subjects when one task should produce bytes for a later task in
+the same pipeline run:
+
+```go
+bundle := pipeline.BlobSubjectFromBlob(pipeline.Blob{
+	Key:  "bundle",
+	Name: "bundle.json",
+	Path: "bundle.json",
+})
+
+p := pipeline.New(
+	pipeline.CompileToFile("bundle", pipeline.SlotEntries(&ws.Services), bundle).
+		Build(layout.DefaultContext, buildBundleJSON),
+	pipeline.TaskFromBlobSubject("gzip-bundle", bundle).
+		Transform(layout.DefaultContext, gzipTransform).
+		To(layout.DefaultContext, ws.Artifacts.File("bundle.json.gz")),
+)
+```
+
 Byte tasks support:
 
 - `Transform`: bytes to bytes.
@@ -202,6 +221,41 @@ remain in the fluent chain so the declaration follows runtime order: origin
 snapshot, optional filtering/sorting/rekeying, handover logic, then optional deep
 operations. Running a handover task without its required verb fails as a
 configuration error.
+
+## Byte-producing handover tasks
+
+Use `CompileToFile`, `BridgeToFiles`, and `ExpandToFiles` when origins are typed
+entries but the produced targets are byte artifacts rather than typed slot
+entries.
+
+These tasks:
+
+- read typed origin entries at execution time
+- populate `BlobSubject` or `BlobSubjectSet` targets in memory
+- optionally write those produced bytes through byte-style sinks
+- allow later byte tasks to consume the produced subjects even when no sink is attached
+
+Example:
+
+```go
+targets := pipeline.BlobSubjects()
+
+p := pipeline.New(
+	pipeline.BridgeToFiles("configs", pipeline.SlotEntries(&ws.Services), targets).
+		Populate(layout.DefaultContext, func(ctx context.Context, lctx layout.Context, origin pipeline.Item[*Service], target *pipeline.Item[pipeline.Blob]) error {
+			target.File = ws.Output.File(origin.Key + ".json")
+			target.Path = origin.Key + ".json"
+			target.Data = mustJSON(ServiceConfig{Name: origin.Key})
+			return nil
+		}).
+		ToTargets(layout.DefaultContext),
+)
+```
+
+`ToTarget` and `ToTargets` write to files already attached to the produced blob
+subjects. `To`, `ToDir`, and `ToFiles` redirect output exactly like byte-task
+sinks. Missing byte sinks are allowed for these tasks so subject sharing stays
+useful.
 
 ## Deferred features
 

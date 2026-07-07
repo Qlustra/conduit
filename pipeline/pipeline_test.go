@@ -777,6 +777,166 @@ func TestExpandExtractsFileSlotEntries(t *testing.T) {
 	}
 }
 
+func TestCompileToFileSharesBlobSubjectWithLaterByteTask(t *testing.T) {
+	var ws testWorkspace
+	if err := layout.Compose(t.TempDir(), &ws); err != nil {
+		t.Fatalf("Compose() error = %v", err)
+	}
+	for _, name := range []string{"api", "worker"} {
+		if _, err := ws.Services.Add(name, layout.DefaultContext); err != nil {
+			t.Fatalf("Services.Add(%s) error = %v", name, err)
+		}
+	}
+
+	bundle := BlobSubjectFromBlob(Blob{Key: "bundle", Name: "bundle.txt", Path: "bundle.txt"})
+	out := layout.NewFile(filepath.Join(ws.Root.Path(), "bundle.upper.txt"))
+
+	p := New(
+		CompileToFile("bundle", SlotEntries(&ws.Services), bundle).
+			Build(layout.DefaultContext, func(ctx context.Context, lctx layout.Context, origins []Item[*testService], target *Item[Blob]) error {
+				names := make([]string, 0, len(origins))
+				for _, origin := range origins {
+					names = append(names, origin.Key)
+				}
+				target.Data = []byte(strings.Join(names, ","))
+				return nil
+			}),
+		TaskFromBlobSubject("bundle-upper", bundle).
+			Transform(layout.DefaultContext, upperTransform).
+			To(layout.DefaultContext, out),
+	)
+
+	if _, err := p.Run(context.Background(), RunOptions{Context: DefaultContext}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got := string(bundle.Snapshot().Data); got != "api,worker" {
+		t.Fatalf("bundle subject = %q, want %q", got, "api,worker")
+	}
+	if got := readTestFile(t, out); got != "API,WORKER" {
+		t.Fatalf("upper bundle = %q, want %q", got, "API,WORKER")
+	}
+}
+
+func TestCompileToFileToTargetWritesAttachedFile(t *testing.T) {
+	var ws testWorkspace
+	if err := layout.Compose(t.TempDir(), &ws); err != nil {
+		t.Fatalf("Compose() error = %v", err)
+	}
+	for _, name := range []string{"api", "worker"} {
+		if _, err := ws.Services.Add(name, layout.DefaultContext); err != nil {
+			t.Fatalf("Services.Add(%s) error = %v", name, err)
+		}
+	}
+
+	targetFile := layout.NewFile(filepath.Join(ws.Root.Path(), "artifacts", "services.txt"))
+	target := BlobSubjectForFile(targetFile)
+	p := New(CompileToFile("bundle", SlotEntries(&ws.Services), target).
+		Build(layout.DefaultContext, func(ctx context.Context, lctx layout.Context, origins []Item[*testService], target *Item[Blob]) error {
+			target.Data = []byte(fmt.Sprintf("services=%d", len(origins)))
+			return nil
+		}).
+		ToTarget(layout.DefaultContext))
+
+	result, err := p.Run(context.Background(), RunOptions{Context: DefaultContext})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got := result.Tasks[0].ToTarget.Items; len(got) != 1 || got[0].File != targetFile.Path() {
+		t.Fatalf("ToTarget result = %+v, want one write to %q", got, targetFile.Path())
+	}
+	if got := readTestFile(t, targetFile); got != "services=2" {
+		t.Fatalf("target file = %q, want %q", got, "services=2")
+	}
+}
+
+func TestBridgeToFilesToTargetsWritesOnlyProducedSubjects(t *testing.T) {
+	var ws testWorkspace
+	if err := layout.Compose(t.TempDir(), &ws); err != nil {
+		t.Fatalf("Compose() error = %v", err)
+	}
+	for _, name := range []string{"api", "worker"} {
+		if _, err := ws.Services.Add(name, layout.DefaultContext); err != nil {
+			t.Fatalf("Services.Add(%s) error = %v", name, err)
+		}
+	}
+
+	targets := BlobSubjects()
+	outDir := layout.NewDir(filepath.Join(ws.Root.Path(), "out"))
+	p := New(BridgeToFiles("bridge", SlotEntries(&ws.Services), targets).
+		Filter(layout.DefaultContext, func(ctx context.Context, lctx layout.Context, item Item[*testService]) (bool, error) {
+			return item.Key == "api", nil
+		}).
+		Populate(layout.DefaultContext, func(ctx context.Context, lctx layout.Context, origin Item[*testService], target *Item[Blob]) error {
+			target.File = outDir.File(origin.Key + ".txt")
+			target.Path = origin.Key + ".txt"
+			target.Data = []byte("service=" + origin.Key)
+			return nil
+		}).
+		ToTargets(layout.DefaultContext))
+
+	result, err := p.Run(context.Background(), RunOptions{Context: DefaultContext})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got := result.Tasks[0].ToTargets.Items; len(got) != 1 || got[0].File != outDir.File("api.txt").Path() {
+		t.Fatalf("ToTargets result = %+v, want one api.txt write", got)
+	}
+	if got := readTestFile(t, outDir.File("api.txt")); got != "service=api" {
+		t.Fatalf("api output = %q, want %q", got, "service=api")
+	}
+	if got := readMaybeTestFile(t, outDir.File("worker.txt")); got != "" {
+		t.Fatalf("worker output = %q, want empty", got)
+	}
+	if _, ok := targets.Get("worker"); ok {
+		t.Fatal("worker target subject was created despite filtering")
+	}
+}
+
+func TestExpandToFilesSharesBlobSubjectSetWithLaterByteTask(t *testing.T) {
+	var ws testWorkspace
+	if err := layout.Compose(t.TempDir(), &ws); err != nil {
+		t.Fatalf("Compose() error = %v", err)
+	}
+	if _, err := ws.Services.Add("api", layout.DefaultContext); err != nil {
+		t.Fatalf("Services.Add(api) error = %v", err)
+	}
+
+	routes := BlobSubjects()
+	out := layout.NewDir(filepath.Join(ws.Root.Path(), "rendered"))
+	p := New(
+		ExpandToFiles("routes", SlotEntries(&ws.Services), routes).
+			Extract(layout.DefaultContext, func(ctx context.Context, lctx layout.Context, origin Item[*testService], emit EntryEmitter[Blob]) error {
+				emit.Emit(origin.Key+"/root.txt", func(target *Item[Blob]) error {
+					target.Path = origin.Key + "/root.txt"
+					target.Data = []byte("root:" + origin.Key)
+					return nil
+				})
+				emit.Emit(origin.Key+"/health.txt", func(target *Item[Blob]) error {
+					target.Path = origin.Key + "/health.txt"
+					target.Data = []byte("health:" + origin.Key)
+					return nil
+				})
+				return nil
+			}),
+		TaskFromBlobSubjectSet("upper-routes", routes).
+			Transform(layout.DefaultContext, upperTransform).
+			ToDir(layout.DefaultContext, out, PreserveStructure()),
+	)
+
+	if _, err := p.Run(context.Background(), RunOptions{Context: DefaultContext}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got := routes.Keys(); strings.Join(got, ",") != "api/health.txt,api/root.txt" {
+		t.Fatalf("route keys = %v, want [api/health.txt api/root.txt]", got)
+	}
+	if got := readTestFile(t, out.File("api/root.txt")); got != "ROOT:API" {
+		t.Fatalf("root output = %q, want %q", got, "ROOT:API")
+	}
+	if got := readTestFile(t, out.File("api/health.txt")); got != "HEALTH:API" {
+		t.Fatalf("health output = %q, want %q", got, "HEALTH:API")
+	}
+}
+
 func TestBridgeDuplicateTargetKeyPolicies(t *testing.T) {
 	var ws testWorkspace
 	if err := layout.Compose(t.TempDir(), &ws); err != nil {
@@ -825,6 +985,60 @@ func TestBridgeDuplicateTargetKeyPolicies(t *testing.T) {
 	}
 	if got := readTestFile(t, ws.Servers.MustAt("same").Config.File); !strings.Contains(got, `"source": "worker"`) {
 		t.Fatalf("last-wins server config = %s, want worker", got)
+	}
+}
+
+func TestBridgeToFilesDuplicateTargetKeyPolicies(t *testing.T) {
+	var ws testWorkspace
+	if err := layout.Compose(t.TempDir(), &ws); err != nil {
+		t.Fatalf("Compose() error = %v", err)
+	}
+	for _, name := range []string{"api", "worker"} {
+		if _, err := ws.Services.Add(name, layout.DefaultContext); err != nil {
+			t.Fatalf("Services.Add(%s) error = %v", name, err)
+		}
+	}
+
+	targets := BlobSubjects()
+	populateCalls := 0
+	failing := New(BridgeToFiles("duplicate-bridge-files", SlotEntries(&ws.Services), targets).
+		Rekey(layout.DefaultContext, func(ctx context.Context, lctx layout.Context, origin Item[*testService]) (string, error) {
+			return "same", nil
+		}).
+		Populate(layout.DefaultContext, func(ctx context.Context, lctx layout.Context, origin Item[*testService], target *Item[Blob]) error {
+			populateCalls++
+			return nil
+		}))
+
+	_, err := failing.Run(context.Background(), RunOptions{Context: DefaultContext})
+	if err == nil || !strings.Contains(err.Error(), "duplicate target key") {
+		t.Fatalf("Run() error = %v, want duplicate target key error", err)
+	}
+	if populateCalls != 0 {
+		t.Fatalf("populate calls = %d, want 0 before duplicate failure", populateCalls)
+	}
+
+	pctx := DefaultContext
+	pctx.DuplicateOutputs = DuplicateOutputLastWins
+	lastWinsTargets := BlobSubjects()
+	lastWins := New(BridgeToFiles("last-wins-bridge-files", SlotEntries(&ws.Services), lastWinsTargets).
+		Rekey(layout.DefaultContext, func(ctx context.Context, lctx layout.Context, origin Item[*testService]) (string, error) {
+			return "same", nil
+		}).
+		Populate(layout.DefaultContext, func(ctx context.Context, lctx layout.Context, origin Item[*testService], target *Item[Blob]) error {
+			target.Data = []byte(origin.Key)
+			return nil
+		}))
+
+	if _, err := lastWins.Run(context.Background(), RunOptions{Context: pctx}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	subject, ok := lastWinsTargets.Get("same")
+	if !ok {
+		t.Fatal("missing last-wins target subject")
+	}
+	if got := string(subject.Snapshot().Data); got != "worker" {
+		t.Fatalf("last-wins subject = %q, want %q", got, "worker")
 	}
 }
 
