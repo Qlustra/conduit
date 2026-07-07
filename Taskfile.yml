@@ -19,9 +19,9 @@ tasks:
   validate:
     desc: Validate all Go modules
     cmds:
-      - gofmt -w -s ./layout ./formats
-      - go test ./layout ./formats
-      - go vet ./layout ./formats
+      - gofmt -w -s ./layout ./formats ./pipeline
+      - go test ./layout ./formats ./pipeline
+      - go vet ./layout ./formats ./pipeline
 
   # ========
   # Workflow

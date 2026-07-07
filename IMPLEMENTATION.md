@@ -17,18 +17,33 @@ go test ./...
 
 ## Current State
 
-The pipeline hardening pass is complete for now. The provider-based task model,
-typed handover tasks, thread-safety contract, per-file atomic write support, and
-Go doc comments are implemented. `TaskResult.Handover` intentionally remains one
-general result field; real usage can justify more result shape later if needed.
+The pipeline hardening pass and source/target API cleanup are complete. Pipeline
+tasks now configure sources and targets through fluent methods, public task names
+use source/target terminology, and task sources snapshot at runtime.
+
+The public shape is:
+
+- `Byte("name")` / `Bytes("name")` for byte single/multi tasks.
+- `Slot[T]("name")` / `Slots[T]("name")` for typed single/multi tasks.
+- `Bridge[O, T]("name")`, `Compile[O, T]("name")`, and `Expand[O, T]("name")`
+  with explicit type arguments and fluent `Take*` / `Target*` methods.
+- Byte sink methods named `WriteTo*` so source/target configuration is distinct
+  from persistence actions.
+
+All task sources snapshot when the task runs, not when the task is constructed.
+That lets earlier pipeline tasks populate slot entries or byte targets that later
+tasks consume predictably.
 
 ## Handover Design Notes
 
 Typed handover tasks are first-class tasks:
 
-- `Bridge(...).Populate(...)` for same-cardinality handover: `O -> T`.
-- `Compile(...).Build(...)` for many-to-one handover: `[]O -> T`.
-- `Expand(...).Extract(...)` for one-to-many handover: `O -> []T`.
+- `Bridge[O, T]("name").TakeSlotEntries(...).TargetSlotEntries(...).Populate(...)`
+  for same-cardinality handover: `O -> T`.
+- `Compile[O, T]("name").TakeSlotEntries(...).TargetSlotEntry(...).Build(...)`
+  for many-to-one handover: `[]O -> T`.
+- `Expand[O, T]("name").TakeSlotEntries(...).TargetSlotEntries(...).Extract(...)`
+  for one-to-many handover: `O -> []T`.
 
 The required handover verbs intentionally remain in the fluent chain so task
 definitions read in runtime order. A handover task without `Populate`, `Build`,
@@ -36,14 +51,24 @@ or `Extract` is incomplete and fails at `Run` with a configuration error.
 
 Runtime order to preserve:
 
-- `Bridge`: snapshot origins, `Filter`, `Sort`, `Rekey`, duplicate-key policy,
+- `Bridge`: snapshot sources, `Filter`, `Sort`, `Rekey`, duplicate-key policy,
   compose targets with `At`, `Populate`, update target cache with `Put`, deep
   operations.
-- `Compile`: snapshot origins, `Filter`, `Sort`, compose target with `At`,
+- `Compile`: snapshot sources, `Filter`, `Sort`, compose target with `At`,
   `Build`, update target cache with `Put`, deep operations.
-- `Expand`: snapshot origins, `Filter`, `Sort`, `Extract`, duplicate-key policy
+- `Expand`: snapshot sources, `Filter`, `Sort`, `Extract`, duplicate-key policy
   over emitted keys, compose targets with `At`, emitted populate callbacks,
   update target cache with `Put`, deep operations.
+
+## Source/Target Follow-Up Cleanup
+
+Postponed follow-up items:
+
+- Rename public result fields that still say origin, such as `OriginKey`, to
+  source terminology.
+- Internally rename remaining `origin` fields/functions to `source` where it does
+  not obscure handover logic.
+- Keep `subject` as an internal term only for backing entities when useful.
 
 ## Deferred Pipeline Work
 
@@ -61,9 +86,10 @@ These are useful but are not part of the current pipeline surface:
 
 ### Inputs Builder
 
-The current direction is package-level task providers, not a standalone input
-builder. If ergonomic incremental input construction becomes useful later, add a
-separate builder while keeping provider APIs primary:
+The current direction is fluent source methods on shape-specific tasks, not a
+standalone input builder. If ergonomic incremental input construction becomes
+useful later, add a separate builder without replacing `Byte`, `Bytes`, `Slot`,
+or `Slots` as the primary task entry points:
 
 ```go
 inputs := pipeline.Inputs().
@@ -71,9 +97,10 @@ inputs := pipeline.Inputs().
 	File(b).
 	Source(custom)
 
-pipeline.TaskFromInputs("format", inputs).
-	Transform(layout.DefaultContext, fn).
-	WriteBack(layout.DefaultContext)
+pipeline.Bytes("format").
+	TakeInputs(inputs).
+	Transform(fn).
+	WriteToSources()
 ```
 
 ### Branch

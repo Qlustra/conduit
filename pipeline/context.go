@@ -25,11 +25,11 @@ const (
 // Context configures pipeline execution.
 type Context struct {
 	// Layout is the fallback layout context used by operations that do not provide
-	// a complete operation-level layout.Context.
+	// explicit overrides for some fields.
 	Layout layout.Context
 
-	// DuplicateOutputs controls how byte sinks and handover tasks handle multiple
-	// planned writes or target keys for the same destination.
+	// DuplicateOutputs controls how byte sinks handle multiple planned writes to
+	// the same destination.
 	DuplicateOutputs DuplicateOutputPolicy
 }
 
@@ -37,6 +37,16 @@ type Context struct {
 var DefaultContext = Context{
 	Layout:           layout.DefaultContext,
 	DuplicateOutputs: DuplicateOutputFail,
+}
+
+func runContext(contexts []Context) (Context, error) {
+	if len(contexts) == 0 {
+		return DefaultContext, nil
+	}
+	if len(contexts) > 1 {
+		return Context{}, fmt.Errorf("pipeline run accepts at most one context")
+	}
+	return contexts[0], nil
 }
 
 func (ctx Context) validate() error {
@@ -54,8 +64,35 @@ func (ctx Context) validate() error {
 }
 
 func resolveLayoutContext(op layout.Context, fallback layout.Context) layout.Context {
-	if op.DirMode == 0 || op.FileMode == 0 {
-		return fallback
+	if op.DirMode == 0 {
+		op.DirMode = fallback.DirMode
+	}
+	if op.FileMode == 0 {
+		op.FileMode = fallback.FileMode
+	}
+	if op.ExecMode == 0 {
+		op.ExecMode = fallback.ExecMode
+	}
+	if op.EnsurePolicy == 0 {
+		op.EnsurePolicy = fallback.EnsurePolicy
+	}
+	if op.SyncPolicy == 0 {
+		op.SyncPolicy = fallback.SyncPolicy
+	}
+	if op.PathSafetyPolicy == 0 {
+		op.PathSafetyPolicy = fallback.PathSafetyPolicy
+	}
+	if op.WritePolicy == 0 {
+		op.WritePolicy = fallback.WritePolicy
+	}
+	if op.TempFilePlacement == 0 {
+		op.TempFilePlacement = fallback.TempFilePlacement
+	}
+	if op.TempDir.Path() == "" {
+		op.TempDir = fallback.TempDir
+	}
+	if op.Reporter == nil {
+		op.Reporter = fallback.Reporter
 	}
 	return op
 }

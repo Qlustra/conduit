@@ -30,29 +30,50 @@ type TaskResult struct {
 
 	// WriteBack records byte WriteBack sink outcomes.
 	WriteBack ByteWriteResult
-	// ToTarget records byte writes to one attached target file.
-	ToTarget ByteWriteResult
-	// ToTargets records byte writes to attached target files.
-	ToTargets ByteWriteResult
 	// To records byte To sink outcomes.
 	To ByteWriteResult
 	// ToDir records byte ToDir sink outcomes.
 	ToDir ByteWriteResult
 	// ToFiles records byte ToFiles sink outcomes.
 	ToFiles ByteWriteResult
+}
 
-	// Handover records typed Bridge, Compile, or Expand outcomes.
-	Handover HandoverResult
+func (r *TaskResult) recordDeepOperation(kind slotSinkOperation, entry SlotOperationResult) {
+	switch kind {
+	case slotSinkEnsureDeep:
+		r.EnsureDeep.Items = append(r.EnsureDeep.Items, entry)
+	case slotSinkDefaultDeep:
+		r.DefaultDeep.Items = append(r.DefaultDeep.Items, entry)
+	case slotSinkRenderDeep:
+		r.RenderDeep.Items = append(r.RenderDeep.Items, entry)
+	case slotSinkSyncDeep:
+		r.SyncDeep.Items = append(r.SyncDeep.Items, entry)
+	case slotSinkValidateDeep:
+		r.ValidateDeep.Items = append(r.ValidateDeep.Items, entry)
+	}
+}
+
+func (r *TaskResult) recordByteWrite(kind byteSinkOperation, entry ByteWriteItemResult) {
+	switch kind {
+	case byteSinkWriteBack:
+		r.WriteBack.Items = append(r.WriteBack.Items, entry)
+	case byteSinkToFile:
+		r.To.Items = append(r.To.Items, entry)
+	case byteSinkToDir:
+		r.ToDir.Items = append(r.ToDir.Items, entry)
+	case byteSinkToFiles:
+		r.ToFiles.Items = append(r.ToFiles.Items, entry)
+	}
 }
 
 // DeepOperationResult records per-item deep layout operation outcomes.
 type DeepOperationResult struct {
 	// Items contains per-item deep operation results.
-	Items []DeepItemResult
+	Items []SlotOperationResult
 }
 
-// DeepItemResult records one typed item deep operation outcome.
-type DeepItemResult struct {
+// SlotOperationResult records one typed item deep operation outcome.
+type SlotOperationResult struct {
 	// Key is the item key.
 	Key string
 	// Name is the item name.
@@ -90,61 +111,6 @@ type ByteWriteItemResult struct {
 	// Bytes is the number of bytes written.
 	Bytes int
 	// Err records the write error, if any.
-	Err error
-}
-
-// HandoverKind records which typed handover task produced a result.
-type HandoverKind uint8
-
-const (
-	// HandoverUnknown indicates no typed handover kind was recorded.
-	HandoverUnknown HandoverKind = iota
-
-	// HandoverBridge indicates a Bridge task produced the result.
-	HandoverBridge
-
-	// HandoverExpand indicates an Expand task produced the result.
-	HandoverExpand
-
-	// HandoverCompile indicates a Compile task produced the result.
-	HandoverCompile
-)
-
-// HandoverResult records typed inter-task handover outcomes.
-type HandoverResult struct {
-	// Kind identifies the handover task kind.
-	Kind HandoverKind
-	// Items contains per-target handover results.
-	Items []HandoverItemResult
-}
-
-// HandoverItemResult records one target item populated by a handover task.
-type HandoverItemResult struct {
-	// OriginKey is the origin item key for one-to-one and one-to-many handovers.
-	OriginKey string
-	// OriginName is the origin item name.
-	OriginName string
-	// OriginPath is the origin item path metadata.
-	OriginPath string
-	// OriginFile is the origin backing file path, when present.
-	OriginFile string
-	// OriginDir is the origin backing directory path, when present.
-	OriginDir string
-	// OriginKeys are the origin item keys for many-to-one handovers.
-	OriginKeys []string
-
-	// TargetKey is the target item key.
-	TargetKey string
-	// TargetName is the target item name.
-	TargetName string
-	// TargetPath is the target item path metadata.
-	TargetPath string
-	// TargetFile is the target backing file path, when present.
-	TargetFile string
-	// TargetDir is the target backing directory path, when present.
-	TargetDir string
-
-	// Err records the handover error for this item, if any.
 	Err error
 }
 

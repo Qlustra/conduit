@@ -9,20 +9,15 @@ import (
 	"github.com/qlustra/conduit/layout"
 )
 
-// Blob is an opaque byte subject with pipeline metadata.
-type Blob struct {
-	// Key is the logical identity used by duplicate handling and results.
-	Key string
-	// Name is the display or basename-style name for the blob.
-	Name string
-	// Path is the relative path used by directory sinks when preserving structure.
-	Path string
-	// Data is the in-memory byte payload. When empty, file-backed items may read
-	// from File instead.
-	Data []byte
-}
+type itemType uint8
 
-// Item is one typed unit flowing through a task.
+const (
+	itemTypeUnknown itemType = iota
+	itemTypeFile
+	itemTypeSlotEntry
+)
+
+// Item is one unit flowing through a task.
 type Item[T any] struct {
 	// Key is the logical identity used by duplicate handling and results.
 	Key string
@@ -38,28 +33,6 @@ type Item[T any] struct {
 	Value T
 	// Data is the in-memory byte payload for byte tasks.
 	Data []byte
-}
-
-type subjectKind uint8
-
-const (
-	subjectUnknown subjectKind = iota
-	subjectSingle
-	subjectMulti
-)
-
-func cloneItems[T any](items []Item[T]) []Item[T] {
-	cloned := make([]Item[T], len(items))
-	copy(cloned, items)
-	for i := range cloned {
-		cloned[i] = cloneItem(cloned[i])
-	}
-	return cloned
-}
-
-func cloneItem[T any](item Item[T]) Item[T] {
-	item.Data = cloneBytes(item.Data)
-	return item
 }
 
 func cloneBytes(data []byte) []byte {
@@ -111,6 +84,50 @@ func normalizeBlobMetadata(blob Blob) (key string, name string, path string) {
 	return key, name, path
 }
 
+func normalizeBlobItem(item Item[Blob]) Item[Blob] {
+	data := item.Data
+	if data == nil && item.Value.Data != nil {
+		data = item.Value.Data
+	}
+	data = cloneBytes(data)
+
+	key := item.Key
+	name := item.Name
+	path := item.Path
+	if key == "" {
+		key = item.Value.Key
+	}
+	if name == "" {
+		name = item.Value.Name
+	}
+	if path == "" {
+		path = item.Value.Path
+	}
+	if hasFile(item.File) {
+		fallbackName := item.File.Base()
+		if name == "" {
+			name = fallbackName
+		}
+		if path == "" {
+			path = itemPathFromFile(item.File, fallbackName)
+		}
+	}
+	key, name, path = normalizeBlobMetadata(Blob{Key: key, Name: name, Path: path})
+
+	blob := item.Value
+	blob.Key = key
+	blob.Name = name
+	blob.Path = path
+	blob.Data = cloneBytes(data)
+
+	item.Key = key
+	item.Name = name
+	item.Path = path
+	item.Data = data
+	item.Value = blob
+	return item
+}
+
 func itemPathFromFile(file layout.File, fallback string) string {
 	if rel, ok := file.ComposedRelativePath(); ok {
 		return rel
@@ -137,26 +154,6 @@ func itemPathFromDir(dir layout.Dir, fallback string) string {
 		return rel
 	}
 	return fallback
-}
-
-func itemFromSlotEntry[T any](slot *layout.Slot[T], entry layout.SlotEntry[T]) Item[T] {
-	return itemFromSlotEntryName(slot, entry.Name, entry.Item)
-}
-
-func itemFromSlotEntryName[T any](slot *layout.Slot[T], name string, value T) Item[T] {
-	dir := slot.Root().Dir(name)
-	path := itemPathFromDir(dir, name)
-	return Item[T]{Key: name, Name: dir.Base(), Path: path, Dir: dir, Value: value}
-}
-
-func itemFromFileSlotEntry[T any](slot *layout.FileSlot[T], entry layout.FileSlotEntry[T]) Item[T] {
-	return itemFromFileSlotEntryName(slot, entry.Name, entry.Item)
-}
-
-func itemFromFileSlotEntryName[T any](slot *layout.FileSlot[T], name string, value T) Item[T] {
-	file := slot.Root().File(name)
-	path := itemPathFromFile(file, name)
-	return Item[T]{Key: name, Name: file.Base(), Path: path, File: file, Value: value}
 }
 
 func materializeByteItem(ctx context.Context, lctx layout.Context, item *Item[Blob]) ([]byte, error) {

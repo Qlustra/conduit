@@ -5,36 +5,23 @@ import (
 	"sync"
 )
 
-// Runnable is a task that can be executed by a Pipeline.
-type Runnable interface {
-	// Name returns the task name used in results and errors.
-	Name() string
-
-	// Run executes the task with the supplied options.
-	Run(ctx context.Context, opts RunOptions) (TaskResult, error)
-}
-
-type runnableSnapshotter interface {
-	snapshotRunnable() Runnable
-}
-
 // Pipeline owns a set of processing tasks.
 type Pipeline struct {
 	mu    sync.RWMutex
 	runMu sync.Mutex
 
-	tasks []Runnable
+	tasks []Runtime
 }
 
 // New returns a pipeline initialized with tasks.
-func New(tasks ...Runnable) *Pipeline {
+func New(tasks ...Runtime) *Pipeline {
 	p := &Pipeline{}
 	p.Add(tasks...)
 	return p
 }
 
 // Add registers tasks in declaration order.
-func (p *Pipeline) Add(tasks ...Runnable) {
+func (p *Pipeline) Add(tasks ...Runtime) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -42,13 +29,21 @@ func (p *Pipeline) Add(tasks ...Runnable) {
 }
 
 // Run executes all registered tasks in declaration order.
-func (p *Pipeline) Run(ctx context.Context, opts RunOptions) (Result, error) {
+func (p *Pipeline) Run(ctx context.Context, contexts ...Context) (Result, error) {
 	p.runMu.Lock()
 	defer p.runMu.Unlock()
 
+	pctx, err := runContext(contexts)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := pctx.validate(); err != nil {
+		return Result{}, err
+	}
+
 	var result Result
-	for _, task := range p.snapshotTasks() {
-		taskResult, err := task.Run(ctx, opts)
+	for _, runner := range p.collectFrozenRunners() {
+		taskResult, err := runner.Run(ctx, pctx)
 		result.Tasks = append(result.Tasks, taskResult)
 		if err != nil {
 			return result, err
@@ -57,23 +52,17 @@ func (p *Pipeline) Run(ctx context.Context, opts RunOptions) (Result, error) {
 	return result, nil
 }
 
-func (p *Pipeline) snapshotTasks() []Runnable {
+func (p *Pipeline) collectFrozenRunners() []Runtime {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	tasks := make([]Runnable, len(p.tasks))
+	runtimes := make([]Runtime, len(p.tasks))
 	for i, task := range p.tasks {
-		if snapshotter, ok := task.(runnableSnapshotter); ok {
-			tasks[i] = snapshotter.snapshotRunnable()
+		if snapshotter, ok := task.(runtimeSnapshotter); ok {
+			runtimes[i] = snapshotter.snapshotRuntime()
 			continue
 		}
-		tasks[i] = task
+		runtimes[i] = task
 	}
-	return tasks
-}
-
-// RunOptions configures pipeline execution.
-type RunOptions struct {
-	// Context is required and supplies layout and duplicate-output policy.
-	Context Context
+	return runtimes
 }

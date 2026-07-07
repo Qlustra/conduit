@@ -196,6 +196,50 @@ func (d Dir) List() ([]os.DirEntry, error) {
 	return os.ReadDir(d.Path())
 }
 
+// FileList returns the direct files of the directory.
+func (d Dir) FileList() ([]File, error) {
+	files := []File{}
+
+	nodes, err := d.List()
+	if err != nil {
+		return files, err
+	}
+
+	for _, node := range nodes {
+		info, err := node.Info()
+		if err != nil {
+			return files, err
+		}
+		if info.Mode().IsRegular() {
+			files = append(files, d.File(node.Name()))
+		}
+	}
+
+	return files, nil
+}
+
+// DirList returns the direct dirs of the directory.
+func (d Dir) DirList() ([]Dir, error) {
+	dirs := []Dir{}
+
+	nodes, err := d.List()
+	if err != nil {
+		return dirs, err
+	}
+
+	for _, node := range nodes {
+		info, err := node.Info()
+		if err != nil {
+			return dirs, err
+		}
+		if info.Mode().IsDir() {
+			dirs = append(dirs, d.Dir(node.Name()))
+		}
+	}
+
+	return dirs, nil
+}
+
 // Dir returns a child directory handle under the receiver.
 func (d Dir) Dir(name string) Dir {
 	return newDirWithCompose(filepath.Join(d.path, name), d.composeBase, d.composedBase)
