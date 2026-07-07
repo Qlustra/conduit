@@ -1,7 +1,7 @@
 # Implementation Handoff
 
-This file tracks active hardening work and deferred implementation plans. Settled
-API details live in the docs:
+This file tracks deferred implementation plans. Settled API details live in the
+docs:
 
 - `docs/usage/layout.md`
 - `docs/usage/pipeline.md`
@@ -15,17 +15,14 @@ Validation baseline:
 go test ./...
 ```
 
-## Active Pipeline Hardening
+## Current State
 
-The next pass should make the new `pipeline` APIs feel stable before adding more
-features.
+The pipeline hardening pass is complete for now. The provider-based task model,
+typed handover tasks, thread-safety contract, per-file atomic write support, and
+Go doc comments are implemented. `TaskResult.Handover` intentionally remains one
+general result field; real usage can justify more result shape later if needed.
 
-1. Add package-level Go documentation examples for `pipeline`.
-2. Review `TaskResult.Handover` after real examples and tests. Keep one general
-   field unless separate `Bridge`, `Compile`, and `Expand` result fields prove
-   clearer.
-
-## Handover Follow-Ups
+## Handover Design Notes
 
 Typed handover tasks are first-class tasks:
 
@@ -50,7 +47,7 @@ Runtime order to preserve:
 
 ## Deferred Pipeline Work
 
-These are useful but should not block the current hardening pass:
+These are useful but are not part of the current pipeline surface:
 
 - Change detection, fingerprinting, and checksums.
 - Watch mode.
