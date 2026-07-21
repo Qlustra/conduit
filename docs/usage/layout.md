@@ -158,7 +158,7 @@ Useful methods on `Link`:
 - `Target()`, `MustTarget()`, `SetTarget(...)`, `SetDefaultTarget(...)`, `HasTarget()`, and `ClearTarget()` manage the in-memory target string.
 - `ResolvedTargetPath()` resolves relative targets from the link's parent directory.
 - `TargetExists()` and `IsDangling()` inspect the current in-memory target.
-- `Load()`, `Discover()`, `Scan()`, `Sync(ctx)`, `Delete()`, `Unload()`, `DiskState()`, and `MemoryState()` follow the same state model used by typed files.
+- `Load()`, `Discover()`, `Scan()`, `Sync(ctx)`, `Delete(ctx)`, `Unload()`, `DiskState()`, and `MemoryState()` follow the same state model used by typed files.
 
 Useful methods on the typed wrappers:
 

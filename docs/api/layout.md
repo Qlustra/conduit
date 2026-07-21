@@ -596,10 +596,10 @@ Methods:
 - `Require(name string) (T, error)`: returns an item only when the child root already exists on disk
 - `Ensure(ctx Context) error`: ensures the slot root directory
 - `EnsureDeep(ctx Context) (ResultCode, error)`: ensures the slot root and all cached items
-- `DiscoverDeep(ctx Context) (ResultCode, error)`: discovers child directories on disk and scans them without loading typed content
+- `DiscoverDeep(ctx Context) (ResultCode, error)`: discovers child directories on disk and scans them without loading stateful content
 - `LoadDeep(ctx Context) (ResultCode, error)`: discovers child directories on disk and loads them
 - `ScanDeep(ctx Context) (ResultCode, error)`: scans only cached items
-- `SyncDeep(ctx Context) (ResultCode, error)`: ensures cached items, then syncs typed content within those items
+- `SyncDeep(ctx Context) (ResultCode, error)`: ensures cached items, then syncs stateful content within those items
 - `RenderDeep() error`: renders only currently cached items
 - `DefaultDeep() error`: applies defaults only to currently cached items
 - `ValidateDeep(opts ValidateOptions) (ResultCode, error)`: validates only currently cached items
@@ -613,7 +613,7 @@ Notable behavior:
 - `Entries` and `All` return cached items as-is, preserving pointer or value semantics chosen by `T`
 - the declared-path helpers delegate to the slot root and expose the slot field's own declared fragment
 - the composed-path helpers delegate to the slot root and return `ok == false` until the slot has been attached through `Compose`
-- `DiscoverDeep` discovers directory-backed entries from disk without loading typed files
+- `DiscoverDeep` discovers directory-backed entries from disk without loading stateful content
 - `LoadDeep` discovers directory-backed entries from disk
 - `ScanDeep` and `SyncDeep` do not discover uncached entries
 - `Slot.SyncDeep` ensures cached children before syncing them, and that preparation ensure pass respects `Context.EnsurePolicy`
@@ -664,10 +664,10 @@ Methods:
 - `Require(name string) (T, error)`: returns an item only when the child file already exists on disk
 - `Ensure(ctx Context) error`: ensures the slot root directory
 - `EnsureDeep(ctx Context) (ResultCode, error)`: ensures the slot root and all cached items
-- `DiscoverDeep(ctx Context) (ResultCode, error)`: discovers child files on disk and scans them without loading typed content
+- `DiscoverDeep(ctx Context) (ResultCode, error)`: discovers child files on disk and scans them without loading stateful content
 - `LoadDeep(ctx Context) (ResultCode, error)`: discovers child files on disk and loads them
 - `ScanDeep(ctx Context) (ResultCode, error)`: scans only cached items
-- `SyncDeep(ctx Context) (ResultCode, error)`: ensures cached items, then syncs typed content within those items
+- `SyncDeep(ctx Context) (ResultCode, error)`: ensures cached items, then syncs stateful content within those items
 - `RenderDeep() error`: renders only currently cached items
 - `DefaultDeep() error`: applies defaults only to currently cached items
 - `ValidateDeep(opts ValidateOptions) (ResultCode, error)`: validates only currently cached items
@@ -813,7 +813,7 @@ Fields:
 - `FileMode`: mode used when creating regular files
 - `ExecMode`: mode used when creating or ensuring `Exec` files
 - `EnsurePolicy`: selects which node kinds `Ensure` and `EnsureDeep` may materialize
-- `SyncPolicy`: selects which typed memory states `Sync` and `SyncDeep` may write, with optional disk-state filters
+- `SyncPolicy`: selects which stateful memory states `Sync` and `SyncDeep` may write, with optional disk-state filters
 - `PathSafetyPolicy`: controls whether mutating typed filesystem operations reject symlink parents during path resolution
 - `WritePolicy`: selects direct rewrites or per-file atomic replacement for `File.WriteBytes`
 - `TempFilePlacement`: selects where atomic writes create their temporary file

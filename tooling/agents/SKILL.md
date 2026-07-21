@@ -1,6 +1,6 @@
 ---
 name: conduit
-description: Use this skill when working with github.com/qlustra/conduit in Go projects. It teaches the library's contract-based filesystem model, how to declare layouts with `layout` tags, when to use `Compose`, `EnsureDeep`, `DefaultDeep`, `DiscoverDeep`, `LoadDeep`, `RenderDeep`, `SyncDeep`, and `ScanDeep`, and how to work safely with `layout.Dir`, `layout.File`, `layout.Exec`, `layout.Slot[T]`, typed files such as `formats.YAMLFile[T]`, `formats.JSONFile[T]`, and `formats.TOMLFile[T]`, and derived text via `layout.TextTemplate[C]`.
+description: Use this skill when working with github.com/qlustra/conduit in Go projects. It teaches the library's contract-based filesystem model, the deep operation phases including `ValidateDeep`, how to work with directories, files, execs, links, slots, and typed files, and the path-safety and write-policy rules that matter when changing Conduit-backed layouts.
 ---
 
 # Conduit
@@ -12,11 +12,12 @@ Treat these as separate phases:
 1. `Compose(root, &layout)` binds paths to a struct.
 2. `EnsureDeep` creates declared structure.
 3. `DefaultDeep` seeds missing in-memory defaults for already composed or cached items.
-4. `DiscoverDeep` discovers slot entries from disk without loading typed file content.
-5. `LoadDeep` reads typed file content and discovers slot entries from disk.
+4. `DiscoverDeep` discovers slot entries from disk and refreshes stateful disk knowledge without loading content.
+5. `LoadDeep` reads stateful content and discovers slot entries from disk.
 6. `RenderDeep` derives text content into memory for renderable template files.
-7. `SyncDeep` writes loaded or dirty typed or rendered content back to disk.
-8. `ScanDeep` refreshes disk-presence metadata without loading content.
+7. `ValidateDeep` checks the already composed or cached layout without mutating it.
+8. `SyncDeep` writes loaded or dirty syncable state back to disk.
+9. `ScanDeep` refreshes disk-presence metadata without loading content.
 
 Conduit does not reconcile disk and memory for you. There is no background sync and no merge policy. Discovery only happens when you explicitly ask for `DiscoverDeep` or `LoadDeep`.
 
@@ -26,15 +27,16 @@ Conduit does not reconcile disk and memory for you. There is no background sync 
 - `Compose` binds paths only. It does not touch the filesystem.
 - `EnsureDeep` creates structure but does not load data.
 - `DefaultDeep` applies defaults in memory only. It does not read or write disk state.
-- `DiscoverDeep` discovers `Slot[T]` items that already exist on disk without loading typed files.
-- `LoadDeep` reads typed files and discovers `Slot[T]` items that already exist on disk.
+- `DiscoverDeep` discovers `Slot[T]`, `FileSlot[T]`, and `LinkSlot[T]` items that already exist on disk without loading content.
+- `LoadDeep` reads syncable state such as typed files, text templates, and links, and discovers dynamic slot items that already exist on disk.
 - `RenderDeep` derives text into memory only. It does not discover slots or write files.
-- `SyncDeep` only writes typed files that currently hold content in memory.
-- `ScanDeep` updates "present vs missing" knowledge only; it does not load bytes or replace memory.
+- `ValidateDeep` checks the current composed or cached shape without creating, loading, or writing anything.
+- `SyncDeep` only writes syncable nodes that currently hold a cached value or link target in memory.
+- `ScanDeep` updates "present vs missing" knowledge only; it does not load bytes, target strings, or replace memory.
 - `Slot[T]` discovery is asymmetric:
-  `DiscoverDeep` discovers entries from disk and preserves unloaded typed-file memory.
+  `DiscoverDeep` discovers entries from disk and preserves unloaded cached state.
   `LoadDeep` discovers entries from disk.
-  `DefaultDeep`, `RenderDeep`, `ScanDeep`, and `SyncDeep` only recurse into already cached entries.
+  `DefaultDeep`, `RenderDeep`, `ScanDeep`, `ValidateDeep`, and `SyncDeep` only recurse into already cached entries.
 
 ## Layout declaration
 
@@ -44,7 +46,9 @@ Use:
 
 - `layout:"."` for the current root
 - relative paths for children
-- `Slot[*T]` for repeated child layouts under one directory
+- `Slot[*T]` for repeated child directories under one directory
+- `FileSlot[T]` for repeated direct-child files
+- `LinkSlot[T]` for repeated direct-child symlink entries
 
 Example:
 
@@ -91,7 +95,7 @@ Common methods:
 - `Dir(name)`
 - `File(name)`
 - `Ensure(ctx)`
-- `DeleteIfExists()`
+- `DeleteIfExists(ctx)`
 
 ### `File`
 
@@ -103,9 +107,11 @@ Common methods:
 - `Exists()`
 - `ReadBytes()`
 - `ReadBytesIfExists()`
-- `WriteBytes(data, dirMode, fileMode)`
+- `WriteBytes(data, ctx)`
+- `OpenRead(ctx, op)` / `OpenWrite(ctx, op)` and the other `Open*` variants
+- `Append*`, `Concat*`, `Transform*`, `Hash`, and `HashHex`
 - `Ensure(ctx)`
-- `DeleteIfExists()`
+- `DeleteIfExists(ctx)`
 
 ### `Exec`
 
@@ -122,30 +128,57 @@ Common methods:
 
 Use `RunOptions.Interpreter` when the file should be invoked through `sh`, `python3`, etc.
 
+### `Link`
+
+`Link` is a stateful symlink node. It tracks a cached target string in memory using the same disk/memory-state model as typed files.
+
+Common methods:
+
+- `Target()` / `MustTarget()`
+- `SetTarget(target)` / `SetDefaultTarget(target)`
+- `ResolvedTargetPath()` / `TargetExists()` / `IsDangling()`
+- `Load()` / `Discover()` / `Scan()`
+- `Sync(ctx)` / `Delete(ctx)` / `Unload()`
+
+Important rules:
+
+- `Link` manages only the symlink entry at `Path()`.
+- `Load()` succeeds for dangling symlinks because it reads the raw `os.Readlink` target.
+- `Sync(ctx)` creates or rewrites the symlink entry itself. It does not create or validate the target payload.
+- `EnsureDeep` does not materialize declared links.
+
+## Path safety and writes
+
+- `Context.PathSafetyPolicy` defaults to `PathSafetyRejectSymlinkParents`. Set `PathSafetyFollowSymlinks` only when following symlink parents is intentional.
+- `OpenPolicy` controls whether `File.Open*` helpers require an existing file or add `os.O_CREATE`.
+- `Context.WritePolicy` controls `File.WriteBytes`: `WriteDirect` rewrites in place, `WriteAtomicReplace` stages through a temp file and replaces atomically when the filesystem allows it.
+- When using atomic replacement, `Context.TempFilePlacement` and `Context.TempDir` control where the temp file is staged.
+
 ## Typed files
 
-The stateful types are:
+The codec-backed typed file wrappers are:
 
 - `formats.JSONFile[T]`
 - `formats.YAMLFile[T]`
 - `formats.TOMLFile[T]`
-- `layout.TextTemplate[C]`
 
-The typed files expose the same `Format[T]` behavior:
+They expose the same `Format[T]` behavior:
 
 - `Load() (bool, error)`
 - `LoadOrInit(defaultValue)`
+- `Read()` / `ReadIfExists()`
 - `Get() (T, bool)` / `MustGet() T`
-- `Set(value)`
-- `SetDefault(value)`
+- `Set(value)` / `SetDefault(value)`
+- `Write(value, ctx)`
 - `Save(ctx)`
 - `Sync(ctx)`
 - `Discover()`
 - `Scan()`
 - `Clear()`
 - `Unload()`
-- `Delete()`
+- `Delete(ctx)`
 - `HasContent()`
+- `DiskState()` / `MemoryState()`
 - `HasBeenLoaded()`
 - `IsDirty()`
 
@@ -166,7 +199,7 @@ High-value behavioral rules:
 - `Sync` is a no-op if no content is loaded.
 - `Scan` preserves memory and only refreshes disk knowledge.
 - `Discover` has the same typed-file effect as `Scan`; the distinction shows up during deep traversal.
-- `Delete` removes the file on disk and clears memory.
+- `Delete(ctx)` removes the file on disk and clears memory.
 
 Choose format by consumer:
 
@@ -184,7 +217,7 @@ Useful methods:
 
 - all string-content methods analogous to `Format[string]`
 - `SetContext(ctx)` / `GetContext()` / `MustContext()`
-- `SetDefaultContext(ctx)`
+- `SetDefaultContext(ctx)` / `HasContext()` / `ClearContext()`
 - `RenderTemplate(tpl)`
 - `SetRendered(value)`
 
@@ -218,11 +251,28 @@ Important methods:
 - `Require(name)` only succeeds if the child directory already exists
 - `Get(name)` returns cached items only
 - `Keys()` returns sorted cached keys only
-- `DiscoverDeep(ctx)` discovers child directories from disk and scans them without loading typed files
+- `DiscoverDeep(ctx)` discovers child directories from disk and scans them without loading stateful content
 - `LoadDeep(ctx)` discovers child directories from disk and loads them
-- `DefaultDeep()`, `RenderDeep()`, `ScanDeep(ctx)`, and `SyncDeep(ctx)` recurse only into cached items
+- `DefaultDeep()`, `RenderDeep()`, `ScanDeep(ctx)`, `ValidateDeep(opts)`, and `SyncDeep(ctx)` recurse only into cached items
 
-Use `Add` for explicit creation. Use `DiscoverDeep` when you want discovery without loading typed content. Use `LoadDeep` when disk is authoritative and you want both discovery and content loading.
+Use `Add` for explicit creation. Use `DiscoverDeep` when you want discovery without loading stateful content. Use `LoadDeep` when disk is authoritative and you want both discovery and content loading.
+
+## `FileSlot[T]` and `LinkSlot[T]`
+
+- `FileSlot[T]` models repeated direct-child files under one directory.
+- `LinkSlot[T]` models repeated direct-child symlink entries under one directory.
+- Their cache and traversal behavior mirrors `Slot[T]`, but discovery is type-specific:
+  `FileSlot[T]` discovers regular files only.
+  `LinkSlot[T]` discovers symlink entries only.
+- `RenderDeep` and `DefaultDeep` recurse into cached `FileSlot[T]` items as well.
+- `LinkSlot[T]` supports only the built-in link family: `layout.Link`, `layout.FileLink`, and `layout.DirLink`.
+
+## Validation and reporting
+
+- `ValidateDeep(target, opts)` is the non-mutating validation phase.
+- `Context.Reporter` collects path-level results during deep operations such as ensure, load, discover, scan, and sync.
+- `ValidateOptions.Reporter` does the same for validation.
+- Use `conduit.Report` when you want an in-memory report implementation you can inspect after a pass.
 
 ## Canonical workflows
 
@@ -312,7 +362,9 @@ Use `Scan` / `ScanDeep` when you need existence information without loading or o
 - expecting `LoadOrInit` to write defaults immediately
 - expecting `DefaultDeep` to read from disk or discover slots
 - expecting `RenderDeep` to write files immediately
+- expecting `ValidateDeep` to discover or load children for you
 - expecting `SyncDeep` to create uncached slot items automatically
+- expecting `SyncDeep` to materialize a link that has no cached target
 - assuming `Keys()` reflects the filesystem without a prior `DiscoverDeep` or `LoadDeep`
 - using `MustGet()` before `Load`, `LoadOrInit`, or `Set`
 - using `Save` when no content is loaded and expecting a no-op; use `Sync` for that
@@ -323,6 +375,6 @@ When modifying code that uses Conduit:
 
 - identify whether disk or memory is authoritative for the current step
 - keep the operation sequence explicit rather than collapsing it into helper magic
-- prefer `EnsureDeep` for "declare structure", `DefaultDeep` for "seed missing memory", `DiscoverDeep` for "enumerate existing structure", `LoadDeep` for "read existing state", `RenderDeep` for "derive text into memory", and `SyncDeep` for "persist current memory"
-- use `Slot[T]` only when children are keyed directories with the same layout shape
-- use plain `File` for bytes, typed files for codec-backed state, and `TextTemplate[C]` for derived text that should participate in the deep phase model
+- prefer `EnsureDeep` for "declare structure", `DefaultDeep` for "seed missing memory", `DiscoverDeep` for "enumerate existing structure", `LoadDeep` for "read existing state", `RenderDeep` for "derive text into memory", `ValidateDeep` for "check current state", and `SyncDeep` for "persist current memory"
+- use `Slot[T]` for keyed child directories, `FileSlot[T]` for keyed child files, and `LinkSlot[T]` for keyed child symlink entries
+- use plain `File` for bytes, typed files for codec-backed state, `Link` for managed symlink entries, and `TextTemplate[C]` for derived text that should participate in the deep phase model

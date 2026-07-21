@@ -5,7 +5,7 @@ Conduit is a contract-based content manager for Go.
 
 The module is split into three public packages:
 
-- `github.com/qlustra/conduit` for operations, `Context`, sync policy, open policy, validation, and reporting types
+- `github.com/qlustra/conduit` for operations, `Context`, policy, validation, and reporting types
 - `github.com/qlustra/conduit/layout` for structural nodes such as `Dir`, `File`, `Link`, `Exec`, `Slot[T]`, `FileSlot[T]`, `LinkSlot[T]`, and `TextTemplate[C]`
 - `github.com/qlustra/conduit/formats` for codec-backed typed files such as `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`
 
@@ -13,10 +13,12 @@ It lets you describe a filesystem as semantic Go types, then move state explicit
 
 - `Compose` binds paths to a layout.
 - `EnsureDeep` materializes declared structure.
-- `DiscoverDeep` discovers declared structure from disk without loading typed content.
-- `LoadDeep` reads disk content into memory.
+- `DefaultDeep` seeds missing in-memory defaults for already composed or cached items.
+- `DiscoverDeep` discovers slot-backed structure and refreshes stateful disk knowledge without loading content.
+- `LoadDeep` reads stateful disk content into memory.
+- `RenderDeep` derives text templates into memory.
 - `ValidateDeep` checks the already composed or cached layout without mutating it.
-- `SyncDeep` writes sync-eligible typed memory state back to disk.
+- `SyncDeep` writes sync-eligible in-memory state back to disk.
 - `ScanDeep` observes disk presence for already composed items.
 
 There is no implicit reconciliation loop, merge policy, or background sync. You decide which side is authoritative and when data moves.

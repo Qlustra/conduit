@@ -100,7 +100,7 @@ for _, name := range ws.Services.Keys() {
 }
 ```
 
-Use `DiscoverDeep` when you want slot discovery but do not want typed file content in memory.
+Use `DiscoverDeep` when you want slot discovery but do not want stateful content in memory.
 
 ## Discover and then load content
 
@@ -120,7 +120,7 @@ for _, name := range ws.Services.Keys() {
 }
 ```
 
-`ScanDeep` does not enumerate new slot entries. `DiscoverDeep` does, while still preserving unloaded typed-file memory.
+`ScanDeep` does not enumerate new slot entries. `DiscoverDeep` does, while still preserving unloaded cached state.
 
 ## Initialize defaults lazily
 

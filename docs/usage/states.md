@@ -1,11 +1,11 @@
 # States usage
 
-Conduit's typed files track two independent state axes:
+Conduit's stateful file wrappers track two independent state axes:
 
 - disk state: what the file layer currently knows about the filesystem
-- memory state: what the typed file currently knows about in-memory content
+- memory state: what the wrapper currently knows about its in-memory value
 
-This applies to `Format[T]` and therefore to `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`.
+This applies directly to `Format[T]` and therefore to `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`. `TextTemplate[C]` uses the same file-state model for rendered text, and `Link` uses the same disk and memory enums for cached symlink targets.
 
 The important rule is that these axes are deliberately separate. A memory operation does not automatically rewrite disk knowledge, and a disk observation does not automatically replace in-memory content.
 
@@ -45,11 +45,11 @@ How disk state changes:
 ```mermaid
 stateDiagram
   [*] --> DiskUnknown
-  DiskUnknown --> DiskMissing: Scan() / Discover() / Load() missing / Delete()
+  DiskUnknown --> DiskMissing: Scan() / Discover() / Load() missing / Delete(ctx)
   DiskUnknown --> DiskPresent: Scan() / Discover() / Load() present / Save()
-  DiskMissing --> DiskMissing: Scan() / Discover() / Load() missing / Delete()
+  DiskMissing --> DiskMissing: Scan() / Discover() / Load() missing / Delete(ctx)
   DiskMissing --> DiskPresent: Scan() / Discover() / Load() present / Save()
-  DiskPresent --> DiskMissing: Scan() / Discover() / Load() missing / Delete()
+  DiskPresent --> DiskMissing: Scan() / Discover() / Load() missing / Delete(ctx)
   DiskPresent --> DiskPresent: Scan() / Discover() / Load() present / Save()
 ```
 
@@ -84,16 +84,16 @@ stateDiagram
   MemoryUnknown --> MemoryLoaded: Load() present
   MemoryUnknown --> MemoryDirty: Set() / LoadOrInit() missing
   MemoryLoaded --> MemoryLoaded: Load() present
-  MemoryLoaded --> MemoryUnknown: Load() missing / Clear() / Unload() / Delete()
+  MemoryLoaded --> MemoryUnknown: Load() missing / Clear() / Unload() / Delete(ctx)
   MemoryLoaded --> MemoryDirty: Set()
   MemoryLoaded --> MemorySynced: Save() / Sync()
   MemoryDirty --> MemoryDirty: Set() / LoadOrInit() missing
   MemoryDirty --> MemoryLoaded: Load() present
-  MemoryDirty --> MemoryUnknown: Load() missing / Clear() / Unload() / Delete()
+  MemoryDirty --> MemoryUnknown: Load() missing / Clear() / Unload() / Delete(ctx)
   MemoryDirty --> MemorySynced: Save() / Sync()
   MemorySynced --> MemoryDirty: Set()
   MemorySynced --> MemoryLoaded: Load() present
-  MemorySynced --> MemoryUnknown: Load() missing / Clear() / Unload() / Delete()
+  MemorySynced --> MemoryUnknown: Load() missing / Clear() / Unload() / Delete(ctx)
   MemorySynced --> MemorySynced: Save() / Sync()
 ```
 
@@ -118,7 +118,7 @@ The table below focuses on `Format[T]` behavior.
 | `Sync()` without content  | unchanged           | unchanged             | no-op                           |
 | `Clear()`                 | unchanged           | set to unknown        | clear content                   |
 | `Unload()`                | unchanged           | set to unknown        | clear content                   |
-| `Delete()`                | set to missing      | set to unknown        | delete file and clear content   |
+| `Delete(ctx)`             | set to missing      | set to unknown        | delete file and clear content   |
 
 ## Important behaviors
 

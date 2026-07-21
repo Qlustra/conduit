@@ -60,7 +60,7 @@ Fields:
 - `FileMode`: mode used when creating regular files
 - `ExecMode`: mode used when creating or ensuring `Exec` files
 - `EnsurePolicy`: selects which node kinds `Ensure` and `EnsureDeep` may materialize
-- `SyncPolicy`: selects which typed memory states `Sync` and `SyncDeep` may write, with optional disk-state filters
+- `SyncPolicy`: selects which stateful memory states `Sync` and `SyncDeep` may write, with optional disk-state filters
 - `PathSafetyPolicy`: controls whether mutating typed filesystem operations reject symlink parents during path resolution
 - `WritePolicy`: selects direct rewrites or per-file atomic replacement for `File.WriteBytes`
 - `TempFilePlacement`: selects where atomic writes create their temporary file
@@ -299,7 +299,7 @@ type SyncPolicy uint8
 
 Description:
 
-- bitmask policy that filters which typed memory states are writable during `Sync` and `SyncDeep`, with optional disk-state gates
+- bitmask policy that filters which stateful memory states are writable during `Sync` and `SyncDeep`, with optional disk-state gates
 
 Constants:
 
@@ -365,7 +365,7 @@ Notable behavior:
 - ensures syncable stateful wrappers only when `ctx.EnsurePolicy` includes them
 - records `EnsureSkippedPolicy` for visited nodes skipped by `ctx.EnsurePolicy`
 - only ensures cached slot items such as `layout.Slot[T]`, `layout.FileSlot[T]`, and `layout.LinkSlot[T]`
-- does not load typed file content
+- does not load stateful content
 - does not discover new slot items from disk
 - returns an error if `target` is nil
 
@@ -377,7 +377,7 @@ func LoadDeep(target any, ctx Context) (conduit.ResultCode, error)
 
 Description:
 
-- recursively loads typed content from disk into memory
+- recursively loads stateful content from disk into memory
 
 Arguments:
 
@@ -391,8 +391,9 @@ Returns:
 
 Notable behavior:
 
-- loads `layout.Format`-backed files such as `formats.JSONFile[T]`, `formats.YAMLFile[T]`, and `formats.TOMLFile[T]`
+- loads stateful nodes such as `layout.Link`, `layout.TextTemplate[C]`, and `layout.Format`-backed files
 - discovers slot-backed entries from disk according to slot kind
+- composes and loads discovered children recursively
 - does not create missing files
 - leaves uncached missing slot entries undiscovered until they exist on disk
 - returns an error if `target` is nil
@@ -405,7 +406,7 @@ func DiscoverDeep(target any, ctx Context) (conduit.ResultCode, error)
 
 Description:
 
-- recursively discovers slot-backed structure from disk without loading typed file content
+- recursively discovers slot-backed structure from disk without loading stateful content
 
 Arguments:
 
@@ -421,8 +422,8 @@ Notable behavior:
 
 - discovers slot-backed entries from disk according to slot kind
 - composes discovered children recursively
-- updates typed-file disk state without loading bytes into memory
-- preserves existing in-memory values and memory state
+- updates disk state for stateful nodes such as links, text templates, and format-backed files without loading bytes or target strings into memory
+- preserves existing in-memory values, targets, and memory state
 - does not create missing files
 - returns an error if `target` is nil
 
@@ -434,7 +435,7 @@ func SyncDeep(target any, ctx Context) (conduit.ResultCode, error)
 
 Description:
 
-- recursively writes sync-eligible typed in-memory content back to disk
+- recursively writes sync-eligible in-memory state back to disk
 
 Arguments:
 
@@ -448,8 +449,8 @@ Returns:
 
 Notable behavior:
 
-- only writes typed files that currently have content loaded in memory
-- applies `ctx.SyncPolicy` to typed memory state and optional disk-state filters before writing
+- writes stateful nodes such as links, text templates, and format-backed files only when they currently have a syncable in-memory value
+- applies `ctx.SyncPolicy` to memory state and optional disk-state filters before writing
 - only syncs cached slot items
 - `layout.Slot[T]`, `layout.FileSlot[T]`, and `layout.LinkSlot[T]` ensure cached children before syncing them, and that ensure pass respects `ctx.EnsurePolicy`
 - does not materialize standalone raw `layout.Dir` or `layout.File` nodes
@@ -478,8 +479,8 @@ Returns:
 
 Notable behavior:
 
-- updates disk state without loading file content
-- preserves current in-memory values and memory state
+- updates disk state for stateful nodes without loading file content or replacing cached link targets
+- preserves current in-memory values, targets, and memory state
 - only scans cached slot items
 - does not discover new slot entries from disk
 - returns an error if `target` is nil
@@ -510,7 +511,7 @@ Notable behavior:
 - calls `ValidateDeep(opts)` on nodes that implement `layout.DeepValidator`
 - only visits already composed or cached children
 - does not discover new slot entries from disk
-- does not read from disk into typed memory
+- does not read from disk into stateful memory
 - does not render templates or write to disk
 - built-in `File`, `Dir`, `Exec`, and link nodes apply `opts.PathSafetyPolicy` during validation
 - returns an error if `target` is nil
@@ -534,7 +535,7 @@ Notable behavior:
 - calls `Render() (string, error)` on nodes that implement `layout.Renderable`
 - otherwise, calls `Template()` and `RenderTemplate(...)` on nodes that implement `layout.Templatable`
 - stores rendered text in memory via `SetRendered(string)`
-- only visits cached `layout.Slot[T]` items
+- only visits cached dynamic children such as `layout.Slot[T]` and `layout.FileSlot[T]`
 - does not discover new slot entries from disk
 - does not write to disk; pair it with `SyncDeep` to persist rendered content
 - `layout.Renderable` takes precedence over `layout.Templatable` when a type implements both
@@ -557,7 +558,7 @@ Arguments:
 Notable behavior:
 
 - calls `Default() error` on nodes that implement `layout.Defaulter`
-- only visits cached `layout.Slot[T]` items
+- only visits cached dynamic children such as `layout.Slot[T]` and `layout.FileSlot[T]`
 - does not discover new slot entries from disk
 - does not read from disk
 - does not write to disk; pair it with `RenderDeep` or `SyncDeep` as needed

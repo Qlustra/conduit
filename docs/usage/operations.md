@@ -31,7 +31,7 @@ What it does:
 
 What it does not do:
 
-- load typed content into memory
+- load stateful content into memory
 - discover new slot entries from disk
 - delete anything
 
@@ -43,6 +43,29 @@ For slot types such as `Slot[T]`, `FileSlot[T]`, and `LinkSlot[T]`, only cached 
 - `conduit.EnsureScaffold` materializes raw `Dir`, `File`, and `Exec` nodes but skips syncable stateful wrappers
 - `conduit.EnsureDirs | conduit.EnsureSyncables` creates directories and syncable backing files, but skips raw standalone files
 
+## Default
+
+`DefaultDeep(target)` applies in-memory defaults without consulting disk:
+
+```go
+err := conduit.DefaultDeep(&ws)
+```
+
+What it does:
+
+- calls `Default() error` on nodes that implement it
+- seeds only already composed or cached children
+- preserves existing in-memory values when wrappers use `SetDefault(...)`, `SetDefaultContext(...)`, or `SetDefaultTarget(...)`
+
+What it does not do:
+
+- read from disk
+- discover new slot entries from disk
+- render templates
+- write anything back to disk
+
+This makes `DefaultDeep` the in-memory seeding phase that usually sits before `RenderDeep`, `ValidateDeep`, or `SyncDeep`.
+
 ## Load
 
 `LoadDeep(target, ctx)` reads filesystem content into the in-memory model:
@@ -53,8 +76,8 @@ _, err := conduit.LoadDeep(&ws, conduit.DefaultContext)
 
 What it does:
 
-- loads typed files such as `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`
-- discovers slot entries by listing child directories on disk
+- loads stateful nodes such as `layout.Link`, `layout.TextTemplate[C]`, and format-backed files
+- discovers slot, file-slot, and link-slot entries from disk according to slot kind
 - composes and loads discovered slot items recursively
 
 What it does not do:
@@ -63,11 +86,11 @@ What it does not do:
 - write anything back to disk
 - remove cached slot items that no longer exist
 
-For a typed file, loading a missing file clears in-memory content and marks the file as missing.
+For stateful nodes, a missing load marks disk state missing and clears the cached in-memory value or link target.
 
 ## Discover
 
-`DiscoverDeep(target, ctx)` discovers the declared layout from disk without loading typed file content:
+`DiscoverDeep(target, ctx)` discovers the declared layout from disk without loading stateful content:
 
 ```go
 _, err := conduit.DiscoverDeep(&ws, conduit.DefaultContext)
@@ -75,10 +98,10 @@ _, err := conduit.DiscoverDeep(&ws, conduit.DefaultContext)
 
 What it does:
 
-- discovers slot entries by listing child directories on disk
+- discovers slot, file-slot, and link-slot entries from disk according to slot kind
 - composes discovered slot items recursively
-- updates typed-file disk state through the declared layout
-- preserves the current in-memory content and memory state
+- updates disk state for stateful nodes such as links, text templates, and format-backed files
+- preserves the current in-memory content, target, and memory state
 
 What it does not do:
 
@@ -86,11 +109,34 @@ What it does not do:
 - create missing files
 - write anything back to disk
 
-This makes `DiscoverDeep` the middle ground between `LoadDeep` and `ScanDeep`: it discovers structure like `LoadDeep`, but it only observes typed files like `ScanDeep`.
+This makes `DiscoverDeep` the middle ground between `LoadDeep` and `ScanDeep`: it discovers structure like `LoadDeep`, but it only observes stateful nodes like `ScanDeep`.
+
+## Render
+
+`RenderDeep(target)` renders derived text templates into cached file content:
+
+```go
+err := conduit.RenderDeep(&ws)
+```
+
+What it does:
+
+- calls `Render() (string, error)` on nodes that implement `layout.Renderable`
+- otherwise, calls `Template()` and `RenderTemplate(...)` on nodes that implement `layout.Templatable`
+- stores rendered text in memory via `SetRendered(string)`
+- visits only already composed or cached children
+
+What it does not do:
+
+- discover new slot entries from disk
+- create missing files
+- write anything back to disk
+
+This makes `RenderDeep` the derive-in-memory phase that usually sits after `DefaultDeep` and before `ValidateDeep` or `SyncDeep`.
 
 ## Sync
 
-`SyncDeep(target, ctx)` writes sync-eligible in-memory typed content back to disk:
+`SyncDeep(target, ctx)` writes sync-eligible in-memory state back to disk:
 
 ```go
 _, err := conduit.SyncDeep(&ws, conduit.DefaultContext)
@@ -98,9 +144,9 @@ _, err := conduit.SyncDeep(&ws, conduit.DefaultContext)
 
 What it does:
 
-- writes typed files that currently hold content and match `ctx.SyncPolicy`
+- writes sync-eligible in-memory state for format-backed files, text templates, and links
 - syncs already cached slot items recursively
-- runs the slot/file-slot preparation ensure phase under the same `ctx.EnsurePolicy`
+- runs the slot, file-slot, and link-slot preparation ensure phase under the same `ctx.EnsurePolicy`
 - allows callers to choose rewrite behavior per sync pass
 
 What it does not do:
@@ -110,7 +156,7 @@ What it does not do:
 - delete files or directories that are missing from memory
 - merge disk content with memory content
 
-For typed files, `Sync` returns a skipped result when no content is loaded or when the current memory state is excluded by `ctx.SyncPolicy`.
+For stateful nodes, `Sync` returns a skipped result when no syncable value is cached or when the current memory state is excluded by `ctx.SyncPolicy`.
 
 ## Scan
 
@@ -122,8 +168,8 @@ _, err := conduit.ScanDeep(&ws, conduit.DefaultContext)
 
 What it does:
 
-- updates the disk state for typed files
-- preserves the current in-memory content and memory state
+- updates disk state for stateful nodes such as links, text templates, and format-backed files
+- preserves the current in-memory content, target, and memory state
 - scans cached slot items recursively
 
 What it does not do:
@@ -154,7 +200,7 @@ What it does not do:
 
 - create missing files or directories
 - discover new slot entries from disk
-- load typed content into memory
+- load stateful content into memory
 - render templates
 - write anything back to disk
 
@@ -184,12 +230,14 @@ Every filesystem operation accepts a `Context`:
 
 ```go
 ctx := conduit.Context{
-	DirMode:      0o755,
-	FileMode:     0o644,
-	ExecMode:     0o755,
-	EnsurePolicy: conduit.EnsureAll,
-	SyncPolicy:   conduit.SyncRewrite,
-	Reporter:     &conduit.Report{},
+	DirMode:          0o755,
+	FileMode:         0o644,
+	ExecMode:         0o755,
+	EnsurePolicy:     conduit.EnsureAll,
+	SyncPolicy:       conduit.SyncRewrite,
+	PathSafetyPolicy: conduit.PathSafetyRejectSymlinkParents,
+	WritePolicy:      conduit.WriteDirect,
+	Reporter:         &conduit.Report{},
 }
 ```
 
@@ -197,7 +245,10 @@ ctx := conduit.Context{
 - `FileMode` controls regular files.
 - `ExecMode` controls `Exec` files.
 - `EnsurePolicy` controls which node kinds `Ensure` and `EnsureDeep` may materialize.
-- `SyncPolicy` controls which typed memory states `Sync` and `SyncDeep` may write, with optional extra disk-state filters.
+- `SyncPolicy` controls which stateful memory states `Sync` and `SyncDeep` may write, with optional extra disk-state filters.
+- `PathSafetyPolicy` controls whether mutating operations reject symlink parents during path resolution.
+- `WritePolicy` controls direct rewrites vs atomic replacement in `File.WriteBytes`.
+- `TempFilePlacement` and `TempDir` control where atomic writes stage their temporary file.
 - `Reporter` optionally collects per-path operation results during deep traversal.
 
 Available ensure policy bits:
@@ -215,15 +266,31 @@ Available ensure policy presets:
 
 Available sync policies:
 
-- `conduit.SyncRewrite`: write loaded, dirty, and already-synced typed content
-- `conduit.SyncIfDirty`: write only dirty typed content
-- `conduit.SyncIfUnsynced`: write loaded and dirty typed content, but skip already-synced content
+- `conduit.SyncRewrite`: write loaded, dirty, and already-synced stateful content
+- `conduit.SyncIfDirty`: write only dirty stateful content
+- `conduit.SyncIfUnsynced`: write loaded and dirty stateful content, but skip already-synced content
 - `conduit.SyncIfMissing`: write only when the file was last observed missing
 
 Available sync filter bits:
 
 - memory-state filters: `conduit.SyncOnLoaded`, `conduit.SyncOnSynced`, `conduit.SyncOnDirty`
 - disk-state filters: `conduit.SyncOnDiskUnknown`, `conduit.SyncOnDiskMissing`, `conduit.SyncOnDiskPresent`
+
+Available path safety policies:
+
+- `conduit.PathSafetyRejectSymlinkParents`
+- `conduit.PathSafetyFollowSymlinks`
+
+Available write policies:
+
+- `conduit.WriteDirect`
+- `conduit.WriteAtomicReplace`
+
+Available atomic-write temp placements:
+
+- `conduit.TempFileSystem`
+- `conduit.TempFileDir`
+- `conduit.TempFileAdjacent`
 
 Behavior notes:
 
@@ -235,13 +302,16 @@ Behavior notes:
 
 ```go
 conduit.Context{
-	DirMode:      0o755,
-	FileMode:     0o644,
-	ExecMode:     0o755,
-	EnsurePolicy: conduit.EnsureAll,
-	SyncPolicy:   conduit.SyncRewrite,
+	DirMode:          0o755,
+	FileMode:         0o644,
+	ExecMode:         0o755,
+	EnsurePolicy:     conduit.EnsureAll,
+	SyncPolicy:       conduit.SyncRewrite,
+	PathSafetyPolicy: conduit.PathSafetyRejectSymlinkParents,
 }
 ```
+
+`WritePolicy` defaults to `conduit.WriteDirect`, and `TempFilePlacement` defaults to `conduit.TempFileSystem` when you enable atomic replacement.
 
 Collect a report during a deep operation:
 
@@ -282,7 +352,7 @@ svc.Config.Set(ServiceConfig{Name: "billing", Port: 8080})
 _, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
 ```
 
-Sync only dirty typed content during a pass:
+Sync only dirty stateful content during a pass:
 
 ```go
 ctx := conduit.DefaultContext
@@ -300,7 +370,7 @@ ctx.SyncPolicy = conduit.SyncIfDirty | conduit.SyncOnDiskMissing
 _, _ = conduit.SyncDeep(&ws, ctx)
 ```
 
-Load an existing workspace, edit it, then persist:
+Discover an existing workspace without loading stateful content:
 
 ```go
 var ws Workspace
@@ -339,4 +409,4 @@ svc := ws.Services.MustAt("billing")
 _, _ = conduit.ScanDeep(svc, conduit.DefaultContext)
 ```
 
-The core rule is simple: Conduit never decides direction for you. You choose whether the next step is ensure, discover, load, sync, or scan, and you choose how aggressive sync should be for typed content.
+The core rule is simple: Conduit never decides direction for you. You choose whether the next step is ensure, default, discover, load, render, validate, sync, or scan, and you choose how aggressive sync should be for stateful content.
