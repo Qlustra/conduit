@@ -3,12 +3,11 @@ Conduit
 
 Conduit is a contract-based content manager for Go.
 
-The module is split into four public packages:
+The module is split into three public packages:
 
 - `github.com/qlustra/conduit` for operations, `Context`, sync policy, open policy, validation, and reporting types
 - `github.com/qlustra/conduit/layout` for structural nodes such as `Dir`, `File`, `Link`, `Exec`, `Slot[T]`, `FileSlot[T]`, `LinkSlot[T]`, and `TextTemplate[C]`
 - `github.com/qlustra/conduit/formats` for codec-backed typed files such as `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`
-- `github.com/qlustra/conduit/pipeline` for buffered file-processing tasks over layout nodes
 
 It lets you describe a filesystem as semantic Go types, then move state explicitly between disk and memory:
 
@@ -140,7 +139,6 @@ Start with the usage guides:
 - [Operations usage](docs/usage/operations.md)
 - [Formats usage](docs/usage/formats.md)
 - [States usage](docs/usage/states.md)
-- [Pipeline usage](docs/usage/pipeline.md)
 
 For raw exported API reference:
 
@@ -148,14 +146,12 @@ For raw exported API reference:
 - [Operations API](docs/api/operations.md)
 - [Layout API](docs/api/layout.md)
 - [Formats API](docs/api/formats.md)
-- [Pipeline API](docs/api/pipeline.md)
 
 Then browse the longer, real-world examples:
 
 - [Layout examples](docs/examples/layout.md)
 - [Operations examples](docs/examples/operations.md)
 - [Formats examples](docs/examples/formats.md)
-- [Pipeline examples](docs/examples/pipeline.md)
 
 ## License
 
