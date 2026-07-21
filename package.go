@@ -10,6 +10,9 @@ type Dir = layout.Dir
 // File is an alias for layout.File.
 type File = layout.File
 
+// FileFingerprint is an alias for layout.FileFingerprint.
+type FileFingerprint = layout.FileFingerprint
+
 // Context is an alias for layout.Context.
 //
 // Use it from the root conduit package when you want the convenience facade.

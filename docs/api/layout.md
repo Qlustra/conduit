@@ -133,6 +133,7 @@ Methods:
 - `Transform(ctx Context, transform TransformFunc) error`: transforms the file's current content in memory, then rewrites the same file
 - `Hash(ctx Context, h hash.Hash) ([]byte, error)`: hashes the file content through `h` and returns digest bytes
 - `HashHex(ctx Context, h hash.Hash) (string, error)`: hashes the file content through `h` and returns lowercase hex
+- `Fingerprint() FileFingerprint`: returns a stateful metadata and checksum observer for repeated change-detection scans
 - `WriteBytes(data []byte, ctx Context) error`: creates parent directories and writes raw bytes
 - `ReadBytes() ([]byte, error)`: reads the file contents
 - `ReadBytesIfExists() ([]byte, bool, error)`: reads the file if present and returns `ok == false` for missing files
@@ -281,6 +282,48 @@ Notable behavior:
 
 - package-level `Transform*` helpers buffer complete transformed output in memory and return it
 - `File.Transform*` helpers rewrite the destination only after the transform succeeds
+
+### `FileFingerprint`
+
+```go
+type FileFingerprint struct{}
+```
+
+Description:
+
+- stateful observer for a `File` that tracks current and previous successful metadata and content observations for cheap change detection
+
+Methods:
+
+- `File() File`: returns the bound file handle
+- `ScanMetadata() (DiskState, error)`: refreshes size and modification-time observation state from `os.Stat`
+- `ScanContent() (DiskState, error)`: refreshes SHA-256 checksum observation state and also refreshes metadata for the same file state
+- `Scan() (DiskState, error)`: refreshes both metadata and content observations
+- `DiskState() DiskState`: returns the last successfully observed disk state
+- `PreviousDiskState() DiskState`: returns the prior successfully observed disk state
+- `HasKnownDiskState() bool`: reports whether a successful observation has been recorded
+- `HasPreviousKnownDiskState() bool`: reports whether a prior successful observation has been recorded
+- `WasObservedOnDisk() bool`: reports whether the last successful observation found the file present
+- `WasPreviouslyObservedOnDisk() bool`: reports whether the prior successful observation found the file present
+- `Size() int64`: returns the last observed size
+- `PreviousSize() int64`: returns the prior observed size
+- `ModTime() time.Time`: returns the last observed modification time
+- `PreviousModTime() time.Time`: returns the prior observed modification time
+- `Checksum() string`: returns the last observed SHA-256 checksum as lowercase hex
+- `PreviousChecksum() string`: returns the prior observed SHA-256 checksum as lowercase hex
+- `ChangedMetadata() bool`: reports whether size or modification time changed while the file stayed present in both metadata observations
+- `ChangedContent() bool`: reports whether content presence or checksum changed between content observations
+- `PresenceChanged() bool`: reports whether the file changed between present and missing
+- `Changed() bool`: reports whether either metadata or content differs from the prior successful observation
+
+Notable behavior:
+
+- a new `FileFingerprint` starts with `DiskUnknown` and no previous observation
+- the first successful metadata or content scan records current state but does not count as a change on its own
+- missing files are recorded as `DiskMissing` without returning an error
+- `ChangedMetadata` and `PresenceChanged` compare the last two successful metadata observations
+- `ChangedContent` compares the last two successful content observations
+- non-missing `os.Stat`, open, hash, and close errors leave current and previous observations unchanged
 
 ### `Exec`
 

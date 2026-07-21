@@ -93,6 +93,7 @@ Useful methods:
 - `ConcatReaders(ctx, opts, srcs...)`, `ConcatBytes(ctx, opts, srcs...)`, `ConcatStrings(ctx, opts, srcs...)`, and `ConcatFiles(ctx, opts, srcs...)` for buffered all-or-nothing rewrites from multiple inputs
 - `TransformReader(ctx, src, fn)`, `TransformBytes(ctx, data, fn)`, `TransformString(ctx, data, fn)`, `TransformFile(ctx, src, fn)`, and `Transform(ctx, fn)` for buffered rewrites after a transform succeeds
 - `Hash(ctx, h)` and `HashHex(ctx, h)` to digest file content through a supplied `hash.Hash`
+- `Fingerprint()` to create a stateful observer for repeated metadata and checksum scans
 - `WriteBytes(data, ctx)`
 - `CopyToPath(path, opts)`, `CopyToFile(dst, opts)`, and `CopyIntoDir(dir, opts)` for streamed file copies
 - `Ensure(ctx)` to create the file and its parent directories
@@ -109,6 +110,39 @@ Use `File` when you want raw bytes and do not need codec-backed state tracking.
 When creation is enabled, the open helpers create parent directories with `Context.DirMode`. Existing symlink leaves are rejected, and symlink parents follow `Context.PathSafetyPolicy`.
 
 The package-level helpers `layout.ConcatReaders`, `layout.ConcatBytes`, `layout.ConcatStrings`, `layout.TransformReader`, `layout.TransformBytes`, `layout.TransformString`, and the `layout.Hash*` functions are useful when you want the same processing behavior without writing through a `File` handle.
+
+`File.Fingerprint()` gives you a stateful scan loop without making `File` itself stateful:
+
+```go
+cfg := layout.NewFile("config.yaml")
+fp := cfg.Fingerprint()
+
+if _, err := fp.ScanMetadata(); err != nil {
+	return err
+}
+
+// ... later ...
+
+if _, err := fp.Scan(); err != nil {
+	return err
+}
+
+if fp.PresenceChanged() {
+	// file appeared or disappeared
+}
+
+if fp.ChangedMetadata() {
+	// size or mtime changed while the file stayed present
+}
+
+if fp.ChangedContent() {
+	// content checksum changed
+}
+
+if fp.Changed() {
+	// any metadata or content change
+}
+```
 
 Mutating `File`, `Dir`, and `Exec` operations are type-strict: they expect the on-disk leaf to match the handle kind and reject symlink leaves instead of following them. `Link` is the type that intentionally manages symlink leaves.
 
