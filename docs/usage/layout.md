@@ -92,6 +92,11 @@ Useful methods:
 - `AppendBytes(data, ctx)`, `AppendString(content, ctx)`, `AppendFile(src, ctx)`, and `AppendFiles(ctx, srcs...)` for append and concat workflows
 - `ConcatReaders(ctx, opts, srcs...)`, `ConcatBytes(ctx, opts, srcs...)`, `ConcatStrings(ctx, opts, srcs...)`, and `ConcatFiles(ctx, opts, srcs...)` for buffered all-or-nothing rewrites from multiple inputs
 - `TransformReader(ctx, src, fn)`, `TransformBytes(ctx, data, fn)`, `TransformString(ctx, data, fn)`, `TransformFile(ctx, src, fn)`, and `Transform(ctx, fn)` for buffered rewrites after a transform succeeds
+- `Inspect(ctx, fn)` to stream file content through caller-defined inspection logic without buffering the whole file in Conduit
+- `Match(ctx, fn)` to stream file content through caller-defined boolean matching logic
+- `MatchIfExists(ctx, fn)` to treat a missing file as `false` instead of an error
+- `InspectTokens(ctx, opts, fn)`, `MatchTokens(ctx, opts, fn)`, and `MatchTokensIfExists(ctx, opts, fn)` for token-oriented scanning through `bufio.Scanner`
+- `InspectLines(ctx, fn)`, `MatchLines(ctx, fn)`, and `MatchLinesIfExists(ctx, fn)` for the common line-oriented case
 - `Hash(ctx, h)` and `HashHex(ctx, h)` to digest file content through a supplied `hash.Hash`
 - `Fingerprint()` to create a stateful observer for repeated metadata and checksum scans
 - `WriteBytes(data, ctx)`
@@ -109,7 +114,9 @@ Use `File` when you want raw bytes and do not need codec-backed state tracking.
 
 When creation is enabled, the open helpers create parent directories with `Context.DirMode`. Existing symlink leaves are rejected, and symlink parents follow `Context.PathSafetyPolicy`.
 
-The package-level helpers `layout.ConcatReaders`, `layout.ConcatBytes`, `layout.ConcatStrings`, `layout.TransformReader`, `layout.TransformBytes`, `layout.TransformString`, and the `layout.Hash*` functions are useful when you want the same processing behavior without writing through a `File` handle.
+The package-level helpers `layout.ConcatReaders`, `layout.ConcatBytes`, `layout.ConcatStrings`, `layout.TransformReader`, `layout.TransformBytes`, `layout.TransformString`, `layout.InspectReader`, `layout.InspectBytes`, `layout.InspectString`, `layout.MatchReader`, `layout.MatchBytes`, `layout.MatchString`, `layout.InspectTokensReader`, `layout.InspectTokensBytes`, `layout.InspectTokensString`, `layout.MatchTokensReader`, `layout.MatchTokensBytes`, `layout.MatchTokensString`, `layout.InspectLinesReader`, `layout.InspectLinesBytes`, `layout.InspectLinesString`, `layout.MatchLinesReader`, `layout.MatchLinesBytes`, `layout.MatchLinesString`, and the `layout.Hash*` functions are useful when you want the same processing behavior without writing through a `File` handle.
+
+Use `TokenOptions` when you want a different `bufio.Scanner` split function or need to raise the maximum token size for long lines or other large tokens.
 
 `File.Fingerprint()` gives you a stateful scan loop without making `File` itself stateful:
 

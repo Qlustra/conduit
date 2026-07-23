@@ -142,6 +142,43 @@ _, _ = svc.Config.Sync(ctx)
 
 This writes the default only after the file has been observed missing, and it skips later sync passes once the file exists.
 
+## Require force only when a file has meaningful content
+
+Goal: treat whitespace-only or comment-only files as safe to replace, while requiring explicit force for real content.
+
+```go
+hasMeaningfulContent := func(line string) (bool, error) {
+	line = strings.TrimSpace(line)
+	if line == "" || strings.HasPrefix(line, "#") {
+		return false, nil
+	}
+	return true, nil
+}
+
+readme := layout.NewFile("/srv/workspace/README.md")
+
+matched, err := readme.MatchLinesIfExists(layout.DefaultContext, hasMeaningfulContent)
+if err != nil {
+	return err
+}
+
+if matched && !force {
+	return fmt.Errorf("refusing to replace %s without --force", readme.Path())
+}
+
+if err := readme.WriteBytes([]byte("# generated\n"), layout.DefaultContext); err != nil {
+	return err
+}
+```
+
+Why the sequence matters:
+
+- `MatchLinesIfExists` keeps your notion of meaningful content in one small callback
+- `MatchLinesIfExists` folds the common missing-file case into `false`
+- `MatchLinesIfExists` removes the `bufio.Scanner` boilerplate for the common line-oriented case
+- the matcher can stop at the first line that proves `--force` is needed
+- the write path stays separate and explicit
+
 ## Render generated files explicitly
 
 Goal: keep derived text artifacts in a separate render phase instead of mixing them into load or sync.

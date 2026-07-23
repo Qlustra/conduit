@@ -126,6 +126,15 @@ Methods:
 - `ConcatBytes(ctx Context, opts ConcatOptions, srcs ...[]byte) error`: concatenates byte slices in memory, then rewrites the file
 - `ConcatStrings(ctx Context, opts ConcatOptions, srcs ...string) error`: concatenates strings in memory, then rewrites the file
 - `ConcatFiles(ctx Context, opts ConcatOptions, srcs ...File) error`: reads source files, concatenates them in memory, then rewrites the file
+- `Inspect(ctx Context, inspect InspectFunc) error`: opens the file read-only and passes streamed content to caller-defined inspection logic
+- `Match(ctx Context, match MatchFunc) (bool, error)`: opens the file read-only and passes streamed content to caller-defined boolean matching logic
+- `MatchIfExists(ctx Context, match MatchFunc) (bool, error)`: matches when the file exists and returns `false, nil` when it is missing
+- `InspectTokens(ctx Context, opts TokenOptions, inspect InspectTokenFunc) error`: opens the file read-only, tokenizes content, and passes tokens to caller-defined inspection logic
+- `MatchTokens(ctx Context, opts TokenOptions, match MatchTokenFunc) (bool, error)`: opens the file read-only, tokenizes content, and passes tokens to caller-defined matching logic
+- `MatchTokensIfExists(ctx Context, opts TokenOptions, match MatchTokenFunc) (bool, error)`: matches tokenized content when the file exists and returns `false, nil` when it is missing
+- `InspectLines(ctx Context, inspect InspectTokenFunc) error`: opens the file read-only and passes lines to caller-defined inspection logic
+- `MatchLines(ctx Context, match MatchTokenFunc) (bool, error)`: opens the file read-only and passes lines to caller-defined matching logic
+- `MatchLinesIfExists(ctx Context, match MatchTokenFunc) (bool, error)`: matches line-oriented content when the file exists and returns `false, nil` when it is missing
 - `TransformReader(ctx Context, src io.Reader, transform TransformFunc) error`: transforms a reader in memory, then rewrites the file
 - `TransformBytes(ctx Context, data []byte, transform TransformFunc) error`: transforms bytes in memory, then rewrites the file
 - `TransformString(ctx Context, data string, transform TransformFunc) error`: transforms a string in memory, then rewrites the file
@@ -150,6 +159,11 @@ Notable behavior:
 - `AppendReader`, `AppendFile`, and `AppendFiles` stream through `io.Copy`; they do not read the whole source into memory first
 - `AppendFiles` appends sources in argument order and may leave already-appended content in place if a later source fails
 - append helpers create parent directories and the destination file when missing
+- `Inspect` streams file content through the callback and does not buffer the whole file in Conduit
+- `Match` streams file content through the callback and returns the callback's boolean result without buffering the whole file in Conduit
+- `MatchIfExists` preserves `Match` behavior for present files but treats `os.ErrNotExist` as `false, nil`
+- token helpers use `bufio.Scanner`; use `TokenOptions` to override split behavior and maximum token size
+- line helpers are thin presets over token helpers using `bufio.ScanLines`
 - `Open*` helpers create parent directories only when the selected `OpenPolicy` adds `os.O_CREATE`
 - concurrent append calls rely on OS append mode for destination offset management, but no whole-call atomicity is guaranteed
 - `Concat*` and `Transform*` helpers buffer complete output before rewriting the destination, so failed reads or transforms leave the destination untouched
@@ -356,7 +370,7 @@ Methods:
 - `JoinComposedPath(parts ...string) (string, bool)`
 - `ComposePath(path string)`
 - `Exists() bool`
-- promoted raw `File` helpers such as `Stat`, `Lstat`, `Chmod`, `Chtimes`, `Open*`, `Append*`, `Concat*`, `Transform*`, `Hash`, `HashHex`, `ReadBytes`, `WriteBytes`, and `CopyTo*`
+- promoted raw `File` helpers such as `Stat`, `Lstat`, `Chmod`, `Chtimes`, `Open*`, `Append*`, `Concat*`, `Inspect`, `Match`, `MatchIfExists`, `InspectTokens`, `MatchTokens`, `MatchTokensIfExists`, `InspectLines`, `MatchLines`, `MatchLinesIfExists`, `Transform*`, `Hash`, `HashHex`, `ReadBytes`, `WriteBytes`, and `CopyTo*`
 - `Chown(uid, gid int, ctx Context) error`
 - `Truncate(size int64, ctx Context) error`
 - `AppendReader(src io.Reader, ctx Context) error`
@@ -364,6 +378,15 @@ Methods:
 - `AppendString(content string, ctx Context) error`
 - `AppendFile(src File, ctx Context) error`
 - `AppendFiles(ctx Context, srcs ...File) error`
+- `Inspect(ctx Context, inspect InspectFunc) error`
+- `Match(ctx Context, match MatchFunc) (bool, error)`
+- `MatchIfExists(ctx Context, match MatchFunc) (bool, error)`
+- `InspectTokens(ctx Context, opts TokenOptions, inspect InspectTokenFunc) error`
+- `MatchTokens(ctx Context, opts TokenOptions, match MatchTokenFunc) (bool, error)`
+- `MatchTokensIfExists(ctx Context, opts TokenOptions, match MatchTokenFunc) (bool, error)`
+- `InspectLines(ctx Context, inspect InspectTokenFunc) error`
+- `MatchLines(ctx Context, match MatchTokenFunc) (bool, error)`
+- `MatchLinesIfExists(ctx Context, match MatchTokenFunc) (bool, error)`
 - `ReadBytes() ([]byte, error)`
 - `ReadBytesIfExists() ([]byte, bool, error)`
 - `WriteBytes(data []byte, ctx Context) error`
@@ -1323,6 +1346,264 @@ func TransformString(data string, transform TransformFunc) (string, error)
 Description:
 
 - applies `transform` to string data and returns transformed text in memory
+
+### `InspectFunc`
+
+```go
+type InspectFunc func(src io.Reader) error
+```
+
+Description:
+
+- inspects streamed content from `src`
+
+### `MatchFunc`
+
+```go
+type MatchFunc func(src io.Reader) (bool, error)
+```
+
+Description:
+
+- matches streamed content from `src`
+
+### `TokenOptions`
+
+```go
+type TokenOptions struct {
+	Split         bufio.SplitFunc
+	InitialBuffer []byte
+	MaxTokenSize  int
+}
+```
+
+Description:
+
+- configures token-oriented inspection and matching helpers built on `bufio.Scanner`
+
+Fields:
+
+- `Split bufio.SplitFunc`: selects tokenization; nil uses `bufio.ScanLines`
+- `InitialBuffer []byte`: optional initial scanner buffer
+- `MaxTokenSize int`: optional maximum token size; zero uses the scanner default
+
+### `InspectTokenFunc`
+
+```go
+type InspectTokenFunc func(token string) error
+```
+
+Description:
+
+- inspects one scanned token
+
+### `MatchTokenFunc`
+
+```go
+type MatchTokenFunc func(token string) (bool, error)
+```
+
+Description:
+
+- matches one scanned token
+
+### `InspectReader`
+
+```go
+func InspectReader(src io.Reader, inspect InspectFunc) error
+```
+
+Description:
+
+- passes `src` to `inspect` without buffering the full content in memory
+
+Notable behavior:
+
+- returns an error when `src` or `inspect` is nil
+
+### `InspectBytes`
+
+```go
+func InspectBytes(data []byte, inspect InspectFunc) error
+```
+
+Description:
+
+- passes byte data to `inspect` without requiring a `File` handle
+
+### `InspectString`
+
+```go
+func InspectString(data string, inspect InspectFunc) error
+```
+
+Description:
+
+- passes string data to `inspect` without requiring a `File` handle
+
+### `MatchReader`
+
+```go
+func MatchReader(src io.Reader, match MatchFunc) (bool, error)
+```
+
+Description:
+
+- passes `src` to `match` without buffering the full content in memory
+
+Notable behavior:
+
+- returns an error when `src` or `match` is nil
+
+### `MatchBytes`
+
+```go
+func MatchBytes(data []byte, match MatchFunc) (bool, error)
+```
+
+Description:
+
+- passes byte data to `match` without requiring a `File` handle
+
+### `MatchString`
+
+```go
+func MatchString(data string, match MatchFunc) (bool, error)
+```
+
+Description:
+
+- passes string data to `match` without requiring a `File` handle
+
+### `InspectTokensReader`
+
+```go
+func InspectTokensReader(src io.Reader, opts TokenOptions, inspect InspectTokenFunc) error
+```
+
+Description:
+
+- scans `src` into tokens and passes them to `inspect`
+
+Notable behavior:
+
+- returns an error when `src` or `inspect` is nil
+- returns an error when `opts.MaxTokenSize` is negative
+
+### `InspectTokensBytes`
+
+```go
+func InspectTokensBytes(data []byte, opts TokenOptions, inspect InspectTokenFunc) error
+```
+
+Description:
+
+- scans byte data into tokens and passes them to `inspect`
+
+### `InspectTokensString`
+
+```go
+func InspectTokensString(data string, opts TokenOptions, inspect InspectTokenFunc) error
+```
+
+Description:
+
+- scans string data into tokens and passes them to `inspect`
+
+### `MatchTokensReader`
+
+```go
+func MatchTokensReader(src io.Reader, opts TokenOptions, match MatchTokenFunc) (bool, error)
+```
+
+Description:
+
+- scans `src` into tokens and passes them to `match` until one matches or scanning ends
+
+Notable behavior:
+
+- returns an error when `src` or `match` is nil
+- returns an error when `opts.MaxTokenSize` is negative
+
+### `MatchTokensBytes`
+
+```go
+func MatchTokensBytes(data []byte, opts TokenOptions, match MatchTokenFunc) (bool, error)
+```
+
+Description:
+
+- scans byte data into tokens and passes them to `match`
+
+### `MatchTokensString`
+
+```go
+func MatchTokensString(data string, opts TokenOptions, match MatchTokenFunc) (bool, error)
+```
+
+Description:
+
+- scans string data into tokens and passes them to `match`
+
+### `InspectLinesReader`
+
+```go
+func InspectLinesReader(src io.Reader, inspect InspectTokenFunc) error
+```
+
+Description:
+
+- scans `src` line by line and passes each line to `inspect`
+
+### `InspectLinesBytes`
+
+```go
+func InspectLinesBytes(data []byte, inspect InspectTokenFunc) error
+```
+
+Description:
+
+- scans byte data line by line and passes each line to `inspect`
+
+### `InspectLinesString`
+
+```go
+func InspectLinesString(data string, inspect InspectTokenFunc) error
+```
+
+Description:
+
+- scans string data line by line and passes each line to `inspect`
+
+### `MatchLinesReader`
+
+```go
+func MatchLinesReader(src io.Reader, match MatchTokenFunc) (bool, error)
+```
+
+Description:
+
+- scans `src` line by line and passes each line to `match`
+
+### `MatchLinesBytes`
+
+```go
+func MatchLinesBytes(data []byte, match MatchTokenFunc) (bool, error)
+```
+
+Description:
+
+- scans byte data line by line and passes each line to `match`
+
+### `MatchLinesString`
+
+```go
+func MatchLinesString(data string, match MatchTokenFunc) (bool, error)
+```
+
+Description:
+
+- scans string data line by line and passes each line to `match`
 
 ### `HashReader`
 

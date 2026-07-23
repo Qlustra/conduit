@@ -93,6 +93,83 @@ This is useful when the filesystem itself is the contract:
 - `EnsureDeep` can create empty script files with executable permissions
 - `Exec` lets the layout invoke those files without hard-coding extra paths elsewhere
 
+## Inspect raw file content without loading it all at once
+
+Use `File.Inspect` when the check is content-sensitive but you do not want Conduit to define the parsing rules for you:
+
+```go
+notes := layout.NewFile("/srv/workspace/NOTES.txt")
+
+err := notes.Inspect(layout.DefaultContext, func(src io.Reader) error {
+	scanner := bufio.NewScanner(src)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		fmt.Println("first meaningful line:", line)
+		return nil
+	}
+	return scanner.Err()
+})
+```
+
+Why this works well:
+
+- the callback gets a normal `io.Reader`, so callers can use `bufio.Scanner`, `bufio.Reader`, `io.ReadAll`, decoders, or custom parsing
+- Conduit handles the file open and path-safety behavior
+- you can stop as soon as your own logic has learned enough
+
+## Reuse the same matcher for files, bytes, and strings
+
+Use `MatchLines` when the check is line-oriented and the result should be a boolean:
+
+```go
+hasMeaningfulContent := func(line string) (bool, error) {
+	line = strings.TrimSpace(line)
+	if line == "" || strings.HasPrefix(line, "#") {
+		return false, nil
+	}
+	return true, nil
+}
+
+matched, _ := layout.MatchLinesString("# note\n\nvalue\n", hasMeaningfulContent)
+present, _ := layout.NewFile("/srv/workspace/NOTES.txt").MatchLines(layout.DefaultContext, hasMeaningfulContent)
+
+_ = matched
+_ = present
+```
+
+Why this works well:
+
+- the same matcher can be reused in tests, helpers, and real file checks
+- callers keep control of what counts as meaningful content
+- later convenience helpers can build on the same boolean shape
+
+## Scan non-line tokens with a custom split
+
+Use token helpers when the input should be split some other way:
+
+```go
+var words []string
+
+_ = layout.InspectTokensString("alpha beta\ngamma", layout.TokenOptions{
+	Split: bufio.ScanWords,
+}, func(token string) error {
+	words = append(words, token)
+	return nil
+})
+
+_ = words
+```
+
+Why this works well:
+
+- the token helpers reuse the same callback shape across strings, bytes, readers, and files
+- `TokenOptions` exposes `bufio.Scanner` split and sizing controls without dropping back to low-level reader plumbing
+- line helpers stay available as the simplest case
+
 ## Flat config bundles with `FileSlot[T]`
 
 ```go

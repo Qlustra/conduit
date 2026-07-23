@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -108,6 +109,139 @@ func TestFileWriteBytesCanFollowSymlinkParentWhenEnabled(t *testing.T) {
 	}
 	if string(got) != "allowed" {
 		t.Fatalf("real payload content = %q, want %q", got, "allowed")
+	}
+}
+
+func TestFileInspectRejectsSymlinkParentByDefault(t *testing.T) {
+	base := t.TempDir()
+	realDir := filepath.Join(base, "real")
+	linkParent := filepath.Join(base, "alias")
+
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(real) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(realDir, "payload.txt"), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile(real payload) error = %v", err)
+	}
+	if err := os.Symlink(realDir, linkParent); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	file := NewFile(filepath.Join(linkParent, "payload.txt"))
+	if err := file.Inspect(DefaultContext, func(src io.Reader) error { return nil }); err == nil {
+		t.Fatal("Inspect() error = nil, want non-nil for symlink parent")
+	}
+}
+
+func TestFileInspectCanFollowSymlinkParentWhenEnabled(t *testing.T) {
+	base := t.TempDir()
+	realDir := filepath.Join(base, "real")
+	linkParent := filepath.Join(base, "alias")
+
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(real) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(realDir, "payload.txt"), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile(real payload) error = %v", err)
+	}
+	if err := os.Symlink(realDir, linkParent); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	ctx := DefaultContext
+	ctx.PathSafetyPolicy = PathSafetyFollowSymlinks
+
+	file := NewFile(filepath.Join(linkParent, "payload.txt"))
+	var got string
+	err := file.Inspect(ctx, func(src io.Reader) error {
+		data, err := io.ReadAll(src)
+		if err != nil {
+			return err
+		}
+		got = string(data)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Inspect() error = %v", err)
+	}
+	if got != "payload" {
+		t.Fatalf("Inspect() content = %q, want %q", got, "payload")
+	}
+}
+
+func TestFileMatchRejectsSymlinkParentByDefault(t *testing.T) {
+	base := t.TempDir()
+	realDir := filepath.Join(base, "real")
+	linkParent := filepath.Join(base, "alias")
+
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(real) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(realDir, "payload.txt"), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile(real payload) error = %v", err)
+	}
+	if err := os.Symlink(realDir, linkParent); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	file := NewFile(filepath.Join(linkParent, "payload.txt"))
+	if _, err := file.Match(DefaultContext, func(src io.Reader) (bool, error) { return false, nil }); err == nil {
+		t.Fatal("Match() error = nil, want non-nil for symlink parent")
+	}
+}
+
+func TestFileMatchCanFollowSymlinkParentWhenEnabled(t *testing.T) {
+	base := t.TempDir()
+	realDir := filepath.Join(base, "real")
+	linkParent := filepath.Join(base, "alias")
+
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(real) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(realDir, "payload.txt"), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile(real payload) error = %v", err)
+	}
+	if err := os.Symlink(realDir, linkParent); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	ctx := DefaultContext
+	ctx.PathSafetyPolicy = PathSafetyFollowSymlinks
+
+	file := NewFile(filepath.Join(linkParent, "payload.txt"))
+	matched, err := file.Match(ctx, func(src io.Reader) (bool, error) {
+		data, err := io.ReadAll(src)
+		if err != nil {
+			return false, err
+		}
+		return string(data) == "payload", nil
+	})
+	if err != nil {
+		t.Fatalf("Match() error = %v", err)
+	}
+	if !matched {
+		t.Fatal("Match() = false, want true")
+	}
+}
+
+func TestFileMatchIfExistsRejectsSymlinkParentByDefault(t *testing.T) {
+	base := t.TempDir()
+	realDir := filepath.Join(base, "real")
+	linkParent := filepath.Join(base, "alias")
+
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
+		t.Fatalf("os.MkdirAll(real) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(realDir, "payload.txt"), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile(real payload) error = %v", err)
+	}
+	if err := os.Symlink(realDir, linkParent); err != nil {
+		t.Fatalf("os.Symlink() error = %v", err)
+	}
+
+	file := NewFile(filepath.Join(linkParent, "payload.txt"))
+	if _, err := file.MatchIfExists(DefaultContext, func(src io.Reader) (bool, error) { return false, nil }); err == nil {
+		t.Fatal("MatchIfExists() error = nil, want non-nil for symlink parent")
 	}
 }
 

@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"errors"
 	"io"
@@ -9,6 +10,365 @@ import (
 	"strings"
 	"testing"
 )
+
+func TestInspectReaderRejectsNilInputs(t *testing.T) {
+	if err := InspectReader(nil, func(src io.Reader) error { return nil }); err == nil {
+		t.Fatal("InspectReader(nil, fn) error = nil, want non-nil")
+	}
+
+	if err := InspectReader(strings.NewReader("payload"), nil); err == nil {
+		t.Fatal("InspectReader(src, nil) error = nil, want non-nil")
+	}
+}
+
+func TestMatchReaderRejectsNilInputs(t *testing.T) {
+	if _, err := MatchReader(nil, func(src io.Reader) (bool, error) { return false, nil }); err == nil {
+		t.Fatal("MatchReader(nil, fn) error = nil, want non-nil")
+	}
+
+	if _, err := MatchReader(strings.NewReader("payload"), nil); err == nil {
+		t.Fatal("MatchReader(src, nil) error = nil, want non-nil")
+	}
+}
+
+func TestInspectTokensReaderRejectsNilInputsAndOptions(t *testing.T) {
+	if err := InspectTokensReader(nil, TokenOptions{}, func(token string) error { return nil }); err == nil {
+		t.Fatal("InspectTokensReader(nil, opts, fn) error = nil, want non-nil")
+	}
+
+	if err := InspectTokensReader(strings.NewReader("payload"), TokenOptions{}, nil); err == nil {
+		t.Fatal("InspectTokensReader(src, opts, nil) error = nil, want non-nil")
+	}
+
+	err := InspectTokensReader(strings.NewReader("payload"), TokenOptions{MaxTokenSize: -1}, func(token string) error { return nil })
+	if err == nil {
+		t.Fatal("InspectTokensReader() error = nil, want non-nil for negative max token size")
+	}
+}
+
+func TestMatchTokensReaderRejectsNilInputsAndOptions(t *testing.T) {
+	if _, err := MatchTokensReader(nil, TokenOptions{}, func(token string) (bool, error) { return false, nil }); err == nil {
+		t.Fatal("MatchTokensReader(nil, opts, fn) error = nil, want non-nil")
+	}
+
+	if _, err := MatchTokensReader(strings.NewReader("payload"), TokenOptions{}, nil); err == nil {
+		t.Fatal("MatchTokensReader(src, opts, nil) error = nil, want non-nil")
+	}
+
+	_, err := MatchTokensReader(strings.NewReader("payload"), TokenOptions{MaxTokenSize: -1}, func(token string) (bool, error) { return false, nil })
+	if err == nil {
+		t.Fatal("MatchTokensReader() error = nil, want non-nil for negative max token size")
+	}
+}
+
+func TestInspectBytesAndStringPassContent(t *testing.T) {
+	var bytesGot string
+	err := InspectBytes([]byte("alpha"), func(src io.Reader) error {
+		data, err := io.ReadAll(src)
+		if err != nil {
+			return err
+		}
+		bytesGot = string(data)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("InspectBytes() error = %v", err)
+	}
+	if bytesGot != "alpha" {
+		t.Fatalf("InspectBytes() content = %q, want %q", bytesGot, "alpha")
+	}
+
+	var lines []string
+	err = InspectString("one\ntwo\n", func(src io.Reader) error {
+		scanner := bufio.NewScanner(src)
+		for scanner.Scan() {
+			lines = append(lines, scanner.Text())
+		}
+		return scanner.Err()
+	})
+	if err != nil {
+		t.Fatalf("InspectString() error = %v", err)
+	}
+	if strings.Join(lines, ",") != "one,two" {
+		t.Fatalf("InspectString() lines = %q, want %q", strings.Join(lines, ","), "one,two")
+	}
+}
+
+func TestFileInspectReadsExistingFile(t *testing.T) {
+	file := NewFile(filepath.Join(t.TempDir(), "payload.txt"))
+	if err := os.WriteFile(file.Path(), []byte("  \nvalue\n"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	var lines []string
+	err := file.Inspect(DefaultContext, func(src io.Reader) error {
+		scanner := bufio.NewScanner(src)
+		for scanner.Scan() {
+			lines = append(lines, scanner.Text())
+		}
+		return scanner.Err()
+	})
+	if err != nil {
+		t.Fatalf("Inspect() error = %v", err)
+	}
+	if strings.Join(lines, "|") != "  |value" {
+		t.Fatalf("Inspect() lines = %q, want %q", strings.Join(lines, "|"), "  |value")
+	}
+}
+
+func TestFileInspectReturnsCallbackError(t *testing.T) {
+	file := NewFile(filepath.Join(t.TempDir(), "payload.txt"))
+	if err := os.WriteFile(file.Path(), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	wantErr := errors.New("stop")
+	err := file.Inspect(DefaultContext, func(src io.Reader) error {
+		_, _ = io.Copy(io.Discard, src)
+		return wantErr
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Inspect() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestMatchBytesAndStringReturnBoolean(t *testing.T) {
+	matched, err := MatchBytes([]byte(" \n value\n"), func(src io.Reader) (bool, error) {
+		scanner := bufio.NewScanner(src)
+		for scanner.Scan() {
+			if strings.TrimSpace(scanner.Text()) != "" {
+				return true, nil
+			}
+		}
+		return false, scanner.Err()
+	})
+	if err != nil {
+		t.Fatalf("MatchBytes() error = %v", err)
+	}
+	if !matched {
+		t.Fatal("MatchBytes() = false, want true")
+	}
+
+	matched, err = MatchString(" \n\t", func(src io.Reader) (bool, error) {
+		data, err := io.ReadAll(src)
+		if err != nil {
+			return false, err
+		}
+		return strings.TrimSpace(string(data)) != "", nil
+	})
+	if err != nil {
+		t.Fatalf("MatchString() error = %v", err)
+	}
+	if matched {
+		t.Fatal("MatchString() = true, want false")
+	}
+}
+
+func TestInspectTokensStringUsesCustomSplit(t *testing.T) {
+	var tokens []string
+	err := InspectTokensString("alpha beta\ngamma", TokenOptions{Split: bufio.ScanWords}, func(token string) error {
+		tokens = append(tokens, token)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("InspectTokensString() error = %v", err)
+	}
+	if strings.Join(tokens, ",") != "alpha,beta,gamma" {
+		t.Fatalf("InspectTokensString() tokens = %q, want %q", strings.Join(tokens, ","), "alpha,beta,gamma")
+	}
+}
+
+func TestInspectTokensStringCanRaiseMaxTokenSize(t *testing.T) {
+	long := strings.Repeat("a", bufio.MaxScanTokenSize+1)
+	var got string
+
+	err := InspectTokensString(long, TokenOptions{MaxTokenSize: len(long) + 1}, func(token string) error {
+		got = token
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("InspectTokensString() error = %v", err)
+	}
+	if got != long {
+		t.Fatalf("InspectTokensString() token length = %d, want %d", len(got), len(long))
+	}
+}
+
+func TestMatchTokensStringUsesCustomSplit(t *testing.T) {
+	matched, err := MatchTokensString("alpha beta\ngamma", TokenOptions{Split: bufio.ScanWords}, func(token string) (bool, error) {
+		return token == "gamma", nil
+	})
+	if err != nil {
+		t.Fatalf("MatchTokensString() error = %v", err)
+	}
+	if !matched {
+		t.Fatal("MatchTokensString() = false, want true")
+	}
+}
+
+func TestInspectLinesStringPassesLines(t *testing.T) {
+	var lines []string
+	err := InspectLinesString("one\ntwo\n", func(line string) error {
+		lines = append(lines, line)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("InspectLinesString() error = %v", err)
+	}
+	if strings.Join(lines, ",") != "one,two" {
+		t.Fatalf("InspectLinesString() lines = %q, want %q", strings.Join(lines, ","), "one,two")
+	}
+}
+
+func TestMatchLinesStringReturnsBoolean(t *testing.T) {
+	matched, err := MatchLinesString("# note\n\nvalue\n", func(line string) (bool, error) {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("MatchLinesString() error = %v", err)
+	}
+	if !matched {
+		t.Fatal("MatchLinesString() = false, want true")
+	}
+}
+
+func TestFileMatchReadsExistingFile(t *testing.T) {
+	file := NewFile(filepath.Join(t.TempDir(), "payload.txt"))
+	if err := os.WriteFile(file.Path(), []byte("# note\n\nvalue\n"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	matched, err := file.Match(DefaultContext, func(src io.Reader) (bool, error) {
+		scanner := bufio.NewScanner(src)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			return true, nil
+		}
+		return false, scanner.Err()
+	})
+	if err != nil {
+		t.Fatalf("Match() error = %v", err)
+	}
+	if !matched {
+		t.Fatal("Match() = false, want true")
+	}
+}
+
+func TestFileMatchReturnsCallbackError(t *testing.T) {
+	file := NewFile(filepath.Join(t.TempDir(), "payload.txt"))
+	if err := os.WriteFile(file.Path(), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	wantErr := errors.New("boom")
+	matched, err := file.Match(DefaultContext, func(src io.Reader) (bool, error) {
+		_, _ = io.Copy(io.Discard, src)
+		return false, wantErr
+	})
+	if matched {
+		t.Fatal("Match() = true, want false on error")
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Match() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestFileMatchIfExistsReturnsFalseForMissingFile(t *testing.T) {
+	file := NewFile(filepath.Join(t.TempDir(), "missing.txt"))
+	called := false
+
+	matched, err := file.MatchIfExists(DefaultContext, func(src io.Reader) (bool, error) {
+		called = true
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("MatchIfExists() error = %v", err)
+	}
+	if matched {
+		t.Fatal("MatchIfExists() = true, want false for missing file")
+	}
+	if called {
+		t.Fatal("MatchIfExists() called matcher for missing file")
+	}
+}
+
+func TestFileMatchIfExistsMatchesPresentFile(t *testing.T) {
+	file := NewFile(filepath.Join(t.TempDir(), "payload.txt"))
+	if err := os.WriteFile(file.Path(), []byte("# note\n\nvalue\n"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	matched, err := file.MatchIfExists(DefaultContext, func(src io.Reader) (bool, error) {
+		scanner := bufio.NewScanner(src)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			return true, nil
+		}
+		return false, scanner.Err()
+	})
+	if err != nil {
+		t.Fatalf("MatchIfExists() error = %v", err)
+	}
+	if !matched {
+		t.Fatal("MatchIfExists() = false, want true")
+	}
+}
+
+func TestFileInspectTokensReadsExistingFile(t *testing.T) {
+	file := NewFile(filepath.Join(t.TempDir(), "payload.txt"))
+	if err := os.WriteFile(file.Path(), []byte("alpha beta\ngamma"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	var tokens []string
+	err := file.InspectTokens(DefaultContext, TokenOptions{Split: bufio.ScanWords}, func(token string) error {
+		tokens = append(tokens, token)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("InspectTokens() error = %v", err)
+	}
+	if strings.Join(tokens, ",") != "alpha,beta,gamma" {
+		t.Fatalf("InspectTokens() tokens = %q, want %q", strings.Join(tokens, ","), "alpha,beta,gamma")
+	}
+}
+
+func TestFileMatchLinesIfExistsReturnsFalseForMissingFile(t *testing.T) {
+	file := NewFile(filepath.Join(t.TempDir(), "missing.txt"))
+	called := false
+
+	matched, err := file.MatchLinesIfExists(DefaultContext, func(line string) (bool, error) {
+		called = true
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("MatchLinesIfExists() error = %v", err)
+	}
+	if matched {
+		t.Fatal("MatchLinesIfExists() = true, want false for missing file")
+	}
+	if called {
+		t.Fatal("MatchLinesIfExists() called matcher for missing file")
+	}
+}
+
+func TestFileMatchLinesIfExistsRejectsNilCallbackForMissingFile(t *testing.T) {
+	file := NewFile(filepath.Join(t.TempDir(), "missing.txt"))
+
+	if _, err := file.MatchLinesIfExists(DefaultContext, nil); err == nil {
+		t.Fatal("MatchLinesIfExists() error = nil, want non-nil for nil callback")
+	}
+}
 
 func TestConcatStringsUsesOptions(t *testing.T) {
 	opts := ConcatOptions{
