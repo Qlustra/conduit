@@ -4,7 +4,7 @@ The module is split by package:
 
 - `github.com/qlustra/conduit`: operations, `Context`, policy, validation, and reporting types
 - `github.com/qlustra/conduit/layout`: structural nodes, directory slots, file slots, executable files, text templates
-- `github.com/qlustra/conduit/formats`: JSON, YAML, and TOML typed files
+- `github.com/qlustra/conduit/formats`: JSON, YAML, TOML, and managed `.env` typed files
 
 The docs are split by intent:
 

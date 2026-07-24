@@ -5,7 +5,7 @@ Conduit's stateful file wrappers track two independent state axes:
 - disk state: what the file layer currently knows about the filesystem
 - memory state: what the wrapper currently knows about its in-memory value
 
-This applies directly to `Format[T]` and therefore to `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`. `TextTemplate[C]` uses the same file-state model for rendered text, and `Link` uses the same disk and memory enums for cached symlink targets.
+This applies directly to `Format[T]` and therefore to `JSONFile[T]`, `YAMLFile[T]`, `TOMLFile[T]`, and `EnvFile`. `TextTemplate[C]` uses the same file-state model for rendered text, and `Link` uses the same disk and memory enums for cached symlink targets.
 
 The important rule is that these axes are deliberately separate. A memory operation does not automatically rewrite disk knowledge, and a disk observation does not automatically replace in-memory content.
 

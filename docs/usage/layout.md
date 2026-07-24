@@ -6,7 +6,7 @@ In code, that usually means:
 
 - import `github.com/qlustra/conduit` for operations such as `Compose`
 - import `github.com/qlustra/conduit/layout` for `Dir`, `File`, `Link`, `FileLink`, `DirLink`, `Exec`, `Slot[T]`, `FileSlot[T]`, `LinkSlot[T]`, and `TextTemplate[C]`
-- import `github.com/qlustra/conduit/formats` for `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`
+- import `github.com/qlustra/conduit/formats` for `JSONFile[T]`, `YAMLFile[T]`, `TOMLFile[T]`, and `EnvFile`
 
 ## Defining a layout
 
@@ -216,7 +216,7 @@ Notable behavior:
 
 ### Typed files
 
-`formats.JSONFile[T]`, `formats.YAMLFile[T]`, and `formats.TOMLFile[T]` are codec-backed files that embed `layout.Format[T, C]`.
+`formats.JSONFile[T]`, `formats.YAMLFile[T]`, `formats.TOMLFile[T]`, and `formats.EnvFile` are codec-backed files that embed `layout.Format[T, C]`.
 
 They behave like regular layout nodes, but also keep typed content in memory:
 

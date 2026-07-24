@@ -107,6 +107,67 @@ Why TOML here:
 - readable for humans
 - useful when the file is mostly key/value configuration
 
+## Env files for managed runtime key/value config
+
+```go
+type RuntimeFiles struct {
+	Env formats.EnvFile `layout:".env"`
+}
+```
+
+Typical flow:
+
+```go
+_ = runtime.Env.LoadOrInit(map[string]string{
+	"PORT":     "8080",
+	"LOG_LEVEL": "debug",
+})
+
+env := runtime.Env.MustGet()
+env["PORT"] = "9000"
+runtime.Env.Set(env)
+
+_ = runtime.Env.Save(conduit.DefaultContext)
+```
+
+Why EnvFile here:
+
+- good fit when the contract is really `map[string]string`
+- saves back to normalized managed `.env` content
+- keeps `.env` files in the same explicit load/set/sync lifecycle as the other formats
+
+Resolving defaults, process values, and file values:
+
+```go
+processEnv, err := formats.EnvMap(os.Environ())
+if err != nil {
+	return err
+}
+
+resolved, ok := runtime.Env.ResolveWithProcess(
+	map[string]string{
+		"PORT":      "8080",
+		"LOG_LEVEL": "info",
+	},
+	processEnv,
+	formats.EnvResolveOptions{
+		Precedence: formats.EnvProcessWins,
+		Scope:      formats.EnvKeepFile,
+	},
+)
+if !ok {
+	return fmt.Errorf("runtime env is not loaded")
+}
+
+_ = resolved
+```
+
+Why this helps:
+
+- defaults define the expected key set and fallback values
+- precedence decides whether process or file values win on overlaps
+- scope decides whether extra process or file keys can enter the result
+
 ## Mixing formats in one layout
 
 You can use different file formats in the same tree based on who consumes each file:
@@ -160,7 +221,7 @@ Why `TextTemplate` here:
 
 - it keeps generated text in the same disk/memory state model as the structured formats
 - render context stays separate from rendered file content
-- it fits scripts, README fragments, `.env` files, and other derived text artifacts
+- it fits scripts, README fragments, and other derived text artifacts
 
 ## One-time defaults with sync policy
 

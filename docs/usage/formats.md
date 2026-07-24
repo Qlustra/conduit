@@ -7,6 +7,7 @@ The public format types are:
 - `formats.JSONFile[T]`
 - `formats.YAMLFile[T]`
 - `formats.TOMLFile[T]`
+- `formats.EnvFile`
 - `layout.TextTemplate[C]`
 
 The typed formats expose the same content API through `layout.Format[T, C]`. `layout.TextTemplate[C]` mirrors that state model for raw text and adds cached render context.
@@ -23,6 +24,7 @@ type Service struct {
 	YAML formats.YAMLFile[ServiceConfig] `layout:"service.yaml"`
 	JSON formats.JSONFile[ServiceConfig] `layout:"service.json"`
 	TOML formats.TOMLFile[ServiceConfig] `layout:"service.toml"`
+	Env  formats.EnvFile                 `layout:".env"`
 }
 ```
 
@@ -172,12 +174,73 @@ Each typed file has a fixed codec:
 - `formats.JSONFile[T]` writes indented JSON with a trailing newline
 - `formats.YAMLFile[T]` uses `gopkg.in/yaml.v3`
 - `formats.TOMLFile[T]` uses `github.com/pelletier/go-toml/v2`
+- `formats.EnvFile` uses `github.com/joho/godotenv` with `map[string]string` content
 
 Choose the format based on how the file will be consumed:
 
 - JSON for machine-oriented artifacts
 - YAML for hand-edited operational config
 - TOML for settings-style files
+- EnvFile for managed `.env` key/value content
+
+`formats.EnvFile` is intentionally a managed map format rather than a source-preserving editor:
+
+- `Load()` accepts `godotenv`-compatible input syntax
+- `Save()` and `Sync()` rewrite the file into normalized managed key/value output
+- comments, duplicate entries, original quoting, separator style, and original line ordering are not preserved
+- no interpolation or shell expression evaluation is performed
+
+### Env resolution helpers
+
+`formats.EnvFile` also supports resolving three sources into one env map:
+
+- `defaults`: the baseline key set and fallback values
+- `processEnv`: a caller-supplied process environment snapshot
+- `fileEnv`: cached `.env` values loaded into `EnvFile`
+
+The helper types are:
+
+- `formats.EnvPrecedence` with `formats.EnvProcessWins` and `formats.EnvFileWins`
+- `formats.EnvScope` with `formats.EnvBaselineOnly`, `formats.EnvKeepProcess`, `formats.EnvKeepFile`, and `formats.EnvKeepAll`
+- `formats.EnvResolveOptions`
+
+Useful helpers:
+
+- `formats.EnvMap(entries)` parses `KEY=VALUE` entries such as `os.Environ()` into `map[string]string`
+- `formats.ResolveEnv(defaults, processEnv, fileEnv, opts)` resolves the three sources directly
+- `formats.EnvList(env)` renders a deterministic sorted `[]string` snapshot
+- `envFile.ResolveWithProcess(defaults, processEnv, opts)` resolves cached file content through the same rules
+
+Example:
+
+```go
+processEnv, err := formats.EnvMap(os.Environ())
+if err != nil {
+	return err
+}
+
+resolved, ok := service.Env.ResolveWithProcess(
+	map[string]string{
+		"PORT":      "8080",
+		"LOG_LEVEL": "info",
+	},
+	processEnv,
+	formats.EnvResolveOptions{
+		Precedence: formats.EnvFileWins,
+		Scope:      formats.EnvKeepFile,
+	},
+)
+if !ok {
+	return fmt.Errorf("env file is not loaded")
+}
+```
+
+Resolution rules:
+
+- the defaults map always defines the baseline key set
+- precedence decides whether process or file values win when both provide a key
+- scope decides which keys outside the defaults baseline may be admitted
+- the helpers do not mutate the process environment or the file
 
 ## Text templates
 

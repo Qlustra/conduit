@@ -7,7 +7,7 @@ The module is split into three public packages:
 
 - `github.com/qlustra/conduit` for operations, `Context`, policy, validation, and reporting types
 - `github.com/qlustra/conduit/layout` for structural nodes such as `Dir`, `File`, `Link`, `Exec`, `Slot[T]`, `FileSlot[T]`, `LinkSlot[T]`, and `TextTemplate[C]`
-- `github.com/qlustra/conduit/formats` for codec-backed typed files such as `JSONFile[T]`, `YAMLFile[T]`, and `TOMLFile[T]`
+- `github.com/qlustra/conduit/formats` for codec-backed typed files such as `JSONFile[T]`, `YAMLFile[T]`, `TOMLFile[T]`, and `EnvFile`
 
 It lets you describe a filesystem as semantic Go types, then move state explicitly between disk and memory:
 

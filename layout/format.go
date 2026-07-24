@@ -12,8 +12,8 @@ import (
 //   - what is currently known about the file on disk
 //   - what is currently known about the cached in-memory value
 //
-// Concrete wrappers such as formats.JSONFile, formats.YAMLFile, and
-// formats.TOMLFile embed Format with a fixed codec.
+// Concrete wrappers such as formats.JSONFile, formats.YAMLFile,
+// formats.TOMLFile, and formats.EnvFile embed Format with a fixed codec.
 type Format[T any, C Codec[T]] struct {
 	File
 	content *T
