@@ -16,6 +16,12 @@ shells:
     compatibility: augment
     entrypoint_policy: preserve
 #    toolSearchPaths: ["."]
+  workshop:
+    image: qlustra.local/workshop:latest
+    compatibility: shaded
+    entrypoint_policy: preserve
+    default_command: ["opencode"]
+    pull: false
 
 # =============================================================================
 # ShellShade Configuration Reference
