@@ -3,11 +3,13 @@ Conduit
 
 Conduit is a contract-based content manager for Go.
 
-The module is split into three public packages:
+The module provides these public packages:
 
 - `github.com/qlustra/conduit` for operations, `Context`, policy, validation, and reporting types
 - `github.com/qlustra/conduit/layout` for structural nodes such as `Dir`, `File`, `Link`, `Exec`, `Slot[T]`, `FileSlot[T]`, `LinkSlot[T]`, and `TextTemplate[C]`
 - `github.com/qlustra/conduit/formats` for codec-backed typed files such as `JSONFile[T]`, `YAMLFile[T]`, `TOMLFile[T]`, and `EnvFile`
+- `github.com/qlustra/conduit/mgmt` for Project, Space, and Explorer controllers, scopes, typed documents, and collection operations
+- `github.com/qlustra/conduit/spec` for optional declarations consumed by `cmd/conduit-gen`
 
 It lets you describe a filesystem as semantic Go types, then move state explicitly between disk and memory:
 
@@ -22,6 +24,19 @@ It lets you describe a filesystem as semantic Go types, then move state explicit
 - `ScanDeep` observes disk presence for already composed items.
 
 There is no implicit reconciliation loop, merge policy, or background sync. You decide which side is authoritative and when data moves.
+
+## Management operations
+
+The first [management runtime](mgmt/README.md) supplies conventional operation
+sequences over existing layouts: bootstrap a project, create a typed collection
+member, validate disk content without disturbing live edits, update a document,
+and refresh derived files. Each operation takes a typed policy; lasting node
+semantics such as `manage:"role=seeded"` remain on the layout declaration.
+
+Use the runtime directly or generate named handles with
+[conduit-gen](cmd/conduit-gen/README.md). The [management example](examples/management/)
+contains both declarations and the generated control surface. Explorer provides
+scanning and content gathering when there is no layout or project marker.
 
 ## Install
 

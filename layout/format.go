@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 )
@@ -87,6 +88,87 @@ type Codec[T any] interface {
 func (f Format[T, C]) codec() C {
 	var c C
 	return c
+}
+
+// EncodeValue marshals a supplied value without changing cached state or disk.
+func (f Format[T, C]) EncodeValue(value T) ([]byte, error) {
+	return f.codec().Marshal(value)
+}
+
+// DecodeValue unmarshals bytes without changing cached state or disk.
+func (f Format[T, C]) DecodeValue(data []byte) (T, error) {
+	return f.codec().Unmarshal(data)
+}
+
+// Encode marshals the current cached value without changing state or disk.
+// It fails when no content is cached.
+func (f Format[T, C]) Encode() ([]byte, error) {
+	if f.content == nil {
+		return nil, fmt.Errorf("file content is not loaded")
+	}
+	return f.EncodeValue(*f.content)
+}
+
+// PreserveState retains the current cached pointer and state metadata, returning
+// a function that restores them exactly without I/O. Use it around operations
+// that replace the cache, such as Load. It does not clone or protect the saved
+// value from mutation through aliases; use SnapshotState when a detached,
+// codec-representable copy is needed instead. The bound path is not restored.
+func (f *Format[T, C]) PreserveState() func() {
+	content, disk, memory := f.content, f.disk, f.memory
+	return func() {
+		f.content, f.disk, f.memory = content, disk, memory
+	}
+}
+
+// SnapshotState clones cached content through its codec and captures disk and
+// memory metadata without changing state. The returned single-use function
+// restores that content and metadata without touching disk or the bound path.
+// Only codec-representable content is retained; additional wrapper state such
+// as TextTemplate's render context is outside this snapshot.
+func (f *Format[T, C]) SnapshotState() (func(), error) {
+	var content *T
+	if f.content != nil {
+		data, err := f.Encode()
+		if err != nil {
+			return nil, err
+		}
+		value, err := f.DecodeValue(bytes.Clone(data))
+		if err != nil {
+			return nil, err
+		}
+		content = &value
+	}
+	disk, memory := f.disk, f.memory
+	restored := false
+	return func() {
+		if restored {
+			return
+		}
+		f.content, f.disk, f.memory = content, disk, memory
+		restored = true
+	}, nil
+}
+
+// PrepareWrite encodes and retains the current content without changing disk
+// or cached state. The result rejects cache replacement, changed encoded
+// content, or a changed path before writing. Content mutation and writing must
+// be serialized; Format does not provide concurrent mutation protection.
+func (f *Format[T, C]) PrepareWrite() (PreparedWrite, error) {
+	data, err := f.Encode()
+	if err != nil {
+		return nil, err
+	}
+	content := f.content
+	file := f.File
+	return newPreparedWrite(file, data, func() ([]byte, error) {
+		if f.File != file || f.content != content {
+			return nil, ErrPreparedWriteStale
+		}
+		return f.Encode()
+	}, func() {
+		f.disk, f.memory = DiskPresent, MemorySynced
+	}), nil
 }
 
 // Write marshals value and writes it directly to disk.

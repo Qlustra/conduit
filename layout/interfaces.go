@@ -16,6 +16,28 @@ type Pather interface {
 	Path() string
 }
 
+// CachedChild identifies one already-cached collection member. Path is the
+// physical child path implied by Name; Value is the actual cached item.
+// Pointer items retain their identity. Nonpointer items are value copies and
+// cannot be used to mutate the collection's cached state in place.
+type CachedChild struct {
+	Name  string
+	Path  string
+	Value any
+}
+
+// CachedChildren exposes and binds direct physical collection members.
+// Enumeration is sorted, never discovers disk entries or composes missing
+// items, and holds no collection lock while returned values are used.
+type CachedChildren interface {
+	CachedChildren() []CachedChild
+	// ChildKind identifies the physical entry kind: "dir", "file", or "link".
+	ChildKind() string
+	// BindChild accepts a physical child name and caches its composed handle
+	// if absent, without loading content or touching disk.
+	BindChild(name string) (any, error)
+}
+
 // Compose
 
 // Composable is implemented by values that can be bound to a concrete path
@@ -56,6 +78,44 @@ type Loadable interface {
 	Load() (bool, error)
 	HasContent() bool
 	Unload()
+}
+
+// ContentState exposes the independent disk and memory state of typed content.
+type ContentState interface {
+	HasContent() bool
+	DiskState() DiskState
+	MemoryState() MemoryState
+}
+
+// StatePreserver retains the exact cached value and metadata for restoration
+// after temporary replacement (for example a Load). It does not clone content;
+// callers must not mutate the retained value through existing aliases.
+type StatePreserver interface {
+	PreserveState() (restore func())
+}
+
+// StateSnapshotter captures content state without changing memory or disk.
+// The returned function restores that snapshot in memory only. A snapshot is
+// for local preparation, not rollback of filesystem effects or concurrent work.
+type StateSnapshotter interface {
+	SnapshotState() (restore func(), err error)
+}
+
+// WritePreparer encodes the current cached content without persisting it.
+type WritePreparer interface {
+	PrepareWrite() (PreparedWrite, error)
+}
+
+// PreparedWrite retains encoded content for a later write. Implementations must
+// reject changed source content before writing and update tracked state only
+// after a successful write. Callers must serialize cache changes and writes.
+type PreparedWrite interface {
+	Pather
+	Bytes() []byte
+	Write(Context) error
+	// WriteExclusive creates only an absent destination. Existing entries are
+	// preserved. WriteAtomicReplace is unsupported by this exclusive operation.
+	WriteExclusive(Context) error
 }
 
 var (

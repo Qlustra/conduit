@@ -162,6 +162,29 @@ func (s *LinkSlot[T]) Entries() []LinkSlotEntry[T] {
 	return entries
 }
 
+// CachedChildren returns a sorted snapshot without composing or loading items.
+// LinkSlot stores values, so each returned Value is a copy of the cached item.
+func (s *LinkSlot[T]) CachedChildren() []CachedChild {
+	entries := s.Entries()
+	children := make([]CachedChild, len(entries))
+	for i, entry := range entries {
+		children[i] = CachedChild{Name: entry.Name, Path: s.root.File(entry.Name).Path(), Value: entry.Item}
+	}
+	return children
+}
+
+// ChildKind identifies the physical kind of a slot member.
+func (s *LinkSlot[T]) ChildKind() string { return "link" }
+
+// BindChild binds a physical child name without loading content or touching disk.
+func (s *LinkSlot[T]) BindChild(name string) (any, error) {
+	item, err := s.At(name)
+	if err != nil {
+		return nil, err
+	}
+	return item, nil
+}
+
 // All iterates cached entries in sorted key order.
 //
 // All is cache-based only; it does not discover from disk.

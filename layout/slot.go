@@ -155,6 +155,29 @@ func (s *Slot[T]) Entries() []SlotEntry[T] {
 	return entries
 }
 
+// CachedChildren returns a sorted snapshot without composing or loading items.
+// Pointer items retain their identity; nonpointer items are value copies.
+func (s *Slot[T]) CachedChildren() []CachedChild {
+	entries := s.Entries()
+	children := make([]CachedChild, len(entries))
+	for i, entry := range entries {
+		children[i] = CachedChild{Name: entry.Name, Path: s.root.Dir(entry.Name).Path(), Value: entry.Item}
+	}
+	return children
+}
+
+// ChildKind identifies the physical kind of a slot member.
+func (s *Slot[T]) ChildKind() string { return "dir" }
+
+// BindChild binds a physical child name without loading content or touching disk.
+func (s *Slot[T]) BindChild(name string) (any, error) {
+	item, err := s.At(name)
+	if err != nil {
+		return nil, err
+	}
+	return item, nil
+}
+
 // All iterates cached entries in sorted key order.
 //
 // All is cache-based only; it does not discover from disk.
