@@ -42,8 +42,8 @@ const (
 	TempFileAdjacent
 )
 
-// EnsurePolicy is a bitmask that controls which node kinds Ensure and
-// EnsureDeep may materialize.
+// EnsurePolicy is a bitmask that controls which node kinds Ensure may
+// materialize.
 //
 // The zero value preserves the historical default behavior and is treated as
 // EnsureAll. Use EnsureNone when an explicit no-op ensure pass is desired.
@@ -78,8 +78,8 @@ const (
 	EnsureNone EnsurePolicy = ensurePolicyNoneSentinel
 )
 
-// SyncPolicy is a bitmask that controls which in-memory states Sync and
-// SyncDeep may write.
+// SyncPolicy is a bitmask that controls which in-memory states Sync may
+// write.
 //
 // Memory-state bits select whether loaded, synced, or dirty values are
 // eligible to be written. Disk-state bits optionally further restrict writes
@@ -143,11 +143,11 @@ type Context struct {
 	// FileMode and adds execute bits automatically.
 	ExecMode os.FileMode
 
-	// EnsurePolicy controls which node kinds Ensure and EnsureDeep may
+	// EnsurePolicy controls which node kinds Ensure may
 	// materialize. The zero value behaves like EnsureAll.
 	EnsurePolicy EnsurePolicy
 
-	// SyncPolicy controls which cached values Sync and SyncDeep may write.
+	// SyncPolicy controls which cached values Sync may write.
 	SyncPolicy SyncPolicy
 
 	// PathSafetyPolicy controls whether mutating filesystem operations reject
@@ -163,7 +163,7 @@ type Context struct {
 	// TempDir is used by atomic writes when TempFilePlacement is TempFileDir.
 	TempDir Dir
 
-	// Reporter, when non-nil, receives path-level results during deep
+	// Reporter, when non-nil, receives path-level results during tree
 	// traversal.
 	Reporter Reporter
 }
@@ -182,10 +182,6 @@ var DefaultContext = Context{
 	EnsurePolicy:     EnsureAll,
 	SyncPolicy:       SyncRewrite,
 	PathSafetyPolicy: PathSafetyRejectSymlinkParents,
-}
-
-func (ctx Context) ensurePolicy() EnsurePolicy {
-	return ctx.EnsurePolicy.normalized()
 }
 
 func (ctx Context) withEnsurePolicy(policy EnsurePolicy) Context {
@@ -240,22 +236,6 @@ func (p EnsurePolicy) Has(bits EnsurePolicy) bool {
 	p = p.normalized()
 	bits &= EnsureAll
 	return bits != 0 && p&bits == bits
-}
-
-func (p EnsurePolicy) allowsDir() bool {
-	return p.normalized()&EnsureDirs != 0
-}
-
-func (p EnsurePolicy) allowsFile() bool {
-	return p.normalized()&EnsureFiles != 0
-}
-
-func (p EnsurePolicy) allowsExec() bool {
-	return p.normalized()&EnsureExecs != 0
-}
-
-func (p EnsurePolicy) allowsSyncable() bool {
-	return p.normalized()&EnsureSyncables != 0
 }
 
 func (ctx Context) syncPolicy() SyncPolicy {

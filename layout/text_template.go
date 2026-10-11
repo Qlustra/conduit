@@ -18,7 +18,7 @@ func (textCodec) Unmarshal(data []byte) (string, error) {
 // TextTemplate is a text-producing file wrapper with cached render context.
 //
 // It uses the same disk and memory state model as Format[string, ...] and adds
-// a separate in-memory render context used by RenderDeep or custom render
+// a separate in-memory render context used by Layout.Render or custom render
 // flows.
 type TextTemplate[C any] struct {
 	Format[string, textCodec]

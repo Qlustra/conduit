@@ -21,12 +21,28 @@ type ServiceConfig struct {
 }
 
 type Service struct {
-	YAML formats.YAMLFile[ServiceConfig] `layout:"service.yaml"`
-	JSON formats.JSONFile[ServiceConfig] `layout:"service.json"`
-	TOML formats.TOMLFile[ServiceConfig] `layout:"service.toml"`
-	Env  formats.EnvFile                 `layout:".env"`
+	YAML formats.YAMLFile[ServiceConfig] `layout:"content" path:"service.yaml"`
+	JSON formats.JSONFile[ServiceConfig] `layout:"content" path:"service.json"`
+	TOML formats.TOMLFile[ServiceConfig] `layout:"content" path:"service.toml"`
+	Env  formats.EnvFile                 `layout:"content" path:".env"`
 }
 ```
+
+Compose before using the carriers:
+
+```go
+structure, err := conduit.Compile[Service]()
+if err != nil {
+	return err
+}
+managed, err := structure.Compose("/srv/service")
+if err != nil {
+	return err
+}
+service := managed.Tree()
+```
+
+The local methods below operate on one typed carrier. `managed` methods apply the corresponding operation across the whole tree.
 
 ## Loading and reading content
 
@@ -67,9 +83,9 @@ err := service.YAML.LoadOrInit(ServiceConfig{
 })
 ```
 
-If the file is missing, the default is stored in memory and marked dirty. It is not written until you call `Save`, `Sync`, or `SyncDeep`.
+If the file is missing, the default is stored in memory and marked dirty. It is not written until you call `Save` or `Sync`.
 
-When you want to apply defaults without touching disk, wrappers can use `SetDefault(...)` inside `Default() error` and then participate in `DefaultDeep(...)`.
+When you want to apply defaults without touching disk, wrappers can use `SetDefault(...)` inside `Default() error` and then participate in `Layout.Default()`.
 
 ## Mutating content
 
@@ -112,7 +128,7 @@ err := service.YAML.Save(conduit.DefaultContext)
 Or as part of a larger layout:
 
 ```go
-_, err := conduit.SyncDeep(&workspace, conduit.DefaultContext)
+_, err := managed.Sync(conduit.DefaultContext)
 ```
 
 To avoid rewriting already-synced or freshly-loaded files during a larger pass:
@@ -121,7 +137,7 @@ To avoid rewriting already-synced or freshly-loaded files during a larger pass:
 ctx := conduit.DefaultContext
 ctx.SyncPolicy = conduit.SyncIfDirty
 
-_, err := conduit.SyncDeep(&workspace, ctx)
+_, err := managed.Sync(ctx)
 ```
 
 To persist initialization defaults only after the file has been observed missing:
@@ -165,7 +181,7 @@ _, err := service.YAML.Scan()
 
 That makes it safe to ask "is this file present?" without loading or replacing the current cached value.
 
-`Discover()` has the same typed-file behavior as `Scan()`. The distinction shows up during deep traversal: `DiscoverDeep` discovers slot items from disk, while `ScanDeep` only visits already cached items.
+`Discover()` has the same typed-file behavior as `Scan()`. The distinction shows up in managed traversal: `Layout.Discover` discovers slot items from disk, while `Layout.Scan` only visits already cached members.
 
 ## Codec behavior
 
@@ -276,30 +292,43 @@ func (f *ReadmeFile) Template() string {
 
 You can use it in two ways:
 
-- implement `Template() string` and let `RenderDeep` use the built-in `text/template` path
+- implement `Template() string` and let `Layout.Render` use the built-in `text/template` path
 - implement `Render() (string, error)` for custom rendering logic; this takes precedence over `Template()`
 
 Typical flow:
 
 ```go
+type RenderedTree struct {
+	Readme ReadmeFile `layout:"content" path:"README.md"`
+}
+
+structure, err := conduit.Compile[RenderedTree]()
+if err != nil {
+	return err
+}
+managed, err := structure.Compose("/srv/billing")
+if err != nil {
+	return err
+}
+file := &managed.Tree().Readme
 file.SetContext(ReadmeContext{Name: "billing"})
 
-if err := conduit.RenderDeep(&workspace); err != nil {
+if err := managed.Render(); err != nil {
 	return err
 }
 
-_, err := conduit.SyncDeep(&workspace, conduit.DefaultContext)
+_, err = managed.Sync(conduit.DefaultContext)
 return err
 ```
 
 This keeps rendering explicit:
 
 - `SetContext` prepares render inputs in memory
-- `RenderDeep` derives raw text into cached file content
-- `SyncDeep` persists the rendered text to disk
+- `Layout.Render` derives raw text into cached file content
+- `Layout.Sync` persists the rendered text to disk
 
 Defaults fit into the same phase model:
 
 - implement `Default() error` on wrappers that should seed missing typed content or missing render context
 - use `SetDefault(...)` on typed files and `SetDefaultContext(...)` on text templates to avoid overwriting existing memory
-- call `DefaultDeep(&workspace)` before `RenderDeep(&workspace)` when defaults should feed rendering
+- call `managed.Default()` before `managed.Render()` when defaults should feed rendering

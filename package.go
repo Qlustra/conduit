@@ -21,13 +21,13 @@ type Context = layout.Context
 
 // SyncPolicy is an alias for layout.SyncPolicy.
 //
-// It controls which in-memory states Sync and SyncDeep may write. See
+// It controls which in-memory states Sync may write. See
 // layout.SyncPolicy for the full policy model and constant descriptions.
 type SyncPolicy = layout.SyncPolicy
 
 // EnsurePolicy is an alias for layout.EnsurePolicy.
 //
-// It controls which node kinds Ensure and EnsureDeep may materialize. See
+// It controls which node kinds Ensure may materialize. See
 // layout.EnsurePolicy for the full policy model and constant descriptions.
 type EnsurePolicy = layout.EnsurePolicy
 
@@ -57,7 +57,7 @@ type OpenPolicy = layout.OpenPolicy
 
 // Reporter is an alias for layout.Reporter.
 //
-// See layout.Reporter for the reporting contract used during deep traversal.
+// See layout.Reporter for the reporting contract used during layout traversal.
 type Reporter = layout.Reporter
 
 // ValidateOptions is an alias for layout.ValidateOptions.
@@ -189,59 +189,3 @@ const (
 	ValidateNotApplicable ResultCode = layout.ValidateNotApplicable
 	ValidateFailed        ResultCode = layout.ValidateFailed
 )
-
-// Ops
-
-// Compose aliases layout.Compose for callers that prefer the root conduit
-// facade.
-//
-// See layout.Compose for full behavior details.
-var Compose = layout.Compose
-
-// EnsureDeep aliases layout.EnsureDeep for callers that prefer the root
-// conduit facade.
-//
-// See layout.EnsureDeep for full behavior details.
-var EnsureDeep = layout.EnsureDeep
-
-// LoadDeep aliases layout.LoadDeep for callers that prefer the root conduit
-// facade.
-//
-// See layout.LoadDeep for full behavior details.
-var LoadDeep = layout.LoadDeep
-
-// DiscoverDeep aliases layout.DiscoverDeep for callers that prefer the root
-// conduit facade.
-//
-// See layout.DiscoverDeep for full behavior details.
-var DiscoverDeep = layout.DiscoverDeep
-
-// SyncDeep aliases layout.SyncDeep for callers that prefer the root conduit
-// facade.
-//
-// See layout.SyncDeep for full behavior details.
-var SyncDeep = layout.SyncDeep
-
-// ScanDeep aliases layout.ScanDeep for callers that prefer the root conduit
-// facade.
-//
-// See layout.ScanDeep for full behavior details.
-var ScanDeep = layout.ScanDeep
-
-// DefaultDeep aliases layout.DefaultDeep for callers that prefer the root
-// conduit facade.
-//
-// See layout.DefaultDeep for full behavior details.
-var DefaultDeep = layout.DefaultDeep
-
-// RenderDeep aliases layout.RenderDeep for callers that prefer the root
-// conduit facade.
-//
-// See layout.RenderDeep for full behavior details.
-var RenderDeep = layout.RenderDeep
-
-// ValidateDeep aliases layout.ValidateDeep for callers that prefer the root
-// conduit facade.
-//
-// See layout.ValidateDeep for full behavior details.
-var ValidateDeep = layout.ValidateDeep

@@ -1,16 +1,16 @@
 # Layout usage
 
-Conduit layouts are plain Go structs with `layout` tags. `Compose` walks the struct, resolves each tagged field relative to a root path, and binds the corresponding filesystem handle or typed file.
+A Conduit tree is a Go struct whose participating fields carry role and path tags. `Compile[T]` recognizes the declaration; `Structure.Compose` constructs a `Layout[T]` manager and binds its live tree to a filesystem root.
 
 In code, that usually means:
 
-- import `github.com/qlustra/conduit` for operations such as `Compose`
+- import `github.com/qlustra/conduit` for `Compile`, `Structure`, and `Layout` operations
 - import `github.com/qlustra/conduit/layout` for `Dir`, `File`, `Link`, `FileLink`, `DirLink`, `Exec`, `Slot[T]`, `FileSlot[T]`, `LinkSlot[T]`, and `TextTemplate[C]`
 - import `github.com/qlustra/conduit/formats` for `JSONFile[T]`, `YAMLFile[T]`, `TOMLFile[T]`, and `EnvFile`
 
 ## Defining a layout
 
-Use `layout:"."` for the root and relative paths for children:
+Use `layout` for the carrier role and `path` for its local filesystem path:
 
 ```go
 type ServiceConfig struct {
@@ -19,21 +19,100 @@ type ServiceConfig struct {
 }
 
 type Service struct {
-	Root   layout.Dir                      `layout:"."`
-	Config formats.YAMLFile[ServiceConfig] `layout:"config.yaml"`
-	Logs   layout.Dir                      `layout:"logs"`
+	Root   layout.Dir                      `layout:"dir" path:"."`
+	Config formats.YAMLFile[ServiceConfig] `layout:"content" path:"config.yaml"`
+	Logs   layout.Dir                      `layout:"dir" path:"logs"`
 }
 
 type Workspace struct {
-	Root     layout.Dir             `layout:"."`
-	Services layout.Slot[*Service]  `layout:"services"`
+	Root     layout.Dir             `layout:"dir" path:"."`
+	Services layout.Slot[*Service]  `layout:"directories" path:"services"`
 }
 
-var ws Workspace
-err := conduit.Compose("/srv/workspace", &ws)
+structure, err := conduit.Compile[Workspace]()
+if err != nil {
+	return err
+}
+managed, err := structure.Compose("/srv/workspace")
+if err != nil {
+	return err
+}
+ws := managed.Tree()
 ```
 
-`Compose` requires a non-nil pointer to a struct. Tagged pointer fields are allocated automatically if needed.
+`Structure.Compose` creates a fresh tree and allocates declared pointer paths. Composition does not touch the filesystem. Use `managed.Tree()` to access carriers and `managed.Ensure`, `managed.Load`, or the other [manager operations](operations.md) for whole-tree behavior.
+
+The declaration roles are:
+
+| Role | Carrier |
+| --- | --- |
+| `dir` | A carrier implementing `layout.DirAPI` |
+| `file` | A carrier implementing `layout.FileAPI` |
+| `exec` | A carrier implementing `layout.ExecAPI` |
+| `content` | A built-in content carrier or embedding with its complete typed API |
+| `group` | An explicitly participating nested struct or pointer to a struct |
+| `directories` | A directory-member slot or embedding with its complete typed API |
+| `documents` | A regular-file-member slot or embedding with its complete typed API |
+| `links` | A symlink-member slot or embedding with its complete typed API |
+
+The filesystem roles use native Go interfaces containing every exported carrier
+method, including pointer-receiver methods. Extra methods and compatible
+overrides are allowed; declared fields may be values or pointers. Embed the
+carrier by value to keep its promoted methods ready after composition:
+
+```go
+type GoFile struct {
+	layout.File
+}
+
+var _ layout.FileAPI = (*GoFile)(nil)
+
+type ProgramLayout struct {
+	Entrypoint GoFile `layout:"file,required" path:"main.go"`
+}
+```
+
+For directory extensions, use an alias for the embedded field name. Embedding
+`layout.Dir` directly names the field `Dir`, which hides the `Dir(name)` method:
+
+```go
+type Directory = layout.Dir
+type CacheDir struct{ Directory }
+
+var _ layout.DirAPI = (*CacheDir)(nil)
+```
+
+Content and collection families select each carrier's complete instantiated
+interface through package-private witnesses. Admission retains the actual
+content, render-context, and member types:
+
+```go
+type ConfigFile struct{ formats.YAMLFile[ServiceConfig] }
+type Services struct{ layout.Slot[*Service] }
+
+var _ layout.FormatAPI[ServiceConfig] = (*ConfigFile)(nil)
+var _ layout.SlotAPI[*Service] = (*Services)(nil)
+
+// The layout legend uses these acceptance declarations:
+saillegend.AcceptContract[layout.FileAPI]()
+saillegend.AcceptContractFamily[layout.ContentFamily]()
+saillegend.AcceptContractFamily[layout.CollectionFamily]()
+```
+
+`FormatAPI[T]` is independent of the codec. `TextTemplateAPI[C]`, `LinkAPI`,
+`FileLinkAPI`, and `DirLinkAPI` retain their additional operations. Each slot
+family has its own API: `SlotAPI[T]`, `FileSlotAPI[T]`, and `LinkSlotAPI[T]`.
+An incompatible override of `Get`, `Set`, `Entries`, or another carrier method
+fails admission even if the wrapper still supplies `Path` and state or member
+iteration. User-defined methods cannot replace the private family witness.
+
+Use the role matching the collection's `ChildKind()`. Conduit checks it during
+`Compile`, including nested groups. Typed member charts receive the same role
+and complete-carrier checks during `Structure.Compose`. Overrides of
+`ChildKind()` must be safe on a zero value and independent of configured state.
+Composition allocates declared pointer paths; it does not initialize pointers
+embedded inside carrier extensions. Use an explicit `Root` field at `path:"."`
+when a member composes several participating fields, as in `Service` above.
 
 ## Node types
 
@@ -208,7 +287,7 @@ Useful methods on the typed wrappers:
 
 Notable behavior:
 
-- `Link` does not implement ensure semantics. `EnsureDeep` leaves declared links alone.
+- `Link` has no Ensure hook. Set its target, then use Sync to materialize the link entry.
 - `Load()` succeeds for dangling symlinks and loads the raw target string from `os.Readlink`.
 - `Scan()` and `Load()` fail when the path exists but is not a symlink.
 - `Sync(ctx)` manages only the symlink entry at the declared path. It never creates or validates the target payload.
@@ -222,7 +301,7 @@ They behave like regular layout nodes, but also keep typed content in memory:
 
 ```go
 type App struct {
-	Config formats.JSONFile[map[string]any] `layout:"config.json"`
+	Config formats.JSONFile[map[string]any] `layout:"content" path:"config.json"`
 }
 ```
 
@@ -234,11 +313,11 @@ See [Formats usage](formats.md) for the full content API.
 
 ```go
 type Service struct {
-	Config formats.YAMLFile[ServiceConfig] `layout:"config.yaml"`
+	Config formats.YAMLFile[ServiceConfig] `layout:"content" path:"config.yaml"`
 }
 
 type Workspace struct {
-	Services layout.Slot[*Service] `layout:"services"`
+	Services layout.Slot[*Service] `layout:"directories" path:"services"`
 }
 ```
 
@@ -254,9 +333,8 @@ services/
 
 Useful methods:
 
-- `At(name)` composes and caches an item lazily.
-- `MustAt(name)` is the panicking version of `At`.
-- `Add(name, ctx)` creates the child root on disk, composes the item, and ensures its declared structure.
+- `ComposeMember(name)` composes and caches an item lazily.
+- `MustComposeMember(name)` is the panicking version of `ComposeMember`.
 - `Delete(name)` removes the child tree from disk when it exists and evicts the cached item.
 - `Get(name)` reads the cache without composing.
 - `DeclaredPath()` and `JoinDeclaredPath(...)` expose the slot field's own declared layout fragment.
@@ -269,11 +347,15 @@ Useful methods:
 
 `Entries()` and `All()` are cache-based only. They do not discover from disk or lazily compose missing items.
 
+Slots provide local `Ensure(ctx)` for their containing root. The owning `conduit.Layout` performs whole-tree operations over cached members. `ComposeMember` changes memory only.
+
+Slots must be configured by `Structure.Compose` before constructing missing members. Their member composer retains the declared member chart and composition root, so each member follows the same role and path vocabulary. See [Layout manager](operations.md#layout-manager) for setup.
+
 Slot item names must identify one direct child only. Empty names, absolute paths, `.` / `..`, and names containing path separators are rejected.
 
-The composed-path helpers return `ok == false` until a node has been attached through `Compose`. When they are available, the compose base is the same root that anchored the whole composed tree, not the nearest nested struct or slot item.
+The composed-path helpers return `ok == false` until a node has been attached through `Structure.Compose`. When they are available, the compose base is the same root that anchored the whole composed tree, not the nearest nested struct or slot item.
 
-The declared-path helpers are different: they return the node's own declared layout fragment only. They do not reconstruct ancestor fragments. For example, a field declared as `layout:"build"` reports `build`, not `bin/build`, even when it lives inside a nested struct rooted at `layout:"bin"`.
+The declared-path helpers are different: they return the node's own declared layout fragment only. They do not reconstruct ancestor fragments. For example, an executable declared with `path:"build"` reports `build`, not `bin/build`, even inside a group with `path:"bin"`.
 
 The ordinary relative helpers are different again: they ignore composition metadata and declared layout metadata entirely. They just perform `filepath.Rel` and optional joining against another path-bearing node or a raw base path.
 
@@ -283,7 +365,7 @@ The ordinary relative helpers are different again: they ignore composition metad
 
 ```go
 type Workspace struct {
-	Configs layout.FileSlot[formats.YAMLFile[ServiceConfig]] `layout:"configs"`
+	Configs layout.FileSlot[*formats.YAMLFile[ServiceConfig]] `layout:"documents" path:"configs"`
 }
 ```
 
@@ -297,13 +379,11 @@ configs/
 
 Useful methods mirror `Slot[T]`, but with file semantics:
 
-- `At(name)` composes and caches an item lazily at `slotRoot/<name>`.
-- `Add(name, ctx)` ensures the slot root, composes the file-backed item, and ensures it.
+- `ComposeMember(name)` composes and caches an item lazily at `slotRoot/<name>`.
 - `Delete(name)` removes the child file from disk when it exists and evicts the cached item.
 - `Require(name)` fails unless the child path already exists on disk as a regular file.
-- `LoadDeep(ctx)` and `DiscoverDeep(ctx)` enumerate direct child regular files and ignore subdirectories and symlinks.
 
-As with `Slot[T]`, `Entries()`, `All()`, `Len()`, and `Keys()` are cache-based only.
+As with `Slot[T]`, `Entries()`, `All()`, `Len()`, and `Keys()` are cache-based only. The owning `Layout.Load` and `Layout.Discover` enumerate regular files, excluding subdirectories and symlinks.
 
 File slot item names follow the same direct-child restriction as `Slot[T]`.
 
@@ -313,7 +393,7 @@ File slot item names follow the same direct-child restriction as `Slot[T]`.
 
 ```go
 type Workspace struct {
-	Context layout.LinkSlot[layout.Link] `layout:"context"`
+	Context layout.LinkSlot[*layout.Link] `layout:"links" path:"context"`
 }
 ```
 
@@ -327,50 +407,40 @@ context/
 
 Useful methods mirror `FileSlot[T]`, but with symlink-entry semantics:
 
-- `At(name)` composes and caches a link item lazily at `slotRoot/<name>`.
-- `Add(name, ctx)` ensures the slot root, composes the link item, and caches it. The link itself is still materialized by `Sync` or `SyncDeep`.
+- `ComposeMember(name)` composes and caches a link item lazily at `slotRoot/<name>`.
 - `Delete(name)` removes the child symlink from disk when it exists and evicts the cached item.
 - `Require(name)` fails unless a symlink already exists at the child path.
-- `LoadDeep(ctx)` and `DiscoverDeep(ctx)` enumerate direct child symlink entries and ignore regular files and directories.
+
+The owning `Layout.Load` and `Layout.Discover` enumerate symlink entries, excluding regular files and directories. `Layout.Sync` materializes links once their targets are cached; Ensure excludes link entries.
 
 `LinkSlot[T]` is restricted to the built-in link family:
 
-- `layout.Link`
-- `layout.FileLink`
-- `layout.DirLink`
+- `layout.Link` or `*layout.Link`
+- `layout.FileLink` or `*layout.FileLink`
+- `layout.DirLink` or `*layout.DirLink`
 
-Use `LinkSlot[layout.Link]` when targets may vary between files and directories.
+Use `LinkSlot[*layout.Link]` when targets may vary between files and directories.
+Pointer members let operations update the cached instances directly. Value
+members remain available when copy semantics are desired.
 
 Link slot item names follow the same direct-child restriction as `Slot[T]`.
 
 ## Composition rules
 
-`Compose` only binds:
+Only exported, explicitly tagged fields participate. Untagged fields and anonymous embeddings are not inferred from their carrier types. Declare nested structure with `layout:"group"` and a path for its children.
 
-- exported fields
-- fields tagged with `layout:"..."`
-
-The tag is always resolved relative to the containing struct's root. `layout:"."` means "bind this field to the current root".
-
-Tags must remain inside the original `Compose` root. Absolute tags are rejected, and relative tags that would resolve outside the compose root fail composition.
-
-The deep operations (`EnsureDeep`, `DiscoverDeep`, `LoadDeep`, `SyncDeep`, `ScanDeep`) also recurse through anonymous embedded fields.
-
-Nested structs work naturally:
+`path:"."` binds a carrier to its containing root. Relative paths resolve from the nearest group or slot member root. Absolute paths are rejected, and a path that escapes the original composition root fails composition.
 
 ```go
 type Tooling struct {
 	Scripts struct {
-		Build layout.Exec `layout:"build"`
-		Test  layout.Exec `layout:"test"`
-	} `layout:"bin"`
+		Build layout.Exec `layout:"exec" path:"build"`
+		Test  layout.Exec `layout:"exec" path:"test"`
+	} `layout:"group" path:"bin"`
 }
 ```
 
-After `Compose("/workspace", &tooling)`, the executables resolve to:
-
-- `/workspace/bin/build`
-- `/workspace/bin/test`
+After composing `Tooling` at `/workspace`, the executable paths are `/workspace/bin/build` and `/workspace/bin/test`. Tag an embedded struct as a group when it should participate too.
 
 ## Common layout patterns
 
@@ -378,9 +448,9 @@ Static structure:
 
 ```go
 type Repo struct {
-	Root   layout.Dir                 `layout:"."`
-	Config formats.TOMLFile[Settings] `layout:"settings.toml"`
-	Hooks  layout.Dir                 `layout:"hooks"`
+	Root   layout.Dir                 `layout:"dir" path:"."`
+	Config formats.TOMLFile[Settings] `layout:"content" path:"settings.toml"`
+	Hooks  layout.Dir                 `layout:"dir" path:"hooks"`
 }
 ```
 
@@ -388,12 +458,12 @@ Static structure plus dynamic children:
 
 ```go
 type Project struct {
-	Config formats.YAMLFile[ProjectConfig] `layout:"project.yaml"`
+	Config formats.YAMLFile[ProjectConfig] `layout:"content" path:"project.yaml"`
 }
 
 type Monorepo struct {
-	Root     layout.Dir             `layout:"."`
-	Projects layout.Slot[*Project]  `layout:"projects"`
+	Root     layout.Dir             `layout:"dir" path:"."`
+	Projects layout.Slot[*Project]  `layout:"directories" path:"projects"`
 }
 ```
 
@@ -401,8 +471,8 @@ Managed tools next to data:
 
 ```go
 type Environment struct {
-	Root   layout.Dir                  `layout:"."`
-	Env    formats.YAMLFile[EnvConfig] `layout:"env.yaml"`
-	Deploy layout.Exec                 `layout:"bin/deploy"`
+	Root   layout.Dir                  `layout:"dir" path:"."`
+	Env    formats.YAMLFile[EnvConfig] `layout:"content" path:"env.yaml"`
+	Deploy layout.Exec                 `layout:"exec" path:"bin/deploy"`
 }
 ```

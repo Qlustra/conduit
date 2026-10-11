@@ -1,11 +1,16 @@
-// Package layout models filesystem structure as explicit Go values.
+// Package layout provides filesystem carriers and local operation contracts.
 //
-// Layouts are ordinary structs with layout tags that are bound to a root path
-// through Compose. Once composed, callers explicitly move state between memory
-// and disk through operations such as EnsureDeep, LoadDeep, DiscoverDeep,
-// ScanDeep, SyncDeep, DefaultDeep, RenderDeep, and ValidateDeep.
+// Dir, File, and Exec are stateless path handles. Link, Format, and TextTemplate
+// retain explicit disk and memory state. Slot, FileSlot, and LinkSlot cache typed
+// directory, regular-file, and symlink members and supply them to Sail.
 //
-// The package exposes raw node types such as Dir, File, Exec, and Link, along
-// with higher-level stateful wrappers such as Format, Slot, FileSlot,
-// LinkSlot, and TextTemplate.
+// FileAPI, DirAPI, ExecAPI, and the typed content and collection APIs describe
+// each carrier's complete exported method set. ContentFamily and
+// CollectionFamily select the instantiated API through private carrier
+// witnesses, retaining content, render-context, and member types.
+//
+// Declare carriers with layout role tags and separate path tags, then compile
+// and compose the tree through the root conduit package. Composition configures
+// slots to construct missing members. Carrier methods act locally; the owning
+// conduit.Layout provides whole-tree operations through Sail traversal.
 package layout

@@ -36,38 +36,6 @@ func TestExecEnsureAppliesExecutableMode(t *testing.T) {
 	}
 }
 
-func TestExecEnsureDeepUsesExecModeForExistingFiles(t *testing.T) {
-	type root struct {
-		Script Exec `layout:"bin/script.sh"`
-	}
-
-	var layout root
-	base := t.TempDir()
-
-	if err := Compose(base, &layout); err != nil {
-		t.Fatalf("Compose() error = %v", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(layout.Script.Path()), 0o755); err != nil {
-		t.Fatalf("os.MkdirAll() error = %v", err)
-	}
-	if err := os.WriteFile(layout.Script.Path(), []byte("#!/bin/sh\n"), 0o644); err != nil {
-		t.Fatalf("os.WriteFile() error = %v", err)
-	}
-
-	ctx := Context{DirMode: 0o755, FileMode: 0o644, ExecMode: 0o751}
-	if _, err := EnsureDeep(&layout, ctx); err != nil {
-		t.Fatalf("EnsureDeep() error = %v", err)
-	}
-
-	info, err := os.Stat(layout.Script.Path())
-	if err != nil {
-		t.Fatalf("os.Stat() error = %v", err)
-	}
-	if got := info.Mode().Perm(); got != 0o751 {
-		t.Fatalf("mode = %v, want %v", got, os.FileMode(0o751))
-	}
-}
-
 func TestExecOutputWithInterpreter(t *testing.T) {
 	execFile := NewExec(filepath.Join(t.TempDir(), "script.sh"))
 

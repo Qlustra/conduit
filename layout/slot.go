@@ -6,6 +6,8 @@ import (
 	"os"
 	"sort"
 	"sync"
+
+	"github.com/qlustra/conduit/internal/contracts"
 )
 
 // SlotEntry is one cached key-item pair returned by Slot.Entries.
@@ -17,11 +19,12 @@ type SlotEntry[T any] struct {
 // Slot models repeated child layouts under one directory.
 //
 // Each key maps to one child root below the slot path. Slot caches composed
-// items in memory and discovers or loads them only when explicitly asked.
+// items in memory. Managed Layout operations discover and load members.
 type Slot[T any] struct {
-	root  Dir
-	mu    sync.RWMutex
-	items map[string]T
+	root     Dir
+	mu       sync.RWMutex
+	items    map[string]T
+	composer contracts.MemberComposer
 }
 
 // NewSlot returns a slot rooted at root.
@@ -155,28 +158,8 @@ func (s *Slot[T]) Entries() []SlotEntry[T] {
 	return entries
 }
 
-// CachedChildren returns a sorted snapshot without composing or loading items.
-// Pointer items retain their identity; nonpointer items are value copies.
-func (s *Slot[T]) CachedChildren() []CachedChild {
-	entries := s.Entries()
-	children := make([]CachedChild, len(entries))
-	for i, entry := range entries {
-		children[i] = CachedChild{Name: entry.Name, Path: s.root.Dir(entry.Name).Path(), Value: entry.Item}
-	}
-	return children
-}
-
 // ChildKind identifies the physical kind of a slot member.
 func (s *Slot[T]) ChildKind() string { return "dir" }
-
-// BindChild binds a physical child name without loading content or touching disk.
-func (s *Slot[T]) BindChild(name string) (any, error) {
-	item, err := s.At(name)
-	if err != nil {
-		return nil, err
-	}
-	return item, nil
-}
 
 // All iterates cached entries in sorted key order.
 //
@@ -204,11 +187,12 @@ func (s *Slot[T]) Keys() []string {
 	return keys
 }
 
-// At returns the cached item for name, composing and caching it on demand when
+// ComposeMember returns the cached item for name, composing and caching it on demand when
 // needed.
 //
-// At does not ensure the item exists on disk.
-func (s *Slot[T]) At(name string) (T, error) {
+// ComposeMember does not ensure the item exists on disk.
+// Uncached members require a member composer installed during managed composition.
+func (s *Slot[T]) ComposeMember(name string) (T, error) {
 	if err := validateSlotItemName("slot item", name); err != nil {
 		var zero T
 		return zero, err
@@ -220,10 +204,11 @@ func (s *Slot[T]) At(name string) (T, error) {
 		s.mu.RUnlock()
 		return item, nil
 	}
+	root, composer := s.root, s.composer
 	s.mu.RUnlock()
 
 	// Compose outside the lock, then check again under the write lock.
-	item, err := ComposeAs[T](s.root.Dir(name))
+	item, err := composeSlotMember[T](composer, root, root.Dir(name).Path())
 	if err != nil {
 		var zero T
 		return zero, err
@@ -245,60 +230,13 @@ func (s *Slot[T]) At(name string) (T, error) {
 	return item, nil
 }
 
-// MustAt returns At(name) or panics on composition error.
-func (s *Slot[T]) MustAt(name string) T {
-	v, err := s.At(name)
+// MustComposeMember returns ComposeMember(name) or panics on composition error.
+func (s *Slot[T]) MustComposeMember(name string) T {
+	v, err := s.ComposeMember(name)
 	if err != nil {
 		panic(err)
 	}
 	return v
-}
-
-// Add ensures the child root exists on disk, composes the item, ensures its
-// declared structure, and caches it.
-func (s *Slot[T]) Add(name string, ctx Context) (T, error) {
-	if err := validateSlotItemName("slot item", name); err != nil {
-		var zero T
-		return zero, err
-	}
-	childRoot := s.root.Dir(name)
-
-	if err := childRoot.Ensure(ctx); err != nil {
-		var zero T
-		return zero, err
-	}
-
-	s.mu.RLock()
-	if existing, ok := s.items[name]; ok {
-		s.mu.RUnlock()
-		return existing, nil
-	}
-	s.mu.RUnlock()
-
-	item, err := ComposeAs[T](childRoot)
-	if err != nil {
-		var zero T
-		return zero, err
-	}
-
-	if _, err := EnsureDeep(item, ctx); err != nil {
-		var zero T
-		return zero, err
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.items == nil {
-		s.items = make(map[string]T)
-	}
-
-	if existing, ok := s.items[name]; ok {
-		return existing, nil
-	}
-
-	s.items[name] = item
-	return item, nil
 }
 
 // Require returns the named item only if its child directory already exists on
@@ -314,23 +252,41 @@ func (s *Slot[T]) Require(name string) (T, error) {
 		return zero, fmt.Errorf("slot item %q not found under %s: %w", name, s.Path(), err)
 	}
 
-	return s.At(name)
+	return s.ComposeMember(name)
 }
 
 // Compose
 
-// ComposePath binds the slot root and clears the cache.
+// ComposePath binds the slot root and clears its cache and member composer.
 func (s *Slot[T]) ComposePath(path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.root = NewDir(path)
 	s.items = make(map[string]T)
+	s.composer = nil
 }
 
-func (s *Slot[T]) setComposeBase(path string) {
-	s.root.setComposeBase(path)
+func (s *Slot[T]) SetComposeBase(path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.root.SetComposeBase(path)
 }
 
-func (s *Slot[T]) setDeclaredPath(path string) {
-	s.root.setDeclaredPath(path)
+func (s *Slot[T]) SetDeclaredPath(path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.root.SetDeclaredPath(path)
+}
+
+// SetMemberComposer configures composition of uncached members.
+func (s *Slot[T]) SetMemberComposer(composer contracts.MemberComposer) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.composer = composer
 }
 
 // Ensure
@@ -338,208 +294,4 @@ func (s *Slot[T]) setDeclaredPath(path string) {
 // Ensure creates the slot root directory.
 func (s *Slot[T]) Ensure(ctx Context) error {
 	return s.root.Ensure(ctx)
-}
-
-// EnsureDeep ensures the slot root and all currently cached items.
-//
-// It does not invent uncached entries.
-func (s *Slot[T]) EnsureDeep(ctx Context) (ResultCode, error) {
-	if err := s.root.Ensure(ctx); err != nil {
-		return EnsureFailed, err
-	}
-
-	s.mu.RLock()
-	items := make(map[string]T, len(s.items))
-	for name, item := range s.items {
-		items[name] = item
-	}
-	s.mu.RUnlock()
-
-	for name, item := range items {
-		if err := s.root.Dir(name).Ensure(ctx); err != nil {
-			return EnsureFailed, fmt.Errorf("slot item root %q: %w", name, err)
-		}
-		if _, err := EnsureDeep(item, ctx); err != nil {
-			return EnsureFailed, fmt.Errorf("slot item %q: %w", name, err)
-		}
-	}
-
-	return EnsureEnsured, nil
-}
-
-// Load
-
-// LoadDeep discovers child directories from disk, composes them, and loads
-// them recursively.
-func (s *Slot[T]) LoadDeep(ctx Context) (ResultCode, error) {
-	entries, err := os.ReadDir(s.root.Path())
-	if err != nil {
-		if os.IsNotExist(err) {
-			return LoadMissing, nil
-		}
-		return LoadFailed, err
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		name := entry.Name()
-		item, err := s.At(name)
-		if err != nil {
-			return LoadFailed, fmt.Errorf("compose slot item %q: %w", name, err)
-		}
-
-		if _, err := LoadDeep(item, ctx); err != nil {
-			return LoadFailed, fmt.Errorf("load slot item %q: %w", name, err)
-		}
-	}
-
-	return LoadTraversed, nil
-}
-
-// Scan
-
-// ScanDeep scans only currently cached items.
-//
-// It does not discover new slot entries from disk.
-func (s *Slot[T]) ScanDeep(ctx Context) (ResultCode, error) {
-	s.mu.RLock()
-	items := make(map[string]T, len(s.items))
-	for name, item := range s.items {
-		items[name] = item
-	}
-	s.mu.RUnlock()
-
-	for name, item := range items {
-		if _, err := ScanDeep(item, ctx); err != nil {
-			return ScanFailed, fmt.Errorf("scan slot item %q: %w", name, err)
-		}
-	}
-
-	return ScanTraversed, nil
-}
-
-// Discover
-
-// DiscoverDeep discovers child directories from disk and scans them
-// recursively without loading typed content.
-func (s *Slot[T]) DiscoverDeep(ctx Context) (ResultCode, error) {
-	entries, err := os.ReadDir(s.root.Path())
-	if err != nil {
-		if os.IsNotExist(err) {
-			return DiscoverMissing, nil
-		}
-		return DiscoverFailed, err
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		name := entry.Name()
-		item, err := s.At(name)
-		if err != nil {
-			return DiscoverFailed, fmt.Errorf("compose slot item %q: %w", name, err)
-		}
-
-		if _, err := DiscoverDeep(item, ctx); err != nil {
-			return DiscoverFailed, fmt.Errorf("discover slot item %q: %w", name, err)
-		}
-	}
-
-	return DiscoverTraversed, nil
-}
-
-// Sync
-
-// SyncDeep ensures and syncs only currently cached items.
-//
-// The preparation ensure phase respects ctx.EnsurePolicy.
-//
-// It does not invent uncached entries.
-func (s *Slot[T]) SyncDeep(ctx Context) (ResultCode, error) {
-	s.mu.RLock()
-	items := make(map[string]T, len(s.items))
-	for name, item := range s.items {
-		items[name] = item
-	}
-	s.mu.RUnlock()
-
-	for name, item := range items {
-		if _, err := EnsureDeep(item, ctx); err != nil {
-			return SyncFailed, fmt.Errorf("ensure slot item %q: %w", name, err)
-		}
-		if _, err := SyncDeep(item, ctx); err != nil {
-			return SyncFailed, fmt.Errorf("sync slot item %q: %w", name, err)
-		}
-	}
-
-	return SyncTraversed, nil
-}
-
-// Render
-
-// RenderDeep renders only currently cached items.
-func (s *Slot[T]) RenderDeep() error {
-	s.mu.RLock()
-	items := make(map[string]T, len(s.items))
-	for name, item := range s.items {
-		items[name] = item
-	}
-	s.mu.RUnlock()
-
-	for name, item := range items {
-		if err := RenderDeep(item); err != nil {
-			return fmt.Errorf("render slot item %q: %w", name, err)
-		}
-	}
-
-	return nil
-}
-
-// Default
-
-// DefaultDeep applies defaults only to currently cached items.
-func (s *Slot[T]) DefaultDeep() error {
-	s.mu.RLock()
-	items := make(map[string]T, len(s.items))
-	for name, item := range s.items {
-		items[name] = item
-	}
-	s.mu.RUnlock()
-
-	for name, item := range items {
-		if err := DefaultDeep(item); err != nil {
-			return fmt.Errorf("default slot item %q: %w", name, err)
-		}
-	}
-
-	return nil
-}
-
-// Validate
-
-// ValidateDeep validates only currently cached items.
-func (s *Slot[T]) ValidateDeep(opts ValidateOptions) (ResultCode, error) {
-	if err := s.root.Validate(opts); err != nil {
-		return ValidateFailed, err
-	}
-
-	s.mu.RLock()
-	items := make(map[string]T, len(s.items))
-	for name, item := range s.items {
-		items[name] = item
-	}
-	s.mu.RUnlock()
-
-	for name, item := range items {
-		if _, err := ValidateDeep(item, opts); err != nil {
-			return ValidateFailed, fmt.Errorf("validate slot item %q: %w", name, err)
-		}
-	}
-
-	return ValidateTraversed, nil
 }

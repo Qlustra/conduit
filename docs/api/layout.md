@@ -1,6 +1,6 @@
 # Layout API
 
-This page documents the exported `github.com/qlustra/conduit/layout` package.
+This page documents the exported `github.com/qlustra/conduit/layout` package. Whole-tree composition and operations live in the [root manager API](operations.md). Typed propagation signatures use Go's `iter` package and `github.com/qlustra/sail/subject`.
 
 ## Types
 
@@ -64,9 +64,9 @@ Notable behavior:
 - `List` returns entries sorted by filename, matching `os.ReadDir`
 - `ParentDir` preserves compose-base metadata when the receiver belongs to a composed tree
 - `RelToPath` and `RelPathTo` differ only by direction: `RelToPath` makes the receiver relative to a base, while `RelPathTo` makes a target relative to the receiver
-- the declared-path helpers return `ok == false` when the handle was not attached through `Compose`
-- for a root field declared as `layout:"."`, `DeclaredPath()` returns `.`
-- the composed-path helpers return `ok == false` when the handle was not attached through `Compose`
+- the declared-path helpers return `ok == false` when the handle was not attached through `Structure.Compose`
+- for a root field declared with `path:"."`, `DeclaredPath()` returns `.`
+- the composed-path helpers return `ok == false` when the handle was not attached through `Structure.Compose`
 - for the compose base directory itself, `ComposedRelativePath()` returns `.`
 
 ### `File`
@@ -175,8 +175,8 @@ Notable behavior:
 - `IsExecutable` returns false for missing paths and non-regular filesystem entries
 - `CopyTo*` uses streamed I/O through `io.Copy`; it does not read the whole file into memory first
 - `Exists` only checks that some filesystem entry exists at the path
-- the declared-path helpers return `ok == false` when the handle was not attached through `Compose`
-- the composed-path helpers return `ok == false` when the handle was not attached through `Compose`
+- the declared-path helpers return `ok == false` when the handle was not attached through `Structure.Compose`
+- the composed-path helpers return `ok == false` when the handle was not attached through `Structure.Compose`
 - `ParentDir` preserves compose-base metadata when the receiver belongs to a composed tree
 - `RelToPath` and `RelPathTo` differ only by direction: `RelToPath` makes the receiver relative to a base, while `RelPathTo` makes a target relative to the receiver
 - dotfiles such as `.env` report an empty extension and keep the full basename as the stem
@@ -402,7 +402,6 @@ Methods:
 - `Run(ctx context.Context, opts RunOptions) error`: runs the executable
 - `Output(ctx context.Context, opts RunOptions) ([]byte, error)`: runs and captures stdout
 - `CombinedOutput(ctx context.Context, opts RunOptions) ([]byte, error)`: runs and captures combined stdout and stderr
-- `EnsureDeep(ctx Context) (ResultCode, error)`: ensures the executable node during deep traversal
 
 Notable behavior:
 
@@ -474,7 +473,7 @@ Notable behavior:
 - `Load` succeeds for dangling symlinks because `os.Readlink` returns the raw target string
 - `Scan`, `Discover`, and `Load` fail when the path exists but is not a symlink
 - `Sync` manages only the symlink entry at `Path()` and its parent directory
-- `Link` does not participate in `EnsureDeep`; links are materialized through `Sync`/`SyncDeep` after a target is set
+- `Link` has no Ensure hook; links are materialized through `Sync` after a target is set
 
 ### `FileLink`
 
@@ -572,7 +571,7 @@ Description:
 Notable behavior:
 
 - `Default()` applies defaults in memory only
-- `conduit.DefaultDeep` calls `Default()` on matching nodes
+- `Layout.Default` calls `Default()` on matching nodes
 - concrete implementations decide which values are considered unset and whether to apply defaults
 
 ### `Renderable`
@@ -592,7 +591,7 @@ Notable behavior:
 
 - `Render()` computes text but does not write to disk by itself
 - `SetRendered(string)` stores rendered text into the target's in-memory file state
-- `conduit.RenderDeep` calls `Render()` and passes the result into `SetRendered(string)`
+- `Layout.Render` calls `Render()` and passes the result into `SetRendered(string)`
 - concrete implementations decide how to handle missing or incomplete render context
 
 ### `Templatable`
@@ -614,7 +613,7 @@ Notable behavior:
 - `Template()` returns the source template text
 - `RenderTemplate(string)` executes template text against the current cached render context
 - `SetRendered(string)` stores rendered text into the target's in-memory file state
-- `conduit.RenderDeep` uses this path only when the node does not implement `Renderable`
+- `Layout.Render` uses this path only when the node does not implement `Renderable`
 
 ### `Slot[T]`
 
@@ -656,33 +655,23 @@ Methods:
 - `Entries() []SlotEntry[T]`: returns a sorted snapshot of cached entries
 - `All() iter.Seq2[string, T]`: iterates cached entries in sorted key order
 - `Keys() []string`: returns sorted cached keys
-- `At(name string) (T, error)`: returns a cached item or composes and caches one lazily
-- `MustAt(name string) T`: panicking form of `At`
-- `Add(name string, ctx Context) (T, error)`: creates the child root on disk, composes the item, ensures its structure, and caches it
+- `ComposeMember(name string) (T, error)`: returns a cached item or composes and caches one lazily
+- `MustComposeMember(name string) T`: panicking form of `ComposeMember`
+- `ComposeMembers(names iter.Seq2[string, error]) (subject.Children, func() error)`: lazily composes supplied names for a typed Sail descent; call the deferred error function after descent to observe enumeration or composition failures
+- `Enter() (subject.Children, error)`: supplies current typed cached members to Sail without discovering names
 - `Require(name string) (T, error)`: returns an item only when the child root already exists on disk
 - `Ensure(ctx Context) error`: ensures the slot root directory
-- `EnsureDeep(ctx Context) (ResultCode, error)`: ensures the slot root and all cached items
-- `DiscoverDeep(ctx Context) (ResultCode, error)`: discovers child directories on disk and scans them without loading stateful content
-- `LoadDeep(ctx Context) (ResultCode, error)`: discovers child directories on disk and loads them
-- `ScanDeep(ctx Context) (ResultCode, error)`: scans only cached items
-- `SyncDeep(ctx Context) (ResultCode, error)`: ensures cached items, then syncs stateful content within those items
-- `RenderDeep() error`: renders only currently cached items
-- `DefaultDeep() error`: applies defaults only to currently cached items
-- `ValidateDeep(opts ValidateOptions) (ResultCode, error)`: validates only currently cached items
 
 Notable behavior:
 
-- `At` composes items relative to `slotRoot/<name>` and caches them
-- `Add` ensures the child root and calls `EnsureDeep` on the new child
+- `ComposeMember` composes items relative to `slotRoot/<name>` and caches them without touching the filesystem
+- recursive operations belong to the owning `conduit.Layout`
+- constructing missing members requires a slot configured by `Structure.Compose`
 - `Delete` removes both the on-disk child tree and the cached entry
 - `Len`, `Entries`, `All`, and `Keys` are cache-based; they do not list the filesystem directly
 - `Entries` and `All` return cached items as-is, preserving pointer or value semantics chosen by `T`
 - the declared-path helpers delegate to the slot root and expose the slot field's own declared fragment
-- the composed-path helpers delegate to the slot root and return `ok == false` until the slot has been attached through `Compose`
-- `DiscoverDeep` discovers directory-backed entries from disk without loading stateful content
-- `LoadDeep` discovers directory-backed entries from disk
-- `ScanDeep` and `SyncDeep` do not discover uncached entries
-- `Slot.SyncDeep` ensures cached children before syncing them, and that preparation ensure pass respects `Context.EnsurePolicy`
+- the composed-path helpers delegate to the slot root and return `ok == false` until the slot has been attached through `Structure.Compose`
 
 ### `FileSlot[T]`
 
@@ -724,34 +713,25 @@ Methods:
 - `Entries() []FileSlotEntry[T]`: returns a sorted snapshot of cached entries
 - `All() iter.Seq2[string, T]`: iterates cached entries in sorted key order
 - `Keys() []string`: returns sorted cached keys
-- `At(name string) (T, error)`: returns a cached item or composes and caches one lazily
-- `MustAt(name string) T`: panicking form of `At`
-- `Add(name string, ctx Context) (T, error)`: ensures the slot root, composes the file-backed item, ensures it, and caches it
+- `ComposeMember(name string) (T, error)`: returns a cached item or composes and caches one lazily
+- `MustComposeMember(name string) T`: panicking form of `ComposeMember`
+- `ComposeMembers(names iter.Seq2[string, error]) (subject.Children, func() error)`: lazily composes supplied names for a typed Sail descent; call the deferred error function after descent to observe enumeration or composition failures
+- `Enter() (subject.Children, error)`: supplies current typed cached members to Sail without discovering names
 - `Require(name string) (T, error)`: returns an item only when the child file already exists on disk
 - `Ensure(ctx Context) error`: ensures the slot root directory
-- `EnsureDeep(ctx Context) (ResultCode, error)`: ensures the slot root and all cached items
-- `DiscoverDeep(ctx Context) (ResultCode, error)`: discovers child files on disk and scans them without loading stateful content
-- `LoadDeep(ctx Context) (ResultCode, error)`: discovers child files on disk and loads them
-- `ScanDeep(ctx Context) (ResultCode, error)`: scans only cached items
-- `SyncDeep(ctx Context) (ResultCode, error)`: ensures cached items, then syncs stateful content within those items
-- `RenderDeep() error`: renders only currently cached items
-- `DefaultDeep() error`: applies defaults only to currently cached items
-- `ValidateDeep(opts ValidateOptions) (ResultCode, error)`: validates only currently cached items
 
 Notable behavior:
 
-- `At` composes items relative to `slotRoot/<name>` and caches them
-- `Add` ensures the slot root and calls `EnsureDeep` on the item
+- `ComposeMember` composes items relative to `slotRoot/<name>` and caches them without touching the filesystem
+- recursive operations belong to the owning `conduit.Layout`
+- constructing missing members requires a slot configured by `Structure.Compose`
 - `Delete` removes both the on-disk child file and the cached entry
 - item names must identify a single direct child; empty, absolute, dot, dot-dot, and separator-containing names are rejected
 - `Has` and `Require` treat only regular files as valid child entries; symlinks are rejected
 - `Len`, `Entries`, `All`, and `Keys` are cache-based; they do not list the filesystem directly
 - `Entries` and `All` return cached items as-is, preserving pointer or value semantics chosen by `T`
 - the declared-path helpers delegate to the slot root and expose the slot field's own declared fragment
-- the composed-path helpers delegate to the slot root and return `ok == false` until the slot has been attached through `Compose`
-- `DiscoverDeep` and `LoadDeep` discover direct child regular files from disk and ignore subdirectories and symlinks
-- `ScanDeep` and `SyncDeep` do not discover uncached entries
-- `FileSlot.SyncDeep` ensures cached children before syncing them, and that preparation ensure pass respects `Context.EnsurePolicy`
+- the composed-path helpers delegate to the slot root and return `ok == false` until the slot has been attached through `Structure.Compose`
 
 ### `LinkSlot[T]`
 
@@ -793,32 +773,25 @@ Methods:
 - `Entries() []LinkSlotEntry[T]`: returns a sorted snapshot of cached entries
 - `All() iter.Seq2[string, T]`: iterates cached entries in sorted key order
 - `Keys() []string`: returns sorted cached keys
-- `At(name string) (T, error)`: returns a cached item or composes and caches one lazily
-- `MustAt(name string) T`: panicking form of `At`
-- `Add(name string, ctx Context) (T, error)`: ensures the slot root, composes the link item, and caches it
+- `ComposeMember(name string) (T, error)`: returns a cached item or composes and caches one lazily
+- `MustComposeMember(name string) T`: panicking form of `ComposeMember`
+- `ComposeMembers(names iter.Seq2[string, error]) (subject.Children, func() error)`: lazily composes supplied names for a typed Sail descent; call the deferred error function after descent to observe enumeration or composition failures
+- `Enter() (subject.Children, error)`: supplies current typed cached members to Sail without discovering names
 - `Require(name string) (T, error)`: returns an item only when the child symlink already exists on disk
 - `Ensure(ctx Context) error`: ensures the slot root directory
-- `EnsureDeep(ctx Context) (ResultCode, error)`: ensures the slot root and visits cached items without materializing the links themselves
-- `DiscoverDeep(ctx Context) (ResultCode, error)`: discovers child symlinks on disk and scans them without loading target content
-- `LoadDeep(ctx Context) (ResultCode, error)`: discovers child symlinks on disk and loads them
-- `ScanDeep(ctx Context) (ResultCode, error)`: scans only cached items
-- `SyncDeep(ctx Context) (ResultCode, error)`: ensures cached items, then syncs link entries within those items
-- `ValidateDeep(opts ValidateOptions) (ResultCode, error)`: validates only currently cached items
 
 Notable behavior:
 
 - `T` is restricted to the built-in link family: `Link`, `FileLink`, or `DirLink`
-- `At` composes items relative to `slotRoot/<name>` and caches them
-- `Add` ensures the slot root but does not materialize the symlink entry itself; links are created by `Sync`/`SyncDeep`
+- `ComposeMember` composes items relative to `slotRoot/<name>` and caches them without touching the filesystem
+- recursive operations belong to the owning `conduit.Layout`
+- constructing missing members requires a slot configured by `Structure.Compose`
 - `Delete` removes only symlink entries and returns an error when a non-symlink entry exists at the child path
 - item names must identify a single direct child; empty, absolute, dot, dot-dot, and separator-containing names are rejected
 - `Len`, `Entries`, `All`, and `Keys` are cache-based; they do not list the filesystem directly
-- `Entries` and `All` return cached items as-is, preserving value semantics chosen by `T`
+- `Entries` and `All` return cached items as-is, preserving pointer or value semantics chosen by `T`
 - the declared-path helpers delegate to the slot root and expose the slot field's own declared fragment
-- the composed-path helpers delegate to the slot root and return `ok == false` until the slot has been attached through `Compose`
-- `DiscoverDeep` and `LoadDeep` discover symlink entries from disk and ignore regular files and directories
-- `ScanDeep` and `SyncDeep` do not discover uncached entries
-- `LinkSlot.SyncDeep` ensures cached children before syncing them, and that preparation ensure pass respects `Context.EnsurePolicy`
+- the composed-path helpers delegate to the slot root and return `ok == false` until the slot has been attached through `Structure.Compose`
 
 ### `TextTemplate[C]`
 
@@ -849,7 +822,7 @@ Context methods:
 Notable behavior:
 
 - mirrors the same disk and memory state model as `Format[string]`
-- resets cached render context when `Compose` rebinds the file path
+- resets cached render context when composition rebinds the file path
 - `SetDefaultContext` returns `false` and leaves context unchanged when context is already cached
 - provides the built-in templated render path used by `Templatable`
 - leaves custom render validation and semantics to the user-defined `Render()` implementation
@@ -878,13 +851,13 @@ Fields:
 - `DirMode`: mode used when creating directories
 - `FileMode`: mode used when creating regular files
 - `ExecMode`: mode used when creating or ensuring `Exec` files
-- `EnsurePolicy`: selects which node kinds `Ensure` and `EnsureDeep` may materialize
-- `SyncPolicy`: selects which stateful memory states `Sync` and `SyncDeep` may write, with optional disk-state filters
+- `EnsurePolicy`: selects which node kinds `Ensure` may materialize
+- `SyncPolicy`: selects which stateful memory states `Sync` may write, with optional disk-state filters
 - `PathSafetyPolicy`: controls whether mutating typed filesystem operations reject symlink parents during path resolution
 - `WritePolicy`: selects direct rewrites or per-file atomic replacement for `File.WriteBytes`
 - `TempFilePlacement`: selects where atomic writes create their temporary file
 - `TempDir`: custom staging directory used when `TempFilePlacement` is `TempFileDir`
-- `Reporter`: optional sink for per-path deep-operation results
+- `Reporter`: optional sink for per-path tree-operation results
 
 ### `DefaultContext`
 
@@ -1057,7 +1030,7 @@ type Report struct { ... }
 
 Description:
 
-- in-memory collector for operation entries recorded during deep traversal
+- in-memory collector for operation entries recorded during tree traversal
 
 Methods:
 
@@ -1159,7 +1132,7 @@ Exposed API:
 - `Read() (T, error)`: reads and unmarshals from disk without changing cached state
 - `ReadIfExists() (T, bool, error)`: reads and unmarshals when the file exists
 - `LoadOrInit(defaultValue T) error`: loads existing content or stores a default value in memory when missing
-- `EnsureDeep(ctx Context) (ResultCode, error)`: ensures the backing file when `ctx.EnsurePolicy` includes syncable nodes
+- `Ensure(ctx Context) error`: ensures the backing file when `ctx.EnsurePolicy` includes `EnsureSyncables`, preserving existing file contents and cached state
 - `Save(ctx Context) error`: writes the cached value and marks memory state synced
 - `Load() (bool, error)`: loads content into memory and reports whether the file existed
 - `HasContent() bool`: reports whether a value is currently cached
@@ -1224,54 +1197,6 @@ type Scannable interface {
 ```go
 type Validator interface {
 	Validate(opts ValidateOptions) error
-}
-```
-
-```go
-type DeepEnsurer interface {
-	EnsureDeep(ctx Context) (ResultCode, error)
-}
-```
-
-```go
-type DeepLoader interface {
-	LoadDeep(ctx Context) (ResultCode, error)
-}
-```
-
-```go
-type DeepDiscoverer interface {
-	DiscoverDeep(ctx Context) (ResultCode, error)
-}
-```
-
-```go
-type DeepSyncer interface {
-	SyncDeep(ctx Context) (ResultCode, error)
-}
-```
-
-```go
-type DeepScanner interface {
-	ScanDeep(ctx Context) (ResultCode, error)
-}
-```
-
-```go
-type DeepRenderer interface {
-	RenderDeep() error
-}
-```
-
-```go
-type DeepDefaulter interface {
-	DefaultDeep() error
-}
-```
-
-```go
-type DeepValidator interface {
-	ValidateDeep(opts ValidateOptions) (ResultCode, error)
 }
 ```
 
@@ -1723,7 +1648,7 @@ func NewSlot[T any](root Dir) Slot[T]
 
 Description:
 
-- returns a slot rooted at `root` with an empty cache
+- returns a slot rooted at `root` with an empty cache; managed composition configures construction of missing members
 
 ### `NewFileSlot[T]`
 
@@ -1733,7 +1658,7 @@ func NewFileSlot[T any](root Dir) FileSlot[T]
 
 Description:
 
-- returns a file slot rooted at `root` with an empty cache
+- returns a file slot rooted at `root` with an empty cache; managed composition configures construction of missing members
 
 ### `NewLinkSlot[T]`
 
@@ -1743,29 +1668,4 @@ func NewLinkSlot[T LinkSlotItem](root Dir) LinkSlot[T]
 
 Description:
 
-- returns a link slot rooted at `root` with an empty cache
-
-### `ComposeAs[T]`
-
-```go
-func ComposeAs[T any](root Dir) (T, error)
-```
-
-Description:
-
-- composes a new value of `T` rooted at `root`
-
-Notable behavior:
-
-- `T` must be a struct or pointer to a struct that follows Conduit composition rules
-- especially useful when creating slot-backed children lazily from an already composed `Dir`
-
-### `ValidateDeep`
-
-```go
-func ValidateDeep(target any, opts ValidateOptions) (ResultCode, error)
-```
-
-Description:
-
-- recursively validates an already composed or cached layout without mutating disk or memory state
+- returns a link slot rooted at `root` with an empty cache; managed composition configures construction of missing members

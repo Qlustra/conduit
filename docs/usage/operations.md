@@ -1,227 +1,133 @@
 # Operations usage
 
-Conduit separates layout declaration from filesystem operations. You compose a layout once, then explicitly choose how state moves between disk and memory.
+Compile the declaration, compose a tree, then choose explicit operations on its `Layout` manager. The manager owns whole-tree traversal; carriers own local filesystem and cached-content behavior.
 
-## Compose
-
-`Compose(root, target)` binds a layout to a real filesystem root:
+## Layout manager
 
 ```go
-var ws Workspace
-err := conduit.Compose("/srv/workspace", &ws)
-```
-
-Composition does not touch the filesystem. It only assigns paths to the declared nodes.
-
-## Ensure
-
-`EnsureDeep(target, ctx)` materializes the declared structure on disk:
-
-```go
-_, err := conduit.EnsureDeep(&ws, conduit.DefaultContext)
-```
-
-What it does:
-
-- creates directories declared by `Dir`
-- creates files declared by `File`
-- creates executable files declared by `Exec`
-- creates backing files for syncable stateful nodes when `ctx.EnsurePolicy` includes them
-- ensures already cached slot items
-
-What it does not do:
-
-- load stateful content into memory
-- discover new slot entries from disk
-- delete anything
-
-For slot types such as `Slot[T]`, `FileSlot[T]`, and `LinkSlot[T]`, only cached items are ensured. Use `slot.Add(name, ctx)` when you want to create a new dynamic child explicitly.
-
-`ctx.EnsurePolicy` lets you narrow the pass. For example:
-
-- `conduit.EnsureAll` preserves the historical behavior
-- `conduit.EnsureScaffold` materializes raw `Dir`, `File`, and `Exec` nodes but skips syncable stateful wrappers
-- `conduit.EnsureDirs | conduit.EnsureSyncables` creates directories and syncable backing files, but skips raw standalone files
-
-## Default
-
-`DefaultDeep(target)` applies in-memory defaults without consulting disk:
-
-```go
-err := conduit.DefaultDeep(&ws)
-```
-
-What it does:
-
-- calls `Default() error` on nodes that implement it
-- seeds only already composed or cached children
-- preserves existing in-memory values when wrappers use `SetDefault(...)`, `SetDefaultContext(...)`, or `SetDefaultTarget(...)`
-
-What it does not do:
-
-- read from disk
-- discover new slot entries from disk
-- render templates
-- write anything back to disk
-
-This makes `DefaultDeep` the in-memory seeding phase that usually sits before `RenderDeep`, `ValidateDeep`, or `SyncDeep`.
-
-## Load
-
-`LoadDeep(target, ctx)` reads filesystem content into the in-memory model:
-
-```go
-_, err := conduit.LoadDeep(&ws, conduit.DefaultContext)
-```
-
-What it does:
-
-- loads stateful nodes such as `layout.Link`, `layout.TextTemplate[C]`, and format-backed files
-- discovers slot, file-slot, and link-slot entries from disk according to slot kind
-- composes and loads discovered slot items recursively
-
-What it does not do:
-
-- create missing files
-- write anything back to disk
-- remove cached slot items that no longer exist
-
-For stateful nodes, a missing load marks disk state missing and clears the cached in-memory value or link target.
-
-## Discover
-
-`DiscoverDeep(target, ctx)` discovers the declared layout from disk without loading stateful content:
-
-```go
-_, err := conduit.DiscoverDeep(&ws, conduit.DefaultContext)
-```
-
-What it does:
-
-- discovers slot, file-slot, and link-slot entries from disk according to slot kind
-- composes discovered slot items recursively
-- updates disk state for stateful nodes such as links, text templates, and format-backed files
-- preserves the current in-memory content, target, and memory state
-
-What it does not do:
-
-- load file content into memory
-- create missing files
-- write anything back to disk
-
-This makes `DiscoverDeep` the middle ground between `LoadDeep` and `ScanDeep`: it discovers structure like `LoadDeep`, but it only observes stateful nodes like `ScanDeep`.
-
-## Render
-
-`RenderDeep(target)` renders derived text templates into cached file content:
-
-```go
-err := conduit.RenderDeep(&ws)
-```
-
-What it does:
-
-- calls `Render() (string, error)` on nodes that implement `layout.Renderable`
-- otherwise, calls `Template()` and `RenderTemplate(...)` on nodes that implement `layout.Templatable`
-- stores rendered text in memory via `SetRendered(string)`
-- visits only already composed or cached children
-
-What it does not do:
-
-- discover new slot entries from disk
-- create missing files
-- write anything back to disk
-
-This makes `RenderDeep` the derive-in-memory phase that usually sits after `DefaultDeep` and before `ValidateDeep` or `SyncDeep`.
-
-## Sync
-
-`SyncDeep(target, ctx)` writes sync-eligible in-memory state back to disk:
-
-```go
-_, err := conduit.SyncDeep(&ws, conduit.DefaultContext)
-```
-
-What it does:
-
-- writes sync-eligible in-memory state for format-backed files, text templates, and links
-- syncs already cached slot items recursively
-- runs the slot, file-slot, and link-slot preparation ensure phase under the same `ctx.EnsurePolicy`
-- allows callers to choose rewrite behavior per sync pass
-
-What it does not do:
-
-- materialize standalone raw `Dir` or `File` fields
-- invent uncached slot entries
-- delete files or directories that are missing from memory
-- merge disk content with memory content
-
-For stateful nodes, `Sync` returns a skipped result when no syncable value is cached or when the current memory state is excluded by `ctx.SyncPolicy`.
-
-## Scan
-
-`ScanDeep(target, ctx)` refreshes disk-presence metadata for already composed items:
-
-```go
-_, err := conduit.ScanDeep(&ws, conduit.DefaultContext)
-```
-
-What it does:
-
-- updates disk state for stateful nodes such as links, text templates, and format-backed files
-- preserves the current in-memory content, target, and memory state
-- scans cached slot items recursively
-
-What it does not do:
-
-- load file content
-- discover new slot entries from disk
-- modify files on disk
-
-This makes `ScanDeep` useful for "is it there?" checks, not discovery.
-
-## Validate
-
-`ValidateDeep(target, opts)` validates the already composed or cached layout without mutating it:
-
-```go
-_, err := conduit.ValidateDeep(&ws, conduit.ValidateOptions{})
-```
-
-What it does:
-
-- calls `Validate(opts) error` on nodes that implement it
-- calls `ValidateDeep(opts)` on nodes that own their own validation traversal
-- validates only already composed or cached children
-- optionally records per-path validation results through `opts.Reporter`
-- applies `opts.PathSafetyPolicy` when validating built-in filesystem node types
-
-What it does not do:
-
-- create missing files or directories
-- discover new slot entries from disk
-- load stateful content into memory
-- render templates
-- write anything back to disk
-
-This makes `ValidateDeep` the semantic-check phase that can sit between load or render and sync.
-
-Every deep operation returns `(ResultCode, error)`.
-
-- `ResultCode` summarizes what happened at the visited root.
-- `error` preserves the existing fail-fast traversal behavior.
-- when `Context.Reporter` is set, per-path details are still collected into the report.
-
-Inspect a root-level result when you need it:
-
-```go
-result, err := conduit.SyncDeep(&ws, conduit.DefaultContext)
+type ServiceConfig struct {
+	Name string `yaml:"name"`
+	Port int    `yaml:"port"`
+}
+
+type Service struct {
+	Root   layout.Dir                  `layout:"dir" path:"."`
+	Config formats.YAMLFile[ServiceConfig] `layout:"content" path:"config.yaml"`
+	Runner layout.Exec                 `layout:"exec" path:"bin/run"`
+}
+
+type Workspace struct {
+	Root     layout.Dir             `layout:"dir" path:"."`
+	Services layout.Slot[*Service] `layout:"directories" path:"services"`
+}
+
+structure, err := conduit.Compile[Workspace]()
 if err != nil {
 	return err
 }
-if result == conduit.SyncSkippedPolicy {
-	// the root was visited, but nothing was written
+managed, err := structure.Compose("/srv/workspace")
+if err != nil {
+	return err
 }
+ws := managed.Tree()
+```
+
+Import `conduit`, `layout`, and `formats` from `github.com/qlustra/conduit`. Each fragment below assumes this setup.
+
+Compilation recognizes role and path declarations. Composition creates a fresh tree, allocates declared pointer paths, and configures slots without touching the filesystem. The compiled Structure can be reused to compose independent trees at other roots. Untagged fields and embeddings do not participate; nested groups use `layout:"group"`.
+
+## Ensure
+
+```go
+_, err := managed.Ensure(conduit.DefaultContext)
+```
+
+Ensure creates declared directories, raw files, executable files, and typed backing files according to `EnsurePolicy`. It prepares a collection root and every cached directory member root before visiting that collection's descendant fields, even for empty trees. A later failure can leave other member roots created.
+
+Typed files use `EnsureSyncables`. Links are persisted by Sync after a target is cached. Ensure visits existing cached members; it does not discover names, load content, or persist cached values.
+
+Use `EnsureScaffold` for raw Dir, File, and Exec scaffolding, or combine policy bits such as `EnsureDirs | EnsureSyncables`.
+
+## Load and Discover
+
+```go
+_, err := managed.Load(conduit.DefaultContext)
+// Or discover names and presence while preserving live content:
+_, err = managed.Discover(conduit.DefaultContext)
+```
+
+Both operations read collection directories and compose physical members into the cache. Directory slots admit directories, file slots regular files, and link slots symlinks, including dangling links. Members are composed and processed lazily in filesystem order, stopping on the first failure.
+
+Load reads stateful content. A missing file clears cached content and marks disk state missing. Discover observes presence while preserving content, targets, and memory state.
+
+Both accumulate members. Stale cached names remain in the cache but are not visited during these filesystem-driven passes. Neither writes or evicts cached members.
+
+## Scan
+
+```go
+_, err := managed.Scan(conduit.DefaultContext)
+```
+
+Scan observes disk presence for declared nodes and cached members. It preserves live content and memory state, does not discover new collection names, and performs no writes.
+
+## Default and Render
+
+```go
+if err := managed.Default(); err != nil {
+	return err
+}
+if err := managed.Render(); err != nil {
+	return err
+}
+```
+
+Default calls local `Default() error` hooks. Implementations can use `SetDefault`, `SetDefaultContext`, or `SetDefaultTarget` to preserve values already present.
+
+Render calls `Renderable.Render`, or the Templatable `Template`/`RenderTemplate` path, and stores the result through `SetRendered`. Both passes visit composed and cached members and keep their effects in memory. Sync writes the resulting content separately.
+
+## Sync
+
+```go
+ctx := conduit.DefaultContext
+ctx.SyncPolicy = conduit.SyncIfDirty
+_, err := managed.Sync(ctx)
+```
+
+Sync persists eligible cached typed-file content, rendered text, and link targets. Its policy gates writes by memory state and optionally the last observed disk state. A carrier may create parent directories for its own write.
+
+Ensure and Sync are separate passes. Call Ensure when you need empty directories or other declared scaffolding. Sync neither discovers members nor deletes disk entries omitted from memory.
+
+Use pointer collection members for stateful carriers. Pointers let Sail bind mutable hooks to the cached instance. Values yielded by a collection are ordinary Go copies; pointer-only hooks on nonaddressable values cannot be bound. A value Format can still use its value-receiver Ensure hook.
+
+## Validate
+
+```go
+_, err := managed.Validate(conduit.ValidateOptions{})
+```
+
+Validate checks collection directories before entering members and calls local validation hooks. It validates declared nodes and cached members, applying path-safety policy to built-in carriers. It does not mutate content, cache membership, or the filesystem.
+
+## Unload
+
+```go
+err := managed.Unload()
+```
+
+Unload clears content through local carrier hooks. It retains cached collection membership and the last disk observation, so a later Scan, Load, or Discover can work with the same live tree.
+
+## Results and reporting
+
+Ensure, Load, Discover, Scan, Sync, and Validate return `(ResultCode, error)`. The result describes the visited root; a traversal result does not mean every descendant had the same outcome. Default, Render, and Unload return an error.
+
+Operations stop at the first failure. Attach a `Report` to capture per-path results and enclosing collection failures:
+
+```go
+var report conduit.Report
+ctx := conduit.DefaultContext
+ctx.Reporter = &report
+
+_, err := managed.Sync(ctx)
+fmt.Println(report.RenderTree())
 ```
 
 ## Context
@@ -244,12 +150,12 @@ ctx := conduit.Context{
 - `DirMode` controls created directories.
 - `FileMode` controls regular files.
 - `ExecMode` controls `Exec` files.
-- `EnsurePolicy` controls which node kinds `Ensure` and `EnsureDeep` may materialize.
-- `SyncPolicy` controls which stateful memory states `Sync` and `SyncDeep` may write, with optional extra disk-state filters.
+- `EnsurePolicy` controls which node kinds `Ensure` may materialize.
+- `SyncPolicy` controls which stateful memory states `Sync` may write, with optional extra disk-state filters.
 - `PathSafetyPolicy` controls whether mutating operations reject symlink parents during path resolution.
 - `WritePolicy` controls direct rewrites vs atomic replacement in `File.WriteBytes`.
 - `TempFilePlacement` and `TempDir` control where atomic writes stage their temporary file.
-- `Reporter` optionally collects per-path operation results during deep traversal.
+- `Reporter` optionally collects per-path operation results during tree traversal.
 
 Available ensure policy bits:
 
@@ -313,7 +219,7 @@ conduit.Context{
 
 `WritePolicy` defaults to `conduit.WriteDirect`, and `TempFilePlacement` defaults to `conduit.TempFileSystem` when you enable atomic replacement.
 
-Collect a report during a deep operation:
+Collect a report during a tree operation:
 
 ```go
 var report conduit.Report
@@ -321,7 +227,7 @@ var report conduit.Report
 ctx := conduit.DefaultContext
 ctx.Reporter = &report
 
-_, _ = conduit.LoadDeep(&ws, ctx)
+_, _ = managed.Load(ctx)
 
 if report.HasErrors() {
 	// inspect report.Entries()
@@ -335,78 +241,49 @@ opts := conduit.ValidateOptions{
 	Reporter: &report,
 }
 
-_, _ = conduit.ValidateDeep(&ws, opts)
+_, _ = managed.Validate(opts)
 ```
 
-## Typical workflows
+## Typical collection workflows
 
-Bootstrap a new workspace:
+Compose a cached member, prepare content, then persist a whole-tree pass:
 
 ```go
-var ws Workspace
-_ = conduit.Compose("/srv/workspace", &ws)
-_, _ = conduit.EnsureDeep(&ws, conduit.DefaultContext)
-
-svc, _ := ws.Services.Add("billing", conduit.DefaultContext)
+svc, err := ws.Services.ComposeMember("billing")
+if err != nil {
+	return err
+}
 svc.Config.Set(ServiceConfig{Name: "billing", Port: 8080})
-_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
+_, err = managed.Sync(conduit.DefaultContext)
 ```
 
-Sync only dirty stateful content during a pass:
+`ComposeMember` is memory-only. When the workflow also requires declared scaffolding, call `managed.Ensure(ctx)` before Sync. Both manager passes operate on the whole tree.
+
+Load discovered content, edit one member, then persist:
 
 ```go
-ctx := conduit.DefaultContext
-ctx.SyncPolicy = conduit.SyncIfDirty
-
-_, _ = conduit.SyncDeep(&ws, ctx)
-```
-
-Write only when the file was observed missing:
-
-```go
-ctx := conduit.DefaultContext
-ctx.SyncPolicy = conduit.SyncIfDirty | conduit.SyncOnDiskMissing
-
-_, _ = conduit.SyncDeep(&ws, ctx)
-```
-
-Discover an existing workspace without loading stateful content:
-
-```go
-var ws Workspace
-_ = conduit.Compose("/srv/workspace", &ws)
-_, _ = conduit.DiscoverDeep(&ws, conduit.DefaultContext)
-```
-
-Validate before syncing:
-
-```go
-_ = conduit.RenderDeep(&ws)
-_, _ = conduit.ValidateDeep(&ws, conduit.ValidateOptions{})
-_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
-```
-
-Load discovered content into memory:
-
-```go
-var ws Workspace
-
-_ = conduit.Compose("/srv/workspace", &ws)
-_, _ = conduit.LoadDeep(&ws, conduit.DefaultContext)
-
-svc := ws.Services.MustAt("billing")
+if _, err := managed.Load(conduit.DefaultContext); err != nil {
+	return err
+}
+svc, ok := ws.Services.Get("billing")
+if !ok {
+	return fmt.Errorf("billing service was not discovered")
+}
 cfg := svc.Config.MustGet()
 cfg.Port = 9000
 svc.Config.Set(cfg)
 
-_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
+ctx := conduit.DefaultContext
+ctx.SyncPolicy = conduit.SyncIfDirty
+_, err := managed.Sync(ctx)
 ```
 
-Check disk presence without loading content:
+Write only when a file was observed missing:
 
 ```go
-svc := ws.Services.MustAt("billing")
-_, _ = conduit.ScanDeep(svc, conduit.DefaultContext)
+ctx := conduit.DefaultContext
+ctx.SyncPolicy = conduit.SyncIfDirty | conduit.SyncOnDiskMissing
+_, err := managed.Sync(ctx)
 ```
 
-The core rule is simple: Conduit never decides direction for you. You choose whether the next step is ensure, default, discover, load, render, validate, sync, or scan, and you choose how aggressive sync should be for stateful content.
+For generated content, use `Default → Render → Validate → Sync`. For disk-authoritative content, use `Load → edit → Validate → Sync`. Choose Ensure separately when the workflow requires scaffolding.

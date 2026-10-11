@@ -4,14 +4,16 @@ import (
 	"fmt"
 	"iter"
 	"os"
-	"path/filepath"
 	"sort"
 	"sync"
+
+	"github.com/qlustra/conduit/internal/contracts"
 )
 
-// LinkSlotItem is the built-in link node family supported by LinkSlot.
+// LinkSlotItem is the built-in link node family supported by LinkSlot,
+// as values or pointers. Pointer members retain their cached state when used.
 type LinkSlotItem interface {
-	Link | FileLink | DirLink
+	Link | *Link | FileLink | *FileLink | DirLink | *DirLink
 }
 
 // LinkSlotEntry is one cached key-item pair returned by LinkSlot.Entries.
@@ -23,12 +25,12 @@ type LinkSlotEntry[T LinkSlotItem] struct {
 // LinkSlot models repeated direct-child symlink entries under one directory.
 //
 // Each key maps directly to a symlink path below the slot root. LinkSlot caches
-// composed items in memory and discovers or loads them only when explicitly
-// asked.
+// composed items in memory. Managed Layout operations discover and load members.
 type LinkSlot[T LinkSlotItem] struct {
-	root  Dir
-	mu    sync.RWMutex
-	items map[string]T
+	root     Dir
+	mu       sync.RWMutex
+	items    map[string]T
+	composer contracts.MemberComposer
 }
 
 // NewLinkSlot returns a link slot rooted at root.
@@ -162,28 +164,8 @@ func (s *LinkSlot[T]) Entries() []LinkSlotEntry[T] {
 	return entries
 }
 
-// CachedChildren returns a sorted snapshot without composing or loading items.
-// LinkSlot stores values, so each returned Value is a copy of the cached item.
-func (s *LinkSlot[T]) CachedChildren() []CachedChild {
-	entries := s.Entries()
-	children := make([]CachedChild, len(entries))
-	for i, entry := range entries {
-		children[i] = CachedChild{Name: entry.Name, Path: s.root.File(entry.Name).Path(), Value: entry.Item}
-	}
-	return children
-}
-
 // ChildKind identifies the physical kind of a slot member.
 func (s *LinkSlot[T]) ChildKind() string { return "link" }
-
-// BindChild binds a physical child name without loading content or touching disk.
-func (s *LinkSlot[T]) BindChild(name string) (any, error) {
-	item, err := s.At(name)
-	if err != nil {
-		return nil, err
-	}
-	return item, nil
-}
 
 // All iterates cached entries in sorted key order.
 //
@@ -211,11 +193,12 @@ func (s *LinkSlot[T]) Keys() []string {
 	return keys
 }
 
-// At returns the cached item for name, composing and caching it on demand when
+// ComposeMember returns the cached item for name, composing and caching it on demand when
 // needed.
 //
-// At does not ensure the symlink exists on disk.
-func (s *LinkSlot[T]) At(name string) (T, error) {
+// ComposeMember does not ensure the symlink exists on disk.
+// Uncached members require a member composer installed during managed composition.
+func (s *LinkSlot[T]) ComposeMember(name string) (T, error) {
 	if err := validateSlotItemName("link slot item", name); err != nil {
 		var zero T
 		return zero, err
@@ -225,14 +208,10 @@ func (s *LinkSlot[T]) At(name string) (T, error) {
 		s.mu.RUnlock()
 		return item, nil
 	}
+	root, composer := s.root, s.composer
 	s.mu.RUnlock()
 
-	composeBase := s.root.Path()
-	if base, ok := s.root.ComposedBaseDir(); ok {
-		composeBase = base.Path()
-	}
-
-	item, err := composePathAs[T](s.root.File(name).Path(), composeBase)
+	item, err := composeSlotMember[T](composer, root, root.File(name).Path())
 	if err != nil {
 		var zero T
 		return zero, err
@@ -253,36 +232,13 @@ func (s *LinkSlot[T]) At(name string) (T, error) {
 	return item, nil
 }
 
-// MustAt returns At(name) or panics on composition error.
-func (s *LinkSlot[T]) MustAt(name string) T {
-	v, err := s.At(name)
+// MustComposeMember returns ComposeMember(name) or panics on composition error.
+func (s *LinkSlot[T]) MustComposeMember(name string) T {
+	v, err := s.ComposeMember(name)
 	if err != nil {
 		panic(err)
 	}
 	return v
-}
-
-// Add ensures the slot root exists on disk, composes the item, and caches it.
-//
-// The link entry itself is still materialized by Sync or SyncDeep.
-func (s *LinkSlot[T]) Add(name string, ctx Context) (T, error) {
-	if err := validateSlotItemName("link slot item", name); err != nil {
-		var zero T
-		return zero, err
-	}
-	if err := s.root.Ensure(ctx); err != nil {
-		var zero T
-		return zero, err
-	}
-
-	s.mu.RLock()
-	if existing, ok := s.items[name]; ok {
-		s.mu.RUnlock()
-		return existing, nil
-	}
-	s.mu.RUnlock()
-
-	return s.At(name)
 }
 
 // Require returns the named item only if its symlink entry already exists on
@@ -303,192 +259,44 @@ func (s *LinkSlot[T]) Require(name string) (T, error) {
 		return zero, fmt.Errorf("link slot item %q not found under %s: path is not a symlink", name, s.Path())
 	}
 
-	return s.At(name)
+	return s.ComposeMember(name)
 }
 
-// ComposePath binds the slot root and clears the cache.
+// ComposePath binds the slot root and clears its cache and member composer.
 func (s *LinkSlot[T]) ComposePath(path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.root = NewDir(path)
 	s.items = make(map[string]T)
+	s.composer = nil
 }
 
-func (s *LinkSlot[T]) setComposeBase(path string) {
-	s.root.setComposeBase(path)
+func (s *LinkSlot[T]) SetComposeBase(path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.root.SetComposeBase(path)
 }
 
-func (s *LinkSlot[T]) setDeclaredPath(path string) {
-	s.root.setDeclaredPath(path)
+func (s *LinkSlot[T]) SetDeclaredPath(path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.root.SetDeclaredPath(path)
+}
+
+// SetMemberComposer configures composition of uncached members.
+func (s *LinkSlot[T]) SetMemberComposer(composer contracts.MemberComposer) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.composer = composer
 }
 
 // Ensure creates the slot root directory.
 func (s *LinkSlot[T]) Ensure(ctx Context) error {
 	return s.root.Ensure(ctx)
-}
-
-// EnsureDeep ensures the slot root and visits all currently cached items.
-//
-// It does not invent uncached entries or materialize the link entries
-// themselves.
-func (s *LinkSlot[T]) EnsureDeep(ctx Context) (ResultCode, error) {
-	if err := s.root.Ensure(ctx); err != nil {
-		return EnsureFailed, err
-	}
-
-	s.mu.RLock()
-	items := make(map[string]T, len(s.items))
-	for name, item := range s.items {
-		items[name] = item
-	}
-	s.mu.RUnlock()
-
-	for name, item := range items {
-		if _, err := EnsureDeep(any(&item), ctx); err != nil {
-			return EnsureFailed, fmt.Errorf("link slot item %q: %w", name, err)
-		}
-	}
-
-	return EnsureEnsured, nil
-}
-
-// LoadDeep discovers direct child symlinks from disk, composes them, and loads
-// them recursively.
-func (s *LinkSlot[T]) LoadDeep(ctx Context) (ResultCode, error) {
-	entries, err := os.ReadDir(s.root.Path())
-	if err != nil {
-		if os.IsNotExist(err) {
-			return LoadMissing, nil
-		}
-		return LoadFailed, err
-	}
-
-	for _, entry := range entries {
-		childPath := filepath.Join(s.root.Path(), entry.Name())
-		ok, err := isSymlinkPath(childPath)
-		if err != nil || !ok {
-			if err != nil {
-				return LoadFailed, err
-			}
-			continue
-		}
-
-		name := entry.Name()
-		item, err := s.At(name)
-		if err != nil {
-			return LoadFailed, fmt.Errorf("compose link slot item %q: %w", name, err)
-		}
-
-		if _, err := LoadDeep(any(&item), ctx); err != nil {
-			return LoadFailed, fmt.Errorf("load link slot item %q: %w", name, err)
-		}
-		s.Put(name, item)
-	}
-
-	return LoadTraversed, nil
-}
-
-// ScanDeep scans only currently cached items.
-//
-// It does not discover new link slot entries from disk.
-func (s *LinkSlot[T]) ScanDeep(ctx Context) (ResultCode, error) {
-	s.mu.RLock()
-	items := make(map[string]T, len(s.items))
-	for name, item := range s.items {
-		items[name] = item
-	}
-	s.mu.RUnlock()
-
-	for name, item := range items {
-		if _, err := ScanDeep(any(&item), ctx); err != nil {
-			return ScanFailed, fmt.Errorf("scan link slot item %q: %w", name, err)
-		}
-		s.Put(name, item)
-	}
-
-	return ScanTraversed, nil
-}
-
-// DiscoverDeep discovers direct child symlinks from disk and scans them
-// recursively without loading target content.
-func (s *LinkSlot[T]) DiscoverDeep(ctx Context) (ResultCode, error) {
-	entries, err := os.ReadDir(s.root.Path())
-	if err != nil {
-		if os.IsNotExist(err) {
-			return DiscoverMissing, nil
-		}
-		return DiscoverFailed, err
-	}
-
-	for _, entry := range entries {
-		childPath := filepath.Join(s.root.Path(), entry.Name())
-		ok, err := isSymlinkPath(childPath)
-		if err != nil || !ok {
-			if err != nil {
-				return DiscoverFailed, err
-			}
-			continue
-		}
-
-		name := entry.Name()
-		item, err := s.At(name)
-		if err != nil {
-			return DiscoverFailed, fmt.Errorf("compose link slot item %q: %w", name, err)
-		}
-
-		if _, err := DiscoverDeep(any(&item), ctx); err != nil {
-			return DiscoverFailed, fmt.Errorf("discover link slot item %q: %w", name, err)
-		}
-		s.Put(name, item)
-	}
-
-	return DiscoverTraversed, nil
-}
-
-// SyncDeep ensures and syncs only currently cached items.
-//
-// The preparation ensure phase respects ctx.EnsurePolicy.
-//
-// It does not invent uncached entries.
-func (s *LinkSlot[T]) SyncDeep(ctx Context) (ResultCode, error) {
-	s.mu.RLock()
-	items := make(map[string]T, len(s.items))
-	for name, item := range s.items {
-		items[name] = item
-	}
-	s.mu.RUnlock()
-
-	for name, item := range items {
-		if _, err := EnsureDeep(any(&item), ctx); err != nil {
-			return SyncFailed, fmt.Errorf("ensure link slot item %q: %w", name, err)
-		}
-		if _, err := SyncDeep(any(&item), ctx); err != nil {
-			return SyncFailed, fmt.Errorf("sync link slot item %q: %w", name, err)
-		}
-		s.Put(name, item)
-	}
-
-	return SyncTraversed, nil
-}
-
-// ValidateDeep validates only currently cached items.
-func (s *LinkSlot[T]) ValidateDeep(opts ValidateOptions) (ResultCode, error) {
-	if err := s.root.Validate(opts); err != nil {
-		return ValidateFailed, err
-	}
-
-	s.mu.RLock()
-	items := make(map[string]T, len(s.items))
-	for name, item := range s.items {
-		items[name] = item
-	}
-	s.mu.RUnlock()
-
-	for name, item := range items {
-		if _, err := ValidateDeep(any(&item), opts); err != nil {
-			return ValidateFailed, fmt.Errorf("validate link slot item %q: %w", name, err)
-		}
-	}
-
-	return ValidateTraversed, nil
 }
 
 func isSymlinkPath(path string) (bool, error) {

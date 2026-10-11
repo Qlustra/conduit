@@ -1,6 +1,8 @@
 # Formats examples
 
-These examples focus on when each typed file format is a good fit.
+These examples focus on when each typed file format is a good fit. Declaration fragments use `layout:"content"` and a separate `path` tag.
+
+Use the [Layout manager setup](../usage/operations.md#layout-manager) to compile and compose each tree before using its carriers. The YAML collection workflow assumes a composed `Layout[Workspace]` with `ws := managed.Tree()` and a `layout.Slot[*Service]` declared as `layout:"directories"`. The other fragments use carriers from their corresponding composed trees.
 
 ## YAML for operator-edited service config
 
@@ -12,14 +14,14 @@ type ServiceConfig struct {
 }
 
 type Service struct {
-	Config formats.YAMLFile[ServiceConfig] `layout:"config.yaml"`
+	Config formats.YAMLFile[ServiceConfig] `layout:"content" path:"config.yaml"`
 }
 ```
 
 Typical flow:
 
 ```go
-svc := ws.Services.MustAt("api")
+svc := ws.Services.MustComposeMember("api")
 
 _ = svc.Config.LoadOrInit(ServiceConfig{
 	Name:      "api",
@@ -50,7 +52,7 @@ type Manifest struct {
 }
 
 type ArtifactDir struct {
-	Manifest formats.JSONFile[Manifest] `layout:"manifest.json"`
+	Manifest formats.JSONFile[Manifest] `layout:"content" path:"manifest.json"`
 }
 ```
 
@@ -83,7 +85,7 @@ type DevSettings struct {
 }
 
 type Environment struct {
-	Settings formats.TOMLFile[DevSettings] `layout:"dev.toml"`
+	Settings formats.TOMLFile[DevSettings] `layout:"content" path:"dev.toml"`
 }
 ```
 
@@ -111,7 +113,7 @@ Why TOML here:
 
 ```go
 type RuntimeFiles struct {
-	Env formats.EnvFile `layout:".env"`
+	Env formats.EnvFile `layout:"content" path:".env"`
 }
 ```
 
@@ -174,9 +176,9 @@ You can use different file formats in the same tree based on who consumes each f
 
 ```go
 type Project struct {
-	Runtime  formats.YAMLFile[RuntimeConfig] `layout:"runtime.yaml"`
-	Manifest formats.JSONFile[Manifest]      `layout:"manifest.json"`
-	Local    formats.TOMLFile[LocalDev]      `layout:"dev.toml"`
+	Runtime  formats.YAMLFile[RuntimeConfig] `layout:"content" path:"runtime.yaml"`
+	Manifest formats.JSONFile[Manifest]      `layout:"content" path:"manifest.json"`
+	Local    formats.TOMLFile[LocalDev]      `layout:"content" path:"dev.toml"`
 }
 ```
 
@@ -208,12 +210,26 @@ func (f *NotesFile) Template() string {
 Typical flow:
 
 ```go
+type NotesTree struct {
+	Notes NotesFile `layout:"content" path:"NOTES.txt"`
+}
+
+structure, err := conduit.Compile[NotesTree]()
+if err != nil {
+	return err
+}
+managed, err := structure.Compose("/srv/notes")
+if err != nil {
+	return err
+}
+notes := &managed.Tree().Notes
+
 notes.SetContext(NotesContext{
 	Service: "api",
 	Port:    8080,
 })
 
-_ = conduit.RenderDeep(&workspace)
+_ = managed.Render()
 _, _ = notes.Sync(conduit.DefaultContext)
 ```
 

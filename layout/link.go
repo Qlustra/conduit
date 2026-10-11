@@ -453,12 +453,12 @@ func (l *Link) ComposePath(path string) {
 	l.memory = MemoryUnknown
 }
 
-func (l *Link) setComposeBase(path string) {
+func (l *Link) SetComposeBase(path string) {
 	l.composeBase = filepath.Clean(path)
 	l.composedBase = true
 }
 
-func (l *Link) setDeclaredPath(path string) {
+func (l *Link) SetDeclaredPath(path string) {
 	l.declaredPath = path
 	l.hasDeclared = true
 }

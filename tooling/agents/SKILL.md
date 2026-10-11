@@ -245,9 +245,9 @@ Each key becomes a child root like `apps/<name>`.
 
 Important methods:
 
-- `At(name)` lazily composes and caches an item
-- `MustAt(name)` panics on error
-- `Add(name, ctx)` creates the child root on disk, composes it, ensures its declared structure, and caches it
+- `ComposeMember(name)` lazily composes and caches an item
+- `MustComposeMember(name)` panics on error
+- `EnsureMember(name, ctx)` obtains a composed, cached item and ensures its child root and declared structure according to `ctx.EnsurePolicy`, including for an already-cached item
 - `Require(name)` only succeeds if the child directory already exists
 - `Get(name)` returns cached items only
 - `Keys()` returns sorted cached keys only
@@ -255,7 +255,7 @@ Important methods:
 - `LoadDeep(ctx)` discovers child directories from disk and loads them
 - `DefaultDeep()`, `RenderDeep()`, `ScanDeep(ctx)`, `ValidateDeep(opts)`, and `SyncDeep(ctx)` recurse only into cached items
 
-Use `Add` for explicit creation. Use `DiscoverDeep` when you want discovery without loading stateful content. Use `LoadDeep` when disk is authoritative and you want both discovery and content loading.
+Use `EnsureMember` to obtain a named member and ensure its filesystem structure. Link members remain excluded from Ensure; `LinkSlot.EnsureMember` ensures the containing slot root, and `Sync` creates the links once targets are set. Use `DiscoverDeep` when you want discovery without loading stateful content. Use `LoadDeep` when disk is authoritative and you want both discovery and content loading.
 
 ## `FileSlot[T]` and `LinkSlot[T]`
 
@@ -287,7 +287,7 @@ if err := conduit.EnsureDeep(&ws, conduit.DefaultContext); err != nil {
 	return err
 }
 
-app, err := ws.Apps.Add("billing", conduit.DefaultContext)
+app, err := ws.Apps.EnsureMember("billing", conduit.DefaultContext)
 if err != nil {
 	return err
 }
@@ -339,7 +339,7 @@ if err := conduit.LoadDeep(&ws, conduit.DefaultContext); err != nil {
 	return err
 }
 
-app := ws.Apps.MustAt("billing")
+app := ws.Apps.MustComposeMember("billing")
 cfg := app.Config.MustGet()
 cfg.Port = 9000
 app.Config.Set(cfg)

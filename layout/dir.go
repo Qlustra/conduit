@@ -302,12 +302,12 @@ func (d *Dir) ComposePath(path string) {
 	d.composedBase = false
 }
 
-func (d *Dir) setComposeBase(path string) {
+func (d *Dir) SetComposeBase(path string) {
 	d.composeBase = filepath.Clean(path)
 	d.composedBase = true
 }
 
-func (d *Dir) setDeclaredPath(path string) {
+func (d *Dir) SetDeclaredPath(path string) {
 	d.declaredPath = path
 	d.hasDeclared = true
 }
@@ -316,7 +316,7 @@ func (d *Dir) setDeclaredPath(path string) {
 
 // Ensure creates the directory tree using ctx.DirMode.
 func (d Dir) Ensure(ctx Context) error {
-	if !ctx.ensurePolicy().allowsDir() {
+	if !ctx.EnsurePolicy.Has(EnsureDirs) {
 		return nil
 	}
 	if err := guardPathMutation(d.Path(), ctx.pathSafetyPolicy(), expectDir); err != nil {

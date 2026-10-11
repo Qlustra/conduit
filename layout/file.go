@@ -385,12 +385,12 @@ func (f *File) ComposePath(path string) {
 	f.composedBase = false
 }
 
-func (f *File) setComposeBase(path string) {
+func (f *File) SetComposeBase(path string) {
 	f.composeBase = filepath.Clean(path)
 	f.composedBase = true
 }
 
-func (f *File) setDeclaredPath(path string) {
+func (f *File) SetDeclaredPath(path string) {
 	f.declaredPath = path
 	f.hasDeclared = true
 }
@@ -401,7 +401,7 @@ func (f *File) setDeclaredPath(path string) {
 //
 // Existing contents are preserved.
 func (f File) Ensure(ctx Context) error {
-	if !ctx.ensurePolicy().allowsFile() {
+	if !ctx.EnsurePolicy.Has(EnsureFiles) {
 		return nil
 	}
 	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {

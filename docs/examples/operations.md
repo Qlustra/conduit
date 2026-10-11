@@ -2,31 +2,22 @@
 
 These examples show the intent behind each operation and how they fit together in realistic flows.
 
-## Bootstrap a new service
+Collection examples below assume `managed` is an already composed
+`Layout[Workspace]` using the setup in [Operations usage](../usage/operations.md#layout-manager), and `ws := managed.Tree()`.
 
-Goal: create the filesystem contract first, then write initial config.
+## Compose a new service
+
+Goal: obtain a cached member, then prepare its in-memory config.
 
 ```go
-var ws Workspace
-
-_ = conduit.Compose("/srv/workspace", &ws)
-_, _ = conduit.EnsureDeep(&ws, conduit.DefaultContext)
-
-svc, _ := ws.Services.Add("api", conduit.DefaultContext)
+svc, _ := ws.Services.ComposeMember("api")
 svc.Config.Set(ServiceConfig{
 	Name: "api",
 	Port: 8080,
 })
-
-_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
 ```
 
-Why the sequence matters:
-
-- `Compose` binds paths
-- `EnsureDeep` creates the static roots
-- `Add` creates one explicit dynamic child
-- `SyncDeep` persists the in-memory config
+`ComposeMember` touches memory only. `managed.Ensure(ctx)` prepares declared and cached structure in a whole-tree pass; `managed.Sync(ctx)` persists eligible content separately.
 
 ## Sync only dirty content
 
@@ -36,7 +27,7 @@ Goal: avoid rewriting typed files that are already loaded or already synced.
 ctx := conduit.DefaultContext
 ctx.SyncPolicy = conduit.SyncIfDirty
 
-_, _ = conduit.SyncDeep(&ws, ctx)
+_, _ = managed.Sync(ctx)
 ```
 
 Why the policy matters:
@@ -50,17 +41,14 @@ Why the policy matters:
 Goal: treat disk as authoritative, change one field, then write it back.
 
 ```go
-var ws Workspace
+_, _ = managed.Load(conduit.DefaultContext)
 
-_ = conduit.Compose("/srv/workspace", &ws)
-_, _ = conduit.LoadDeep(&ws, conduit.DefaultContext)
-
-svc := ws.Services.MustAt("api")
+svc := ws.Services.MustComposeMember("api")
 cfg := svc.Config.MustGet()
 cfg.Port = 9090
 svc.Config.Set(cfg)
 
-_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
+_, _ = managed.Sync(conduit.DefaultContext)
 ```
 
 This is the main "edit existing content" path.
@@ -70,13 +58,13 @@ This is the main "edit existing content" path.
 Goal: check whether known files exist without replacing in-memory content.
 
 ```go
-svc := ws.Services.MustAt("api")
+svc := ws.Services.MustComposeMember("api")
 svc.Config.Set(ServiceConfig{Name: "preview", Port: 3000})
 
-_, _ = conduit.ScanDeep(svc, conduit.DefaultContext)
+_, _ = managed.Scan(conduit.DefaultContext)
 ```
 
-After `ScanDeep`:
+After the whole-tree `Scan` pass:
 
 - the config's disk metadata is refreshed
 - the in-memory value is still `preview:3000`
@@ -89,45 +77,39 @@ This is useful for validation or status reporting.
 Goal: find existing service directories without loading their typed files.
 
 ```go
-var ws Workspace
-
-_ = conduit.Compose("/srv/workspace", &ws)
-_, _ = conduit.DiscoverDeep(&ws, conduit.DefaultContext)
+_, _ = managed.Discover(conduit.DefaultContext)
 
 for _, name := range ws.Services.Keys() {
-	svc := ws.Services.MustAt(name)
+	svc := ws.Services.MustComposeMember(name)
 	_, _ = svc.Config.Get()
 }
 ```
 
-Use `DiscoverDeep` when you want slot discovery but do not want stateful content in memory.
+Use `Layout.Discover` when you want slot discovery but do not want stateful content in memory.
 
 ## Discover and then load content
 
 Goal: enumerate existing services first, then load only when you choose to.
 
 ```go
-var ws Workspace
-
-_ = conduit.Compose("/srv/workspace", &ws)
-_, _ = conduit.DiscoverDeep(&ws, conduit.DefaultContext)
-_, _ = conduit.LoadDeep(&ws, conduit.DefaultContext)
+_, _ = managed.Discover(conduit.DefaultContext)
+_, _ = managed.Load(conduit.DefaultContext)
 
 for _, name := range ws.Services.Keys() {
-	svc := ws.Services.MustAt(name)
+	svc := ws.Services.MustComposeMember(name)
 	cfg := svc.Config.MustGet()
 	_ = cfg
 }
 ```
 
-`ScanDeep` does not enumerate new slot entries. `DiscoverDeep` does, while still preserving unloaded cached state.
+`Layout.Scan` does not enumerate new slot entries. `Layout.Discover` does, while preserving unloaded cached state and retaining stale cached members.
 
 ## Initialize defaults lazily
 
 Goal: keep a default in memory only when a file is missing.
 
 ```go
-svc := ws.Services.MustAt("worker")
+svc := ws.Services.MustComposeMember("worker")
 
 _ = svc.Config.LoadOrInit(ServiceConfig{
 	Name: "worker",
@@ -198,28 +180,28 @@ func (f *ReadmeFile) Template() string {
 }
 
 type Service struct {
-	Readme ReadmeFile `layout:"README.md"`
+	Readme ReadmeFile `layout:"content" path:"README.md"`
 }
 
-svc := ws.Services.MustAt("api")
+svc := ws.Services.MustComposeMember("api")
 svc.Readme.SetContext(ReadmeContext{
 	Name: "api",
 	Port: 8080,
 })
 
-_ = conduit.RenderDeep(&ws)
-_, _ = conduit.SyncDeep(&ws, conduit.DefaultContext)
+_ = managed.Render()
+_, _ = managed.Sync(conduit.DefaultContext)
 ```
 
 Why the sequence matters:
 
 - `SetContext` prepares render inputs in memory
-- `RenderDeep` turns template context into cached file content
-- `SyncDeep` persists the rendered text using the same typed-file sync rules as other managed files
+- `Layout.Render` turns template context into cached file content
+- `Layout.Sync` persists the rendered text using the same typed-file sync rules as other managed files
 
 ## Collect a traversal report
 
-Goal: inspect what a deep operation actually visited and whether it skipped, wrote, validated, or failed per path.
+Goal: inspect what a tree operation actually visited and whether it skipped, wrote, validated, or failed per path.
 
 ```go
 var report conduit.Report
@@ -227,7 +209,7 @@ var report conduit.Report
 ctx := conduit.DefaultContext
 ctx.Reporter = &report
 
-_, _ = conduit.SyncDeep(&ws, ctx)
+_, _ = managed.Sync(ctx)
 
 entries := report.Entries()
 tree := report.RenderTree()
@@ -239,7 +221,7 @@ _ = tree
 Why this is useful:
 
 - `ResultCode` on the root only tells you the top-level outcome
-- the report lets you inspect per-path results after `EnsureDeep`, `LoadDeep`, `DiscoverDeep`, `ScanDeep`, `SyncDeep`, or `ValidateDeep`
+- the report lets you inspect per-path results after the manager’s Ensure, Load, Discover, Scan, Sync, or Validate passes
 - `RenderTree()` is useful when you want one human-readable summary for logs or tests
 
 Validation uses the same `Report` type through `ValidateOptions`:
@@ -251,5 +233,5 @@ opts := conduit.ValidateOptions{
 	Reporter: &report,
 }
 
-_, _ = conduit.ValidateDeep(&ws, opts)
+_, _ = managed.Validate(opts)
 ```

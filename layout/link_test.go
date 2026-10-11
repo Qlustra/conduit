@@ -6,50 +6,6 @@ import (
 	"testing"
 )
 
-func TestLinkComposeAndTypedTargets(t *testing.T) {
-	type project struct {
-		Root   Dir      `layout:"."`
-		Readme FileLink `layout:"README.link"`
-		Assets DirLink  `layout:"assets.link"`
-	}
-
-	var layout project
-	base := t.TempDir()
-
-	if err := Compose(base, &layout); err != nil {
-		t.Fatalf("Compose() error = %v", err)
-	}
-
-	layout.Readme.SetTarget("docs/README.md")
-	layout.Assets.SetTarget("../shared/assets")
-
-	if got := layout.Readme.Path(); got != filepath.Join(base, "README.link") {
-		t.Fatalf("Readme.Path() = %q", got)
-	}
-	if got, ok := layout.Readme.DeclaredPath(); !ok || got != "README.link" {
-		t.Fatalf("Readme.DeclaredPath() = (%q, %t), want (%q, true)", got, ok, "README.link")
-	}
-	if got, ok := layout.Assets.ComposedRelativePath(); !ok || got != "assets.link" {
-		t.Fatalf("Assets.ComposedRelativePath() = (%q, %t), want (%q, true)", got, ok, "assets.link")
-	}
-
-	readmeTarget, ok := layout.Readme.TargetFile()
-	if !ok {
-		t.Fatal("Readme.TargetFile() ok = false, want true")
-	}
-	if got := readmeTarget.Path(); got != filepath.Join(base, "docs", "README.md") {
-		t.Fatalf("Readme.TargetFile().Path() = %q, want %q", got, filepath.Join(base, "docs", "README.md"))
-	}
-
-	assetsTarget, ok := layout.Assets.TargetDir()
-	if !ok {
-		t.Fatal("Assets.TargetDir() ok = false, want true")
-	}
-	if got := assetsTarget.Path(); got != filepath.Join(filepath.Dir(base), "shared", "assets") {
-		t.Fatalf("Assets.TargetDir().Path() = %q, want %q", got, filepath.Join(filepath.Dir(base), "shared", "assets"))
-	}
-}
-
 func TestLinkLoadMissingUpdatesState(t *testing.T) {
 	var link Link
 	link.ComposePath(filepath.Join(t.TempDir(), "missing.link"))
@@ -220,31 +176,5 @@ func TestLinkDeleteRemovesSymlinkAndKeepsTargetKindChecksLocal(t *testing.T) {
 	}
 	if got := link.DiskState(); got != DiskMissing {
 		t.Fatalf("DiskState() = %v, want %v", got, DiskMissing)
-	}
-}
-
-func TestEnsureDeepDoesNotMaterializeLinks(t *testing.T) {
-	type project struct {
-		Root   Dir  `layout:"."`
-		Config File `layout:"config.yaml"`
-		Link   Link `layout:"config.link"`
-	}
-
-	var layout project
-	base := t.TempDir()
-
-	if err := Compose(base, &layout); err != nil {
-		t.Fatalf("Compose() error = %v", err)
-	}
-
-	if _, err := EnsureDeep(&layout, DefaultContext); err != nil {
-		t.Fatalf("EnsureDeep() error = %v", err)
-	}
-
-	if _, err := os.Stat(layout.Config.Path()); err != nil {
-		t.Fatalf("os.Stat(config) error = %v", err)
-	}
-	if _, err := os.Lstat(layout.Link.Path()); !os.IsNotExist(err) {
-		t.Fatalf("os.Lstat(link) error = %v, want not-exist", err)
 	}
 }

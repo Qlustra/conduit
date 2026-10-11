@@ -1,6 +1,6 @@
 package layout
 
-import "reflect"
+import "github.com/qlustra/conduit/internal/contracts"
 
 // Node
 
@@ -16,59 +16,15 @@ type Pather interface {
 	Path() string
 }
 
-// CachedChild identifies one already-cached collection member. Path is the
-// physical child path implied by Name; Value is the actual cached item.
-// Pointer items retain their identity. Nonpointer items are value copies and
-// cannot be used to mutate the collection's cached state in place.
-type CachedChild struct {
-	Name  string
-	Path  string
-	Value any
-}
-
-// CachedChildren exposes and binds direct physical collection members.
-// Enumeration is sorted, never discovers disk entries or composes missing
-// items, and holds no collection lock while returned values are used.
-type CachedChildren interface {
-	CachedChildren() []CachedChild
-	// ChildKind identifies the physical entry kind: "dir", "file", or "link".
-	ChildKind() string
-	// BindChild accepts a physical child name and caches its composed handle
-	// if absent, without loading content or touching disk.
-	BindChild(name string) (any, error)
-}
-
-// Compose
+// Composition
 
 // Composable is implemented by values that can be bound to a concrete path
 // during composition.
-type Composable interface {
-	ComposePath(string)
-}
+type Composable = contracts.Composable
 
-var composableEntryType = reflect.TypeOf((*Composable)(nil)).Elem()
+type ComposeBaseAware = contracts.ComposeBaseAware
 
-type composeBaseAware interface {
-	setComposeBase(string)
-}
-
-type declaredPathAware interface {
-	setDeclaredPath(string)
-}
-
-// Ensure
-
-var (
-	dirType         = reflect.TypeOf(Dir{})
-	fileType        = reflect.TypeOf(File{})
-	deepEnsurerType = reflect.TypeOf((*DeepEnsurer)(nil)).Elem()
-)
-
-// DeepEnsurer is implemented by values that handle EnsureDeep traversal
-// themselves.
-type DeepEnsurer interface {
-	EnsureDeep(ctx Context) (ResultCode, error)
-}
+type DeclaredPathAware = contracts.DeclaredPathAware
 
 // Load
 
@@ -118,23 +74,7 @@ type PreparedWrite interface {
 	WriteExclusive(Context) error
 }
 
-var (
-	loaderType     = reflect.TypeOf((*Loadable)(nil)).Elem()
-	deepLoaderType = reflect.TypeOf((*DeepLoader)(nil)).Elem()
-)
-
-// DeepLoader is implemented by values that handle LoadDeep traversal
-// themselves.
-type DeepLoader interface {
-	LoadDeep(ctx Context) (ResultCode, error)
-}
-
 // Discover
-
-var (
-	discovererType     = reflect.TypeOf((*Discoverable)(nil)).Elem()
-	deepDiscovererType = reflect.TypeOf((*DeepDiscoverer)(nil)).Elem()
-)
 
 // Discoverable is implemented by values that can observe disk state without
 // loading content into memory.
@@ -142,18 +82,7 @@ type Discoverable interface {
 	Discover() (DiskState, error)
 }
 
-// DeepDiscoverer is implemented by values that handle DiscoverDeep traversal
-// themselves.
-type DeepDiscoverer interface {
-	DiscoverDeep(ctx Context) (ResultCode, error)
-}
-
 // Sync
-
-var (
-	syncerType     = reflect.TypeOf((*Syncer)(nil)).Elem()
-	deepSyncerType = reflect.TypeOf((*DeepSyncer)(nil)).Elem()
-)
 
 // Syncer is implemented by stateful values that can write eligible cached
 // content back to disk.
@@ -161,18 +90,7 @@ type Syncer interface {
 	Sync(ctx Context) (ResultCode, error)
 }
 
-// DeepSyncer is implemented by values that handle SyncDeep traversal
-// themselves.
-type DeepSyncer interface {
-	SyncDeep(ctx Context) (ResultCode, error)
-}
-
 // Scan
-
-var (
-	scannerType     = reflect.TypeOf((*Scannable)(nil)).Elem()
-	deepScannerType = reflect.TypeOf((*DeepScanner)(nil)).Elem()
-)
 
 // DiskState records what a stateful node currently knows about the
 // corresponding filesystem entry.
@@ -214,19 +132,7 @@ type Scannable interface {
 	Scan() (DiskState, error)
 }
 
-// DeepScanner is implemented by values that handle ScanDeep traversal
-// themselves.
-type DeepScanner interface {
-	ScanDeep(ctx Context) (ResultCode, error)
-}
-
 // Render
-
-var (
-	renderableType   = reflect.TypeOf((*Renderable)(nil)).Elem()
-	templatableType  = reflect.TypeOf((*Templatable)(nil)).Elem()
-	deepRendererType = reflect.TypeOf((*DeepRenderer)(nil)).Elem()
-)
 
 // Renderable is implemented by values that render derived text through custom
 // logic.
@@ -243,18 +149,7 @@ type Templatable interface {
 	SetRendered(string)
 }
 
-// DeepRenderer is implemented by values that handle RenderDeep traversal
-// themselves.
-type DeepRenderer interface {
-	RenderDeep() error
-}
-
 // Default
-
-var (
-	defaulterType     = reflect.TypeOf((*Defaulter)(nil)).Elem()
-	deepDefaulterType = reflect.TypeOf((*DeepDefaulter)(nil)).Elem()
-)
 
 // Defaulter is implemented by values that can install in-memory defaults
 // without consulting disk.
@@ -262,27 +157,16 @@ type Defaulter interface {
 	Default() error
 }
 
-// DeepDefaulter is implemented by values that handle DefaultDeep traversal
-// themselves.
-type DeepDefaulter interface {
-	DefaultDeep() error
-}
-
 // Report
 
-// Reporter receives path-level outcomes recorded during deep traversal.
+// Reporter receives path-level outcomes recorded during layout traversal.
 type Reporter interface {
 	Record(Entry)
 }
 
 // Validate
 
-var (
-	validatorType     = reflect.TypeOf((*Validator)(nil)).Elem()
-	deepValidatorType = reflect.TypeOf((*DeepValidator)(nil)).Elem()
-)
-
-// ValidateOptions carries optional reporting hooks for ValidateDeep.
+// ValidateOptions carries optional reporting hooks for layout validation.
 type ValidateOptions struct {
 	// Reporter, when non-nil, receives path-level results during validation
 	// traversal.
@@ -299,35 +183,29 @@ type Validator interface {
 	Validate(opts ValidateOptions) error
 }
 
-// DeepValidator is implemented by values that handle ValidateDeep traversal
-// themselves.
-type DeepValidator interface {
-	ValidateDeep(opts ValidateOptions) (ResultCode, error)
-}
-
 // Enums
 
-// Operation identifies which deep traversal operation produced a report entry
+// Operation identifies which layout operation produced a report entry
 // or root result.
 type Operation uint8
 
 const (
-	// OpEnsure identifies EnsureDeep.
+	// OpEnsure identifies Ensure.
 	OpEnsure Operation = iota + 1
 
-	// OpLoad identifies LoadDeep.
+	// OpLoad identifies Load.
 	OpLoad
 
-	// OpDiscover identifies DiscoverDeep.
+	// OpDiscover identifies Discover.
 	OpDiscover
 
-	// OpScan identifies ScanDeep.
+	// OpScan identifies Scan.
 	OpScan
 
-	// OpSync identifies SyncDeep.
+	// OpSync identifies Sync.
 	OpSync
 
-	// OpValidate identifies ValidateDeep.
+	// OpValidate identifies Validate.
 	OpValidate
 )
 
@@ -351,8 +229,8 @@ func (op Operation) String() string {
 	}
 }
 
-// ResultCode is an operation-specific outcome code returned by deep
-// traversal operations and recorded in reports.
+// ResultCode is an operation-specific outcome code returned by layout
+// operations and recorded in reports.
 //
 // Interpret a ResultCode together with the Operation that produced it.
 type ResultCode uint8

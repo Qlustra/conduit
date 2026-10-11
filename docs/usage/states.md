@@ -33,7 +33,7 @@ Values:
 
 How disk state changes:
 
-- `Compose` or `ComposePath` resets it to `DiskUnknown`
+- `Structure.Compose` or `ComposePath` resets it to `DiskUnknown`
 - `Scan` sets it to `DiskMissing` or `DiskPresent`
 - `Discover` sets it to `DiskMissing` or `DiskPresent`
 - `Load` sets it to `DiskMissing` or `DiskPresent`
@@ -66,7 +66,7 @@ Values:
 
 How memory state changes:
 
-- `Compose` or `ComposePath` resets it to `MemoryUnknown`
+- `Structure.Compose` or `ComposePath` resets it to `MemoryUnknown`
 - `Load` sets it to `MemoryLoaded` when the file exists
 - `Load` sets it to `MemoryUnknown` when the file is missing
 - `LoadOrInit` sets it to `MemoryDirty` only when the file is missing and the default is installed in memory
@@ -103,7 +103,7 @@ The table below focuses on `Format[T]` behavior.
 
 | Operation                 | Disk state effect   | Memory state effect   | Content effect                  |
 |---------------------------|---------------------|-----------------------|---------------------------------|
-| `Compose` / `ComposePath` | reset to unknown    | reset to unknown      | clears content                  |
+| `Structure.Compose` / `ComposePath` | reset to unknown    | reset to unknown      | clears content                  |
 | `Discover()` present      | set to present      | unchanged             | unchanged                       |
 | `Discover()` missing      | set to missing      | unchanged             | unchanged                       |
 | `Scan()` present          | set to present      | unchanged             | unchanged                       |
@@ -143,10 +143,10 @@ After this:
 
 For a typed file, `Discover` has the same state effect as `Scan`.
 
-The difference appears in deep traversal:
+The difference appears in tree traversal:
 
-- `DiscoverDeep` discovers slot-backed children from disk before recursing
-- `ScanDeep` only observes items that are already cached in memory
+- `Layout.Discover` discovers slot-backed children from disk before recursing
+- `Layout.Scan` only observes members already cached in memory
 
 ### `Load` is authoritative for memory
 
@@ -180,7 +180,7 @@ That means the resulting combination is intentionally:
 - disk missing
 - memory dirty
 
-The default is only written if you later call `Save`, `Sync`, or `SyncDeep`.
+The default is only written if you later call `Save` or `Sync`.
 
 ### `Save` and `Sync` are not identical
 

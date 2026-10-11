@@ -211,7 +211,7 @@ func (f Format[T, C]) ReadIfExists() (T, bool, error) {
 // the file is missing.
 //
 // When the file is missing, the default is cached and memory state becomes
-// MemoryDirty. Nothing is written until Save, Sync, or SyncDeep is called.
+// MemoryDirty. Nothing is written until Save or Sync is called.
 func (f *Format[T, C]) LoadOrInit(defaultValue T) error {
 	loaded, err := f.Load()
 	if err != nil {
@@ -243,20 +243,13 @@ func (f *Format[T, C]) saveLoaded(ctx Context) error {
 	return nil
 }
 
-// EnsureDeep materializes the backing file for a syncable typed file when the
-// current ensure policy allows syncable nodes.
-func (f Format[T, C]) EnsureDeep(ctx Context) (ResultCode, error) {
-	if !ctx.ensurePolicy().allowsSyncable() {
-		return EnsureSkippedPolicy, nil
+// Ensure materializes the backing file when the current ensure policy allows
+// syncable nodes. It preserves existing file contents and cached state.
+func (f Format[T, C]) Ensure(ctx Context) error {
+	if !ctx.EnsurePolicy.Has(EnsureSyncables) {
+		return nil
 	}
-
-	fileCtx := ctx.withEnsurePolicy(EnsureFiles)
-	err := f.File.Ensure(fileCtx)
-	result := EnsureEnsured
-	if err != nil {
-		result = EnsureFailed
-	}
-	return result, err
+	return f.File.Ensure(ctx.withEnsurePolicy(EnsureFiles))
 }
 
 // Compose

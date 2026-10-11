@@ -9,7 +9,7 @@ import (
 
 // Entry
 
-// Entry records one path-level outcome from a deep traversal operation.
+// Entry records one path-level outcome from a layout operation.
 type Entry struct {
 	Op     Operation
 	Path   string
@@ -123,7 +123,7 @@ func (e Entry) ResultName() string {
 
 // Report
 
-// Report collects Entry values produced during deep traversal.
+// Report collects Entry values produced during layout traversal.
 //
 // A Report is safe for concurrent Record calls.
 type Report struct {
@@ -292,69 +292,6 @@ func (r *Report) RenderTree() string {
 }
 
 // Helpers
-
-func recordResult(ctx Context, op Operation, path string, result ResultCode, err error) (ResultCode, error) {
-	return recordResultWithReporter(ctx.Reporter, op, path, result, err)
-}
-
-func recordValidateResult(opts ValidateOptions, op Operation, path string, result ResultCode, err error) (ResultCode, error) {
-	return recordResultWithReporter(opts.Reporter, op, path, result, err)
-}
-
-func recordResultWithReporter(reporter Reporter, op Operation, path string, result ResultCode, err error) (ResultCode, error) {
-	recordEntryWithReporter(reporter, Entry{
-		Op:     op,
-		Path:   path,
-		Result: result,
-		Err:    err,
-	})
-	return result, err
-}
-
-func recordEntryWithReporter(reporter Reporter, entry Entry) {
-	if reporter == nil {
-		return
-	}
-	reporter.Record(entry)
-}
-
-func pathOf(target any) (string, bool) {
-	pather, ok := target.(Pather)
-	if !ok {
-		return "", false
-	}
-	return pather.Path(), true
-}
-
-func resultFromDiskState(present ResultCode, missing ResultCode, fallback ResultCode, state DiskState) ResultCode {
-	switch state {
-	case DiskPresent:
-		return present
-	case DiskMissing:
-		return missing
-	default:
-		return fallback
-	}
-}
-
-func resultForDiscoverFromScanResult(result ResultCode, err error) ResultCode {
-	if err != nil {
-		return DiscoverFailed
-	}
-
-	switch result {
-	case ScanPresent:
-		return DiscoverPresent
-	case ScanMissing:
-		return DiscoverMissing
-	case ScanTraversed:
-		return DiscoverTraversed
-	case ScanNotApplicable:
-		return DiscoverNotApplicable
-	default:
-		return DiscoverTraversed
-	}
-}
 
 func splitReportPath(path string) []string {
 	clean := filepath.Clean(path)

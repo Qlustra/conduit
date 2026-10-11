@@ -39,14 +39,14 @@ func (e Exec) Ensure(ctx Context) error {
 //
 // When ctx.ExecMode is zero, FileMode is used with execute bits added.
 func (e Exec) EnsureExecutable(ctx Context) error {
-	if !ctx.ensurePolicy().allowsExec() {
+	if !ctx.EnsurePolicy.Has(EnsureExecs) {
 		return nil
 	}
 	if err := guardPathMutation(e.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
 		return err
 	}
 	ctx.FileMode = e.executableMode(ctx)
-	if err := e.File.Ensure(ctx); err != nil {
+	if err := e.File.Ensure(ctx.withEnsurePolicy(EnsureFiles)); err != nil {
 		return err
 	}
 	return os.Chmod(e.Path(), ctx.FileMode)
@@ -160,16 +160,6 @@ func (e Exec) CombinedOutput(ctx context.Context, opts RunOptions) ([]byte, erro
 }
 
 // Ensure
-
-// EnsureDeep ensures the executable node during deep traversal.
-func (e Exec) EnsureDeep(ctx Context) (ResultCode, error) {
-	err := e.Ensure(ctx)
-	result := EnsureEnsured
-	if err != nil {
-		result = EnsureFailed
-	}
-	return result, err
-}
 
 func (e Exec) executableMode(ctx Context) os.FileMode {
 	mode := ctx.ExecMode

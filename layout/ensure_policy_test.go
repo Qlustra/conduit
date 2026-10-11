@@ -6,44 +6,48 @@ import (
 	"testing"
 )
 
-func TestEnsureDeepPolicyCanLimitMaterializedNodeKinds(t *testing.T) {
-	type root struct {
-		Assets Dir         `layout:"assets"`
-		Readme File        `layout:"README.md"`
-		Config testMapFile `layout:"config.json"`
+func TestBuiltinEnsurePreservesExplicitNoneAndZeroDefault(t *testing.T) {
+	type node interface {
+		Node
+		Ensure(Context) error
 	}
-
-	var layout root
-	base := t.TempDir()
-
-	if err := Compose(base, &layout); err != nil {
-		t.Fatalf("Compose() error = %v", err)
+	carriers := []struct {
+		name string
+		new  func(string) node
+	}{
+		{"directory", func(path string) node { d := NewDir(path); return &d }},
+		{"file", func(path string) node { f := NewFile(path); return &f }},
+		{"executable", func(path string) node { e := NewExec(path); return &e }},
+		{"format", func(path string) node { var f testMapFile; f.ComposePath(path); return &f }},
 	}
-
-	var report Report
-	ctx := DefaultContext
-	ctx.EnsurePolicy = EnsureDirs
-	ctx.Reporter = &report
-
-	if _, err := EnsureDeep(&layout, ctx); err != nil {
-		t.Fatalf("EnsureDeep() error = %v", err)
+	for _, policy := range []struct {
+		name   string
+		value  EnsurePolicy
+		create bool
+	}{
+		{"none", EnsureNone, false},
+		{"zero default", 0, true},
+	} {
+		for _, carrier := range carriers {
+			t.Run(policy.name+"/"+carrier.name, func(t *testing.T) {
+				path := filepath.Join(t.TempDir(), "uncreated", "node")
+				n := carrier.new(path)
+				ctx := DefaultContext
+				ctx.EnsurePolicy = policy.value
+				if err := n.Ensure(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if got := n.Exists(); got != policy.create {
+					t.Fatalf("Ensure created node = %v, want %v", got, policy.create)
+				}
+				if !policy.create {
+					if _, err := os.Stat(filepath.Dir(path)); !os.IsNotExist(err) {
+						t.Fatalf("EnsureNone created a parent directory: %v", err)
+					}
+				}
+			})
+		}
 	}
-
-	if _, err := os.Stat(layout.Assets.Path()); err != nil {
-		t.Fatalf("os.Stat(assets) error = %v", err)
-	}
-	if _, err := os.Stat(layout.Readme.Path()); !os.IsNotExist(err) {
-		t.Fatalf("os.Stat(readme) err = %v, want not-exist", err)
-	}
-	if _, err := os.Stat(layout.Config.Path()); !os.IsNotExist(err) {
-		t.Fatalf("os.Stat(config) err = %v, want not-exist", err)
-	}
-
-	assertEntries(t, report.Entries(), []Entry{
-		{Op: OpEnsure, Path: layout.Assets.Path(), Result: EnsureEnsured},
-		{Op: OpEnsure, Path: layout.Readme.Path(), Result: EnsureSkippedPolicy},
-		{Op: OpEnsure, Path: layout.Config.Path(), Result: EnsureSkippedPolicy},
-	})
 }
 
 func TestEnsurePolicyHelpers(t *testing.T) {
@@ -70,133 +74,4 @@ func TestEnsurePolicyHelpers(t *testing.T) {
 	if policy != EnsureDirs {
 		t.Fatalf("policy with unknown bits allowed = %v, want EnsureDirs", policy)
 	}
-}
-
-func TestEnsureDeepPolicyCanEnsureSyncablesWithoutRawFiles(t *testing.T) {
-	type root struct {
-		Readme File        `layout:"README.md"`
-		Config testMapFile `layout:"config.json"`
-	}
-
-	var layout root
-	base := t.TempDir()
-
-	if err := Compose(base, &layout); err != nil {
-		t.Fatalf("Compose() error = %v", err)
-	}
-
-	var report Report
-	ctx := DefaultContext
-	ctx.EnsurePolicy = EnsureSyncables
-	ctx.Reporter = &report
-
-	if _, err := EnsureDeep(&layout, ctx); err != nil {
-		t.Fatalf("EnsureDeep() error = %v", err)
-	}
-
-	if _, err := os.Stat(layout.Readme.Path()); !os.IsNotExist(err) {
-		t.Fatalf("os.Stat(readme) err = %v, want not-exist", err)
-	}
-	if _, err := os.Stat(layout.Config.Path()); err != nil {
-		t.Fatalf("os.Stat(config) error = %v", err)
-	}
-
-	assertEntries(t, report.Entries(), []Entry{
-		{Op: OpEnsure, Path: layout.Readme.Path(), Result: EnsureSkippedPolicy},
-		{Op: OpEnsure, Path: layout.Config.Path(), Result: EnsureEnsured},
-	})
-}
-
-func TestSlotSyncDeepEnsurePhaseRespectsEnsurePolicy(t *testing.T) {
-	type item struct {
-		Root   Dir         `layout:"."`
-		Config testMapFile `layout:"config.json"`
-	}
-
-	type root struct {
-		Root  Dir         `layout:"."`
-		Items Slot[*item] `layout:"items"`
-	}
-
-	var layout root
-	base := t.TempDir()
-
-	if err := Compose(base, &layout); err != nil {
-		t.Fatalf("Compose() error = %v", err)
-	}
-
-	api, err := layout.Items.At("api")
-	if err != nil {
-		t.Fatalf("Items.At() error = %v", err)
-	}
-	api.Config.Set(map[string]string{"name": "api"})
-
-	var report Report
-	ctx := DefaultContext
-	ctx.EnsurePolicy = EnsureDirs
-	ctx.Reporter = &report
-
-	if _, err := SyncDeep(&layout, ctx); err != nil {
-		t.Fatalf("SyncDeep() error = %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(base, "items", "api")); err != nil {
-		t.Fatalf("os.Stat(item root) error = %v", err)
-	}
-	if _, err := os.Stat(api.Config.Path()); err != nil {
-		t.Fatalf("os.Stat(config) error = %v", err)
-	}
-
-	assertHasEntry(t, report.Entries(), Entry{Op: OpEnsure, Path: filepath.Join(base, "items", "api"), Result: EnsureEnsured})
-	assertHasEntry(t, report.Entries(), Entry{Op: OpEnsure, Path: api.Config.Path(), Result: EnsureSkippedPolicy})
-	assertHasEntry(t, report.Entries(), Entry{Op: OpSync, Path: api.Config.Path(), Result: SyncWritten})
-}
-
-func TestFileSlotSyncDeepEnsurePhaseRespectsEnsurePolicy(t *testing.T) {
-	type root struct {
-		Configs FileSlot[*testMapFile] `layout:"configs"`
-	}
-
-	var layout root
-	base := t.TempDir()
-
-	if err := Compose(base, &layout); err != nil {
-		t.Fatalf("Compose() error = %v", err)
-	}
-
-	cfg, err := layout.Configs.At("api.json")
-	if err != nil {
-		t.Fatalf("Configs.At() error = %v", err)
-	}
-	cfg.Set(map[string]string{"name": "api"})
-
-	var report Report
-	ctx := DefaultContext
-	ctx.EnsurePolicy = EnsureDirs
-	ctx.Reporter = &report
-
-	if _, err := SyncDeep(&layout, ctx); err != nil {
-		t.Fatalf("SyncDeep() error = %v", err)
-	}
-
-	if _, err := os.Stat(cfg.Path()); err != nil {
-		t.Fatalf("os.Stat(config) error = %v", err)
-	}
-
-	assertHasEntry(t, report.Entries(), Entry{Op: OpEnsure, Path: cfg.Path(), Result: EnsureSkippedPolicy})
-	assertHasEntry(t, report.Entries(), Entry{Op: OpSync, Path: cfg.Path(), Result: SyncWritten})
-}
-
-func assertHasEntry(t *testing.T, entries []Entry, want Entry) {
-	t.Helper()
-
-	for _, got := range entries {
-		if got.Op == want.Op && got.Path == want.Path && got.Result == want.Result {
-			if want.Err == nil || got.Err != nil {
-				return
-			}
-		}
-	}
-
-	t.Fatalf("missing entry %#v in %#v", want, entries)
 }
