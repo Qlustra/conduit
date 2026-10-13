@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	safety "github.com/qlustra/conduit/path"
 )
 
 // File is a stateless handle to a regular file path.
@@ -182,7 +184,7 @@ func (f File) Exists() bool {
 
 // Chown applies os.Chown to the file path.
 func (f File) Chown(uid int, gid int, ctx Context) error {
-	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+	if err := safety.GuardPathMutation(f.Path(), ctx.pathSafetyPolicy(), safety.ExpectFile); err != nil {
 		return err
 	}
 	return os.Chown(f.Path(), uid, gid)
@@ -200,7 +202,7 @@ func (f File) IsExecutable() bool {
 
 // Truncate resizes the file in place using os.Truncate.
 func (f File) Truncate(size int64, ctx Context) error {
-	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+	if err := safety.GuardPathMutation(f.Path(), ctx.pathSafetyPolicy(), safety.ExpectFile); err != nil {
 		return err
 	}
 	return os.Truncate(f.Path(), size)
@@ -243,7 +245,7 @@ func (f File) AppendFile(src File, ctx Context) (err error) {
 	if samePath(f.Path(), src.Path()) {
 		return fmt.Errorf("source and destination must differ: %s", f.Path())
 	}
-	if err := guardNodeKind(src.Path(), expectFile); err != nil {
+	if err := safety.GuardNodeKind(src.Path(), safety.ExpectFile); err != nil {
 		return err
 	}
 
@@ -290,7 +292,7 @@ func (f File) WriteBytes(data []byte, ctx Context) error {
 }
 
 func (f File) writeBytesDirect(data []byte, ctx Context) error {
-	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+	if err := safety.GuardPathMutation(f.Path(), ctx.pathSafetyPolicy(), safety.ExpectFile); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(f.path), ctx.DirMode); err != nil {
@@ -300,7 +302,7 @@ func (f File) writeBytesDirect(data []byte, ctx Context) error {
 }
 
 func (f File) writeBytesAtomic(data []byte, ctx Context) error {
-	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+	if err := safety.GuardPathMutation(f.Path(), ctx.pathSafetyPolicy(), safety.ExpectFile); err != nil {
 		return err
 	}
 	parent := filepath.Dir(f.Path())
@@ -350,7 +352,7 @@ func (f File) ReadBytes() ([]byte, error) {
 
 // DeleteIfExists removes the file when it exists.
 func (f File) DeleteIfExists(ctx Context) error {
-	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+	if err := safety.GuardPathMutation(f.Path(), ctx.pathSafetyPolicy(), safety.ExpectFile); err != nil {
 		return err
 	}
 	_, err := os.Lstat(f.Path())
@@ -376,25 +378,6 @@ func (f File) ReadBytesIfExists() ([]byte, bool, error) {
 	return nil, false, err
 }
 
-// Compose
-
-// ComposePath binds the handle to path and resets composition metadata.
-func (f *File) ComposePath(path string) {
-	f.path = filepath.Clean(path)
-	f.composeBase = ""
-	f.composedBase = false
-}
-
-func (f *File) SetComposeBase(path string) {
-	f.composeBase = filepath.Clean(path)
-	f.composedBase = true
-}
-
-func (f *File) SetDeclaredPath(path string) {
-	f.declaredPath = path
-	f.hasDeclared = true
-}
-
 // Ensure
 
 // Ensure creates parent directories and creates the file when it is missing.
@@ -404,7 +387,7 @@ func (f File) Ensure(ctx Context) error {
 	if !ctx.EnsurePolicy.Has(EnsureFiles) {
 		return nil
 	}
-	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+	if err := safety.GuardPathMutation(f.Path(), ctx.pathSafetyPolicy(), safety.ExpectFile); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(f.path), ctx.DirMode); err != nil {
@@ -422,7 +405,7 @@ func (f File) Ensure(ctx Context) error {
 // Validate reports an error when Path exists but is not a regular file, or
 // when validation policy rejects any symlink parent in the path.
 func (f File) Validate(opts ValidateOptions) error {
-	return guardPathMutation(f.Path(), opts.PathSafetyPolicy, expectFile)
+	return safety.GuardPathMutation(f.Path(), opts.PathSafetyPolicy, safety.ExpectFile)
 }
 
 func splitBaseExt(base string) (stem string, ext string) {
@@ -450,7 +433,7 @@ func joinDeclaredPath(base string, parts ...string) string {
 }
 
 func (f File) openAppendDestination(ctx Context) (*os.File, error) {
-	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+	if err := safety.GuardPathMutation(f.Path(), ctx.pathSafetyPolicy(), safety.ExpectFile); err != nil {
 		return nil, err
 	}
 	if err := os.MkdirAll(filepath.Dir(f.path), ctx.DirMode); err != nil {
@@ -468,7 +451,7 @@ func (f File) createAtomicTemp(ctx Context) (*os.File, error) {
 		if ctx.TempDir.Path() == "" {
 			return nil, fmt.Errorf("atomic write temp directory is required when TempFilePlacement is TempFileDir")
 		}
-		if err := guardPathMutation(ctx.TempDir.Path(), ctx.pathSafetyPolicy(), expectDir); err != nil {
+		if err := safety.GuardPathMutation(ctx.TempDir.Path(), ctx.pathSafetyPolicy(), safety.ExpectDir); err != nil {
 			return nil, err
 		}
 		if err := os.MkdirAll(ctx.TempDir.Path(), ctx.DirMode); err != nil {
@@ -488,29 +471,4 @@ func atomicReplaceError(dest string, temp string, err error) error {
 		reason = "temp file is not on the same filesystem as destination"
 	}
 	return fmt.Errorf("atomic replace failed for %s: %s: %w\ncorrective actions:\n- set Context.TempFilePlacement = TempFileAdjacent if watcher noise is acceptable\n- set Context.TempFilePlacement = TempFileDir and Context.TempDir to a directory on the same filesystem\n- set Context.WritePolicy = WriteDirect if atomic replacement is not required\ntemp file: %s", dest, reason, err, temp)
-}
-
-// Copy
-
-// CopyToPath copies the file payload onto the exact destination path.
-func (f File) CopyToPath(path string, opts CopyOptions) error {
-	dst := filepath.Clean(path)
-	if samePath(f.Path(), dst) {
-		return fmt.Errorf("source and destination must differ: %s", f.Path())
-	}
-	if err := guardNodeKind(f.Path(), expectFile); err != nil {
-		return err
-	}
-
-	return newCopier(opts).copyFile(f.Path(), dst)
-}
-
-// CopyToFile copies the file payload onto dst.Path().
-func (f File) CopyToFile(dst File, opts CopyOptions) error {
-	return f.CopyToPath(dst.Path(), opts)
-}
-
-// CopyIntoDir copies the file under dir using the source basename.
-func (f File) CopyIntoDir(dir Dir, opts CopyOptions) error {
-	return f.CopyToPath(dir.File(f.Base()).Path(), opts)
 }

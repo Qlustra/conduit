@@ -249,7 +249,7 @@ func TestFileOpenCanFollowSymlinkParentWhenEnabled(t *testing.T) {
 	}
 
 	ctx := DefaultContext
-	ctx.PathSafetyPolicy = PathSafetyFollowSymlinks
+	ctx.PathSafetyPolicy = path.PathSafetyFollowSymlinks
 	handle, err := file.OpenWrite(ctx, OpenOrCreate)
 	if err != nil {
 		t.Fatalf("OpenWrite() error = %v", err)

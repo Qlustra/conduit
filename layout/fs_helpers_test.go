@@ -304,7 +304,7 @@ func TestDirChownCanFollowSymlinkParentWhenEnabled(t *testing.T) {
 	}
 
 	ctx := DefaultContext
-	ctx.PathSafetyPolicy = PathSafetyFollowSymlinks
+	ctx.PathSafetyPolicy = path.PathSafetyFollowSymlinks
 
 	if err := dir.Chown(-1, -1, ctx); err != nil {
 		t.Fatalf("Dir.Chown() error = %v", err)

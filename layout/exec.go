@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+
+	safety "github.com/qlustra/conduit/path"
 )
 
 var (
@@ -42,7 +44,7 @@ func (e Exec) EnsureExecutable(ctx Context) error {
 	if !ctx.EnsurePolicy.Has(EnsureExecs) {
 		return nil
 	}
-	if err := guardPathMutation(e.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+	if err := safety.GuardPathMutation(e.Path(), ctx.pathSafetyPolicy(), safety.ExpectFile); err != nil {
 		return err
 	}
 	ctx.FileMode = e.executableMode(ctx)
@@ -181,7 +183,7 @@ func (e Exec) Validate(opts ValidateOptions) error {
 		return nil
 	}
 
-	if err := guardPathMutation(e.Path(), opts.PathSafetyPolicy, expectFile); err != nil {
+	if err := safety.GuardPathMutation(e.Path(), opts.PathSafetyPolicy, safety.ExpectFile); err != nil {
 		return err
 	}
 

@@ -1,4 +1,4 @@
-package layout
+package path
 
 import (
 	"fmt"
@@ -9,19 +9,33 @@ import (
 type expectedNodeKind uint8
 
 const (
-	expectFile expectedNodeKind = iota + 1
-	expectDir
-	expectLink
+	ExpectFile expectedNodeKind = iota + 1
+	ExpectDir
+	ExpectLink
 )
 
-func guardPathMutation(path string, policy PathSafetyPolicy, kind expectedNodeKind) error {
-	if err := guardPathParents(path, policy); err != nil {
+// PathSafetyPolicy controls how mutating operations treat symlinks encountered
+// while resolving destination paths.
+type PathSafetyPolicy uint8
+
+const (
+	// PathSafetyRejectSymlinkParents rejects existing symlink parents during
+	// mutating path resolution.
+	PathSafetyRejectSymlinkParents PathSafetyPolicy = iota
+
+	// PathSafetyFollowSymlinks preserves the library's historical path-following
+	// behavior.
+	PathSafetyFollowSymlinks
+)
+
+func GuardPathMutation(path string, policy PathSafetyPolicy, kind expectedNodeKind) error {
+	if err := GuardPathParents(path, policy); err != nil {
 		return err
 	}
-	return guardNodeKind(path, kind)
+	return GuardNodeKind(path, kind)
 }
 
-func guardPathParents(path string, policy PathSafetyPolicy) error {
+func GuardPathParents(path string, policy PathSafetyPolicy) error {
 	if policy == PathSafetyFollowSymlinks {
 		return nil
 	}
@@ -45,7 +59,7 @@ func guardPathParents(path string, policy PathSafetyPolicy) error {
 	}
 }
 
-func guardNodeKind(path string, kind expectedNodeKind) error {
+func GuardNodeKind(path string, kind expectedNodeKind) error {
 	info, err := os.Lstat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -55,21 +69,21 @@ func guardNodeKind(path string, kind expectedNodeKind) error {
 	}
 
 	switch kind {
-	case expectFile:
+	case ExpectFile:
 		if info.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf("path %s is a symlink, not a file", path)
 		}
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("path %s is not a file", path)
 		}
-	case expectDir:
+	case ExpectDir:
 		if info.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf("path %s is a symlink, not a directory", path)
 		}
 		if !info.IsDir() {
 			return fmt.Errorf("path %s is not a directory", path)
 		}
-	case expectLink:
+	case ExpectLink:
 		if info.Mode()&os.ModeSymlink == 0 {
 			return fmt.Errorf("path %s is not a symlink", path)
 		}

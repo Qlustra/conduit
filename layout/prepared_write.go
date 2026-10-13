@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	safety "github.com/qlustra/conduit/path"
 )
 
 // ErrPreparedWriteStale reports that content or its binding changed after
@@ -61,7 +63,7 @@ func (w *preparedWrite) WriteExclusive(ctx Context) error {
 	if err := w.check(); err != nil {
 		return err
 	}
-	if err := guardPathParents(w.Path(), ctx.pathSafetyPolicy()); err != nil {
+	if err := safety.GuardPathParents(w.Path(), ctx.pathSafetyPolicy()); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(w.Path()), ctx.DirMode); err != nil {

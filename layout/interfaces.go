@@ -1,6 +1,9 @@
 package layout
 
-import "github.com/qlustra/conduit/internal/contracts"
+import (
+	"github.com/qlustra/conduit/internal/contracts"
+	"github.com/qlustra/conduit/path"
+)
 
 // Node
 
@@ -174,7 +177,7 @@ type ValidateOptions struct {
 
 	// PathSafetyPolicy controls whether validation rejects symlink parents for
 	// typed filesystem nodes.
-	PathSafetyPolicy PathSafetyPolicy
+	PathSafetyPolicy path.PathSafetyPolicy
 }
 
 // Validator is implemented by values that can validate their current state

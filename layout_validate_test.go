@@ -2,7 +2,10 @@ package conduit_test
 
 import (
 	"errors"
+
 	. "github.com/qlustra/conduit/layout"
+	"github.com/qlustra/conduit/path"
+
 	"os"
 	"path/filepath"
 	"strings"
@@ -194,7 +197,7 @@ func TestValidateLayoutCanFollowSymlinkParentWhenEnabled(t *testing.T) {
 
 	manager, _ := composeTree[root](t, linkBase)
 
-	opts := ValidateOptions{PathSafetyPolicy: PathSafetyFollowSymlinks}
+	opts := ValidateOptions{PathSafetyPolicy: path.PathSafetyFollowSymlinks}
 	if _, err := manager.Validate(opts); err != nil {
 		t.Fatalf("Validate() error = %v", err)
 	}

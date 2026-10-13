@@ -6,6 +6,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	safety "github.com/qlustra/conduit/path"
 )
 
 // Dir is a stateless handle to a directory path.
@@ -174,7 +176,7 @@ func (d Dir) Exists() bool {
 
 // Chown applies os.Chown to the directory path.
 func (d Dir) Chown(uid int, gid int, ctx Context) error {
-	if err := guardPathMutation(d.Path(), ctx.pathSafetyPolicy(), expectDir); err != nil {
+	if err := safety.GuardPathMutation(d.Path(), ctx.pathSafetyPolicy(), safety.ExpectDir); err != nil {
 		return err
 	}
 	return os.Chown(d.Path(), uid, gid)
@@ -252,7 +254,7 @@ func (d Dir) File(name string) File {
 
 // DeleteIfExists removes the directory tree when it exists.
 func (d Dir) DeleteIfExists(ctx Context) error {
-	if err := guardPathMutation(d.Path(), ctx.pathSafetyPolicy(), expectDir); err != nil {
+	if err := safety.GuardPathMutation(d.Path(), ctx.pathSafetyPolicy(), safety.ExpectDir); err != nil {
 		return err
 	}
 	_, err := os.Lstat(d.Path())
@@ -272,7 +274,7 @@ func (d Dir) DeleteIfExists(ctx Context) error {
 // directory, Empty returns an error. Symlink roots are rejected. Symlink
 // children are removed as entries and are never followed.
 func (d Dir) Empty(ctx Context) error {
-	if err := guardPathMutation(d.Path(), ctx.pathSafetyPolicy(), expectDir); err != nil {
+	if err := safety.GuardPathMutation(d.Path(), ctx.pathSafetyPolicy(), safety.ExpectDir); err != nil {
 		return err
 	}
 
@@ -319,7 +321,7 @@ func (d Dir) Ensure(ctx Context) error {
 	if !ctx.EnsurePolicy.Has(EnsureDirs) {
 		return nil
 	}
-	if err := guardPathMutation(d.Path(), ctx.pathSafetyPolicy(), expectDir); err != nil {
+	if err := safety.GuardPathMutation(d.Path(), ctx.pathSafetyPolicy(), safety.ExpectDir); err != nil {
 		return err
 	}
 	return os.MkdirAll(d.path, ctx.DirMode)
@@ -328,7 +330,7 @@ func (d Dir) Ensure(ctx Context) error {
 // Validate reports an error when Path exists but is not a directory, or when
 // validation policy rejects any symlink parent in the path.
 func (d Dir) Validate(opts ValidateOptions) error {
-	return guardPathMutation(d.Path(), opts.PathSafetyPolicy, expectDir)
+	return safety.GuardPathMutation(d.Path(), opts.PathSafetyPolicy, safety.ExpectDir)
 }
 
 // Copy
@@ -345,7 +347,7 @@ func (d Dir) CopyToPath(path string, opts CopyOptions) error {
 	if pathWithin(dst, d.Path()) {
 		return fmt.Errorf("destination path %s must not be inside source directory %s", dst, d.Path())
 	}
-	if err := guardNodeKind(d.Path(), expectDir); err != nil {
+	if err := safety.GuardNodeKind(d.Path(), safety.ExpectDir); err != nil {
 		return err
 	}
 

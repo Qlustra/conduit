@@ -1,19 +1,9 @@
 package layout
 
-import "os"
+import (
+	"os"
 
-// PathSafetyPolicy controls how mutating operations treat symlinks encountered
-// while resolving destination paths.
-type PathSafetyPolicy uint8
-
-const (
-	// PathSafetyRejectSymlinkParents rejects existing symlink parents during
-	// mutating path resolution.
-	PathSafetyRejectSymlinkParents PathSafetyPolicy = iota
-
-	// PathSafetyFollowSymlinks preserves the library's historical path-following
-	// behavior.
-	PathSafetyFollowSymlinks
+	"github.com/qlustra/conduit/path"
 )
 
 // WritePolicy controls how File.WriteBytes replaces destination content.
@@ -152,7 +142,7 @@ type Context struct {
 
 	// PathSafetyPolicy controls whether mutating filesystem operations reject
 	// symlink parents during path resolution.
-	PathSafetyPolicy PathSafetyPolicy
+	PathSafetyPolicy path.PathSafetyPolicy
 
 	// WritePolicy controls how File.WriteBytes replaces destination content.
 	WritePolicy WritePolicy
@@ -181,7 +171,7 @@ var DefaultContext = Context{
 	ExecMode:         0o755,
 	EnsurePolicy:     EnsureAll,
 	SyncPolicy:       SyncRewrite,
-	PathSafetyPolicy: PathSafetyRejectSymlinkParents,
+	PathSafetyPolicy: path.PathSafetyRejectSymlinkParents,
 }
 
 func (ctx Context) withEnsurePolicy(policy EnsurePolicy) Context {
@@ -242,7 +232,7 @@ func (ctx Context) syncPolicy() SyncPolicy {
 	return ctx.SyncPolicy
 }
 
-func (ctx Context) pathSafetyPolicy() PathSafetyPolicy {
+func (ctx Context) pathSafetyPolicy() path.PathSafetyPolicy {
 	return ctx.PathSafetyPolicy
 }
 

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	safety "github.com/qlustra/conduit/path"
 )
 
 // Link models a symlink entry with explicit disk and memory state.
@@ -286,7 +288,7 @@ func (l Link) Validate(opts ValidateOptions) error {
 		return nil
 	}
 
-	return guardPathMutation(l.Path(), opts.PathSafetyPolicy, expectLink)
+	return safety.GuardPathMutation(l.Path(), opts.PathSafetyPolicy, safety.ExpectLink)
 }
 
 // Delete removes the symlink when it exists, clears cached target state, and
@@ -294,7 +296,7 @@ func (l Link) Validate(opts ValidateOptions) error {
 //
 // Delete fails if Path exists but is not a symlink.
 func (l *Link) Delete(ctx Context) error {
-	if err := guardPathMutation(l.Path(), ctx.pathSafetyPolicy(), expectLink); err != nil {
+	if err := safety.GuardPathMutation(l.Path(), ctx.pathSafetyPolicy(), safety.ExpectLink); err != nil {
 		return err
 	}
 	info, err := os.Lstat(l.Path())
@@ -520,7 +522,7 @@ func (l *Link) Sync(ctx Context) (ResultCode, error) {
 	if !ctx.syncPolicy().allows(l.memory, l.disk) {
 		return SyncSkippedPolicy, nil
 	}
-	if err := guardPathMutation(l.Path(), ctx.pathSafetyPolicy(), expectLink); err != nil {
+	if err := safety.GuardPathMutation(l.Path(), ctx.pathSafetyPolicy(), safety.ExpectLink); err != nil {
 		return SyncFailed, err
 	}
 	if err := os.MkdirAll(filepath.Dir(l.path), ctx.DirMode); err != nil {

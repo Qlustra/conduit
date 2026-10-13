@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	safety "github.com/qlustra/conduit/path"
 )
 
 // OpenPolicy controls the creation flags added by File open helpers.
@@ -112,7 +114,7 @@ func (f File) OpenReadRewriteAppend(ctx Context, op OpenPolicy) (*os.File, error
 // ctx.DirMode before opening the file. Existing symlink leaves are rejected;
 // symlink parents are governed by ctx.PathSafetyPolicy.
 func (f File) OpenFile(ctx Context, flag int, perm os.FileMode) (*os.File, error) {
-	if err := guardPathMutation(f.Path(), ctx.pathSafetyPolicy(), expectFile); err != nil {
+	if err := safety.GuardPathMutation(f.Path(), ctx.pathSafetyPolicy(), safety.ExpectFile); err != nil {
 		return nil, err
 	}
 	if flag&os.O_CREATE != 0 {

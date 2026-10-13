@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	safety "github.com/qlustra/conduit/path"
 )
 
 // CopySymlinkPolicy controls how copy helpers handle symlinks encountered in
@@ -50,7 +52,7 @@ type CopyOptions struct {
 
 	// PathSafetyPolicy controls whether destination path resolution rejects
 	// symlink parents.
-	PathSafetyPolicy PathSafetyPolicy
+	PathSafetyPolicy safety.PathSafetyPolicy
 
 	// PreserveMode controls whether source modes are reused on created files and
 	// directories.
@@ -70,7 +72,7 @@ type CopyOptions struct {
 var DefaultCopyOptions = CopyOptions{
 	Overwrite:        CopyOverwriteFail,
 	Symlinks:         CopySymlinkPreserve,
-	PathSafetyPolicy: PathSafetyRejectSymlinkParents,
+	PathSafetyPolicy: safety.PathSafetyRejectSymlinkParents,
 	PreserveMode:     true,
 }
 
@@ -133,7 +135,7 @@ func (c copier) copySymlink(src string, dst string, kind sourceKind) error {
 		if err != nil {
 			return err
 		}
-		if err := guardPathParents(dst, c.opts.PathSafetyPolicy); err != nil {
+		if err := safety.GuardPathParents(dst, c.opts.PathSafetyPolicy); err != nil {
 			return err
 		}
 		if err := c.prepareDestination(dst); err != nil {
@@ -169,7 +171,7 @@ func (c copier) copySymlink(src string, dst string, kind sourceKind) error {
 }
 
 func (c copier) copyRegularFile(src string, dst string, info os.FileInfo) (err error) {
-	if err := guardPathParents(dst, c.opts.PathSafetyPolicy); err != nil {
+	if err := safety.GuardPathParents(dst, c.opts.PathSafetyPolicy); err != nil {
 		return err
 	}
 	if err := c.prepareDestination(dst); err != nil {
@@ -221,7 +223,7 @@ func (c copier) copyDirectoryTree(src string, dst string, info os.FileInfo) erro
 	c.activeRealDirs[realPath] = struct{}{}
 	defer delete(c.activeRealDirs, realPath)
 
-	if err := guardPathParents(dst, c.opts.PathSafetyPolicy); err != nil {
+	if err := safety.GuardPathParents(dst, c.opts.PathSafetyPolicy); err != nil {
 		return err
 	}
 	if err := c.prepareDestination(dst); err != nil {

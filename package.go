@@ -2,6 +2,7 @@ package conduit
 
 import (
 	"github.com/qlustra/conduit/layout"
+	"github.com/qlustra/conduit/path"
 )
 
 // Dir is an alias for layout.Dir.
@@ -35,7 +36,7 @@ type EnsurePolicy = layout.EnsurePolicy
 //
 // It controls whether mutating filesystem operations reject symlink parents
 // while resolving paths. See layout.PathSafetyPolicy for details.
-type PathSafetyPolicy = layout.PathSafetyPolicy
+type PathSafetyPolicy = path.PathSafetyPolicy
 
 // WritePolicy is an alias for layout.WritePolicy.
 //
@@ -104,8 +105,8 @@ const (
 )
 
 const (
-	PathSafetyRejectSymlinkParents PathSafetyPolicy = layout.PathSafetyRejectSymlinkParents
-	PathSafetyFollowSymlinks       PathSafetyPolicy = layout.PathSafetyFollowSymlinks
+	PathSafetyRejectSymlinkParents PathSafetyPolicy = path.PathSafetyRejectSymlinkParents
+	PathSafetyFollowSymlinks       PathSafetyPolicy = path.PathSafetyFollowSymlinks
 )
 
 const (
