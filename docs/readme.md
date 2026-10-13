@@ -6,6 +6,7 @@ The module is split by package:
 - `github.com/qlustra/conduit/layout`: structural nodes, directory slots, file slots, executable files, text templates
 - `github.com/qlustra/conduit/formats`: JSON, YAML, TOML, and managed `.env` typed files
 - `github.com/qlustra/conduit/legend`: the Sail layout declaration vocabulary
+- `github.com/qlustra/conduit/control`: typed project, scope, document, and collection controls
 
 The docs are split by intent:
 
@@ -16,6 +17,7 @@ The docs are split by intent:
 ## Usage guides
 
 - [Layout usage](usage/layout.md)
+- [Control surfaces](usage/control.md)
 - [Operations usage](usage/operations.md)
 - [Formats usage](usage/formats.md)
 - [States usage](usage/states.md)

@@ -46,6 +46,9 @@ func TestControlLegendPopulatesAuthoredProjectScopes(t *testing.T) {
 		t.Fatalf("projects = %d, want 2", len(chart.Lane.ProjectsSpot.Value))
 	}
 	project := chart.Lane.ProjectsSpot.Value[0]
+	if project.Layout.Get() != reflect.TypeFor[programLayout]() || chart.Lane.ProjectsSpot.Value[1].Layout.Get() != reflect.TypeFor[otherLayout]() {
+		t.Fatal("project declarations lost their controlled layout types")
+	}
 	if len(project.Lane.DocumentsSpot.Value) != 1 || len(project.Lane.CollectionsSpot.Value) != 1 || len(project.Lane.ScopesSpot.Value) != 1 {
 		t.Fatalf("project children = documents %d, collections %d, scopes %d, want one each",
 			len(project.Lane.DocumentsSpot.Value), len(project.Lane.CollectionsSpot.Value), len(project.Lane.ScopesSpot.Value))
@@ -53,16 +56,76 @@ func TestControlLegendPopulatesAuthoredProjectScopes(t *testing.T) {
 	if len(project.Lane.ScopesSpot.Value[0].Lane.DocumentsSpot.Value) != 1 {
 		t.Fatal("nested scope did not retain its document declaration")
 	}
+	if project.Lane.ScopesSpot.Value[0].Layout.Get() != reflect.TypeFor[commandLayout]() {
+		t.Fatal("nested scope declaration lost its controlled layout type")
+	}
 
 	// The external authored wrappers retain role contracts and exact type metadata.
 	var surface programControl
 	var projectCarrier control.ProjectCarrier = surface.Program
+	var scopeCarrier control.ScopeCarrier = surface.Program
 	var collectionCarrier control.CollectionCarrier = surface.Program.Commands
 	if projectCarrier.LayoutCarrierType() != reflect.TypeFor[programLayout]() {
 		t.Fatal("project carrier lost its layout declaration type")
 	}
+	if scopeCarrier.LayoutCarrierType() != projectCarrier.LayoutCarrierType() {
+		t.Fatal("project's scope contract lost its layout declaration type")
+	}
 	if collectionCarrier.LayoutCarrierType() != reflect.TypeFor[layout.Slot[*commandLayout]]() || collectionCarrier.MemberControlType() != reflect.TypeFor[commandControl]() {
 		t.Fatal("collection carrier lost its source or member control type")
+	}
+}
+
+func TestControlLegendPopulatesIndependentWholeAndFocusedScopes(t *testing.T) {
+	type standalone struct {
+		Whole   control.ScopeCtrl[programLayout] `control:"scope"`
+		Command commandControl                   `control:"scope"`
+	}
+	charter, err := sail.CompileLegend[legend.ControlLegend]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	chart, err := sail.Populate[standalone](charter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chart.Lane.ProjectsSpot.Value) != 0 || len(chart.Lane.ScopesSpot.Value) != 2 {
+		t.Fatalf("root controls = projects %d, scopes %d, want 0 and 2",
+			len(chart.Lane.ProjectsSpot.Value), len(chart.Lane.ScopesSpot.Value))
+	}
+	if len(chart.Lane.ScopesSpot.Value[1].Lane.DocumentsSpot.Value) != 1 {
+		t.Fatal("independent focused scope lost its document declaration")
+	}
+	if chart.Lane.ScopesSpot.Value[0].Layout.Get() != reflect.TypeFor[programLayout]() || chart.Lane.ScopesSpot.Value[1].Layout.Get() != reflect.TypeFor[commandLayout]() {
+		t.Fatal("whole and focused scope declarations lost their controlled layout types")
+	}
+	var surface standalone
+	if surface.Whole.LayoutCarrierType() != reflect.TypeFor[programLayout]() || surface.Command.LayoutCarrierType() != reflect.TypeFor[commandLayout]() {
+		t.Fatal("whole and focused scopes lost their controlled layout types")
+	}
+}
+
+func TestControlLegendAcceptsProjectThroughScopeContract(t *testing.T) {
+	type surface struct {
+		Program projectControl `control:"scope"`
+	}
+	charter, err := sail.CompileLegend[legend.ControlLegend]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	chart, err := sail.Populate[surface](charter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chart.Lane.ScopesSpot.Value) != 1 || len(chart.Lane.ProjectsSpot.Value) != 0 {
+		t.Fatal("project was not interpreted through its declared scope role")
+	}
+	if chart.Lane.ScopesSpot.Value[0].Layout.Get() != reflect.TypeFor[programLayout]() {
+		t.Fatal("project's scope declaration lost its controlled layout type")
+	}
+	members := chart.Lane.ScopesSpot.Value[0].Lane
+	if len(members.DocumentsSpot.Value) != 1 || len(members.CollectionsSpot.Value) != 1 || len(members.ScopesSpot.Value) != 1 {
+		t.Fatal("project's scope view lost its exposed members")
 	}
 }
 
@@ -100,10 +163,17 @@ func TestControlLegendRejectsWrongRolesAndRootPeers(t *testing.T) {
 		}
 		requireRejectedControl[invalid](t, charter)
 	})
-	t.Run("root contains only projects", func(t *testing.T) {
+	t.Run("root rejects document peers", func(t *testing.T) {
 		type invalid struct {
 			Project  control.ProjectCtrl[programLayout]               `control:"project"`
 			Document control.DocumentCtrl[formats.YAMLFile[manifest]] `control:"document"`
+		}
+		requireRejectedControl[invalid](t, charter)
+	})
+
+	t.Run("space is not a developing scoping role", func(t *testing.T) {
+		type invalid struct {
+			Space control.ScopeCtrl[programLayout] `control:"space"`
 		}
 		requireRejectedControl[invalid](t, charter)
 	})

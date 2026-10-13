@@ -1,4 +1,4 @@
-package conduit
+package managed
 
 import (
 	"fmt"
@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/qlustra/conduit/internal/contracts"
+	legend "github.com/qlustra/conduit/internal/layoutdecl"
 	"github.com/qlustra/conduit/layout"
-	"github.com/qlustra/conduit/legend"
 	"github.com/qlustra/sail/subject"
 )
 
@@ -46,7 +46,7 @@ func composeMembersFromFilesystem(node layout.CollectionCarrier) (composedMember
 	if err != nil {
 		return composedMembers{}, err
 	}
-	children, compositionErr := composer.ComposeMembers(physicalMemberNames(node.Path(), kind, entries))
+	children, compositionErr := composer.ComposeMembers(PhysicalMemberNames(node.Path(), kind, entries))
 	if compositionErr == nil {
 		return composedMembers{}, fmt.Errorf("member source at %q must supply a composition error callback", node.Path())
 	}
@@ -55,7 +55,7 @@ func composeMembersFromFilesystem(node layout.CollectionCarrier) (composedMember
 
 // Classify each entry only when traversal asks for its next member. This keeps
 // disk checks, member composition, and the member's operation in legacy order.
-func physicalMemberNames(path, kind string, entries []os.DirEntry) iter.Seq2[string, error] {
+func PhysicalMemberNames(path, kind string, entries []os.DirEntry) iter.Seq2[string, error] {
 	return func(yield func(string, error) bool) {
 		for _, entry := range entries {
 			if kind == "dir" {

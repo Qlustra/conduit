@@ -7,6 +7,9 @@ import (
 	saillegend "github.com/qlustra/sail/legend"
 )
 
+// Earlier metadata contracts and Control are retained alongside the developing
+// carrier-based ControlLegend during shaping.
+
 // LayoutDeclaration identifies the storage layout of a Project, Space, or Scope.
 // This declaration-time method must be safe on a zero-valued receiver.
 type LayoutDeclaration interface {
@@ -36,11 +39,15 @@ func (Control) Mark() string { return "control" }
 
 // ====
 
+// ControlLegend describes project-led control surfaces and independently
+// usable scopes. A project's additional meaning does not change its scope
+// members. Documents and collections expose controls over layout carriers.
 type ControlLegend struct {
 	saillegend.Legend
 	Lane struct {
 		saillegend.Lane
 		ProjectsSpot saillegend.MultiSpot[ProjectLandmark] `sail:"spot" multiplicity:"any"`
+		ScopesSpot   saillegend.MultiSpot[ScopeRegion]     `sail:"spot" multiplicity:"any"`
 	} `sail:"lane"`
 }
 
@@ -48,14 +55,18 @@ func (ControlLegend) Mark() string { return "control" }
 
 // ----
 
+// ProjectLandmark describes a scope with additional project meaning.
+// Recognition is a live operation; declaration interpretation does not detect
+// or compose a project.
 type ProjectLandmark struct {
 	saillegend.Region
-	Lane ScopesLane `sail:"lane"`
+	Layout saillegend.Barrel[reflect.Type, control.ProjectCarrier] `sail:"barrel" populate:"LayoutCarrierType" barrel:"required"`
+	Lane   ScopesLane                                              `sail:"lane"`
 }
 
 func (ProjectLandmark) Family() string { return "project" }
 func (ProjectLandmark) Accept() saillegend.Acceptance {
-	return saillegend.AcceptContract[control.ProjectCarrier]()
+	return saillegend.AcceptContractFamily[control.ProjectFamily]()
 }
 
 // ----
@@ -66,21 +77,27 @@ type DocumentLandmark struct {
 
 func (DocumentLandmark) Family() string { return "document" }
 func (DocumentLandmark) Accept() saillegend.Acceptance {
-	return saillegend.AcceptContract[control.DocumentCarrier]()
+	return saillegend.AcceptContractFamily[control.DocumentFamily]()
 }
 
 // ----
 
+// ScopeRegion describes control over a chosen layout segment. It can appear
+// independently or within another scope. Deep operation extent comes from the
+// controlled Layout, rather than the exposed control members.
 type ScopeRegion struct {
 	saillegend.Region
-	Lane ScopesLane `sail:"lane"`
+	Layout saillegend.Barrel[reflect.Type, control.ScopeCarrier] `sail:"barrel" populate:"LayoutCarrierType" barrel:"required"`
+	Lane   ScopesLane                                            `sail:"lane"`
 }
 
 func (ScopeRegion) Family() string { return "scope" }
 func (ScopeRegion) Accept() saillegend.Acceptance {
-	return saillegend.AcceptContract[control.ScopeCarrier]()
+	return saillegend.AcceptContractFamily[control.ScopeFamily]()
 }
 
+// ScopesLane exposes the same member vocabulary for projects and scopes.
+// Declaration nesting does not itself select storage or establish ownership.
 type ScopesLane struct {
 	saillegend.Lane
 	DocumentsSpot   saillegend.MultiSpot[DocumentLandmark]   `sail:"spot" multiplicity:"any"`
@@ -96,10 +113,14 @@ type CollectionLandmark struct {
 
 func (CollectionLandmark) Family() string { return "collection" }
 func (CollectionLandmark) Accept() saillegend.Acceptance {
-	return saillegend.AcceptContract[control.CollectionCarrier]()
+	return saillegend.AcceptContractFamily[control.CollectionFamily]()
 }
 
 // ====
+
+// The following vocabulary belongs to the earlier Control. In particular,
+// Space is retained here for development context; ControlLegend uses Project
+// and Scope for scoping.
 
 // Members is one declaration-order band of control roles. Containers describe
 // presentation topology, while Documents and Collections are terminal markers.

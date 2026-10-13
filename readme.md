@@ -9,6 +9,7 @@ The module provides these public packages:
 - `github.com/qlustra/conduit/layout` for carriers such as `Dir`, `File`, `Exec`, `Link`, `Slot[T]`, `FileSlot[T]`, and `LinkSlot[T]`
 - `github.com/qlustra/conduit/formats` for codec-backed typed files such as `JSONFile[T]`, `YAMLFile[T]`, `TOMLFile[T]`, and `EnvFile`
 - `github.com/qlustra/conduit/legend` for the Sail layout declaration vocabulary
+- `github.com/qlustra/conduit/control` for typed project, scope, document, and collection controls
 
 Conduit uses [Sail](https://github.com/qlustra/sail) for declaration recognition, binding, and live traversal. Conduit owns filesystem paths, carrier behavior, collection caches, and operation policies.
 
@@ -140,6 +141,7 @@ This fragment also imports Go's `context` package. `Exec` retains the raw `File`
 
 - [Docs index](docs/readme.md)
 - [Layout usage](docs/usage/layout.md)
+- [Control surfaces](docs/usage/control.md)
 - [Operations usage](docs/usage/operations.md)
 - [Formats usage](docs/usage/formats.md)
 - [States usage](docs/usage/states.md)

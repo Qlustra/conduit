@@ -3,7 +3,7 @@ package composer
 import (
 	"fmt"
 
-	"github.com/qlustra/conduit/legend"
+	legend "github.com/qlustra/conduit/internal/layoutdecl"
 	"github.com/qlustra/sail"
 )
 

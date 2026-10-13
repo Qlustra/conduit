@@ -1,4 +1,4 @@
-package conduit
+package managed
 
 import (
 	"fmt"
@@ -8,37 +8,24 @@ import (
 	"github.com/qlustra/sail/subject"
 )
 
-// Discover constructs physical collection members and refreshes their disk
-// state without loading content. Sail owns traversal; local Discoverable hooks
-// take precedence over Scannable.
-func (l *Layout[T]) Discover(ctx layout.Context) (layout.ResultCode, error) {
+// Load discovers physical collection members and loads declared content from
+// disk. Missing content is cleared by its local Load hook. Sail owns traversal,
+// and absent cached members are skipped.
+func (l *Layout[T]) Load(ctx layout.Context) (layout.ResultCode, error) {
 	if l == nil || l.layoutVessel == nil {
-		return layout.DiscoverFailed, fmt.Errorf("discover: a composed layout is required")
+		return layout.LoadFailed, fmt.Errorf("load: a composed layout is required")
 	}
 
-	result := layout.DiscoverTraversed
+	result := layout.LoadTraversed
 	finish := func(node any, at subject.Encounter, code layout.ResultCode, err error) (subject.Route, error) {
 		if at.Depth() == 0 {
 			result = code
 		}
-		recordDiscovery(ctx, node, code, err)
+		recordLoad(ctx, node, code, err)
 		if err != nil {
 			return subject.Abort(err)
 		}
 		return subject.Prune(), nil
-	}
-	observe := func(node any, at subject.Encounter, state layout.DiskState, err error) (subject.Route, error) {
-		code := layout.DiscoverTraversed
-		switch state {
-		case layout.DiskPresent:
-			code = layout.DiscoverPresent
-		case layout.DiskMissing:
-			code = layout.DiscoverMissing
-		}
-		if err != nil {
-			code = layout.DiscoverFailed
-		}
-		return finish(node, at, code, err)
 	}
 
 	// Sources complete after their composed descendants. Member failures keep
@@ -51,10 +38,10 @@ func (l *Layout[T]) Discover(ctx layout.Context) (layout.ResultCode, error) {
 			}
 			members, err := composeMembersFromFilesystem(node)
 			if os.IsNotExist(err) {
-				return finish(node, at, layout.DiscoverMissing, nil)
+				return finish(node, at, layout.LoadMissing, nil)
 			}
 			if err != nil {
-				return finish(node, at, layout.DiscoverFailed, err)
+				return finish(node, at, layout.LoadFailed, err)
 			}
 			pending = append(pending, node)
 			return subject.DescendSelected(subject.DepthFirst, members.children, func() error {
@@ -62,41 +49,44 @@ func (l *Layout[T]) Discover(ctx layout.Context) (layout.ResultCode, error) {
 					return err
 				}
 				pending = pending[:len(pending)-1]
-				recordDiscovery(ctx, node, layout.DiscoverTraversed, nil)
+				recordLoad(ctx, node, layout.LoadTraversed, nil)
 				return nil
 			}), nil
 		}),
-		subject.Intercept[layout.Discoverable](func(node layout.Discoverable, at subject.Encounter) (subject.Route, error) {
-			state, err := node.Discover()
-			return observe(node, at, state, err)
-		}),
-		subject.Intercept[layout.Scannable](func(node layout.Scannable, at subject.Encounter) (subject.Route, error) {
-			state, err := node.Scan()
-			return observe(node, at, state, err)
+		subject.Intercept[layout.Loadable](func(node layout.Loadable, at subject.Encounter) (subject.Route, error) {
+			loaded, err := node.Load()
+			code := layout.LoadMissing
+			if loaded {
+				code = layout.LoadLoaded
+			}
+			if err != nil {
+				code = layout.LoadFailed
+			}
+			return finish(node, at, code, err)
 		}),
 		subject.Intercept[layout.Pather](func(node layout.Pather, at subject.Encounter) (subject.Route, error) {
 			if isFilesystemLeaf(node, at) {
-				return finish(node, at, layout.DiscoverNotApplicable, nil)
+				return finish(node, at, layout.LoadNotApplicable, nil)
 			}
 			return subject.Pass(), nil
 		}),
 	})
 	if err != nil {
 		for i := len(pending) - 1; i >= 0; i-- {
-			recordDiscovery(ctx, pending[i], layout.DiscoverFailed, err)
+			recordLoad(ctx, pending[i], layout.LoadFailed, err)
 		}
-		result = layout.DiscoverFailed
+		result = layout.LoadFailed
 	}
 	return result, err
 }
 
-func recordDiscovery(ctx layout.Context, node any, result layout.ResultCode, err error) {
+func recordLoad(ctx layout.Context, node any, result layout.ResultCode, err error) {
 	if ctx.Reporter == nil {
 		return
 	}
 	if pather, ok := node.(layout.Pather); ok {
 		ctx.Reporter.Record(layout.Entry{
-			Op:     layout.OpDiscover,
+			Op:     layout.OpLoad,
 			Path:   pather.Path(),
 			Result: result,
 			Err:    err,

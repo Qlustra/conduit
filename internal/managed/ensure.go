@@ -1,4 +1,4 @@
-package conduit
+package managed
 
 import (
 	"fmt"

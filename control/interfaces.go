@@ -8,10 +8,10 @@ type ControlCarrier interface {
 	LayoutCarrierType() reflect.Type
 }
 
-// ProjectCarrier identifies project controls, including authored types that
-// embed ProjectCtrl.
+// ProjectCarrier extends a scope with project identity, including authored
+// types that embed ProjectCtrl.
 type ProjectCarrier interface {
-	ControlCarrier
+	ScopeCarrier
 	isProjectControl()
 }
 
@@ -21,7 +21,8 @@ type DocumentCarrier interface {
 	isDocumentControl()
 }
 
-// ScopeCarrier identifies controls over a declared layout subtree.
+// ScopeCarrier identifies controls over a chosen layout segment. A scope can
+// stand alone, cover an entire layout, or focus on a subtree.
 type ScopeCarrier interface {
 	ControlCarrier
 	isScopeControl()

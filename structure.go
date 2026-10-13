@@ -2,15 +2,10 @@ package conduit
 
 import (
 	"github.com/qlustra/conduit/internal/composer"
+	"github.com/qlustra/conduit/internal/managed"
 	"github.com/qlustra/conduit/legend"
 	"github.com/qlustra/sail"
 )
-
-type Structure[T any] struct {
-	layoutComposer *composer.Engine
-	layoutCharter  *sail.Charter[legend.Layout]
-	layoutChart    *legend.Layout
-}
 
 // Compile prepares a tree's layout declaration for managed composition.
 func Compile[T any]() (*Structure[T], error) {
@@ -34,4 +29,15 @@ func Compile[T any]() (*Structure[T], error) {
 	structure.layoutComposer = composer.New(layoutCharter)
 
 	return structure, nil
+}
+
+type Structure[T any] struct {
+	layoutComposer *composer.Engine
+	layoutCharter  *sail.Charter[legend.Layout]
+	layoutChart    *legend.Layout
+}
+
+// Compose constructs a fresh layout at root without touching the filesystem.
+func (s *Structure[T]) Compose(root string) (*Layout[T], error) {
+	return managed.Compose[T](s.layoutCharter, s.layoutChart, s.layoutComposer, root)
 }

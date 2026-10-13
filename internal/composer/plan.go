@@ -6,8 +6,8 @@ import (
 	"slices"
 
 	"github.com/qlustra/conduit/internal/contracts"
+	legend "github.com/qlustra/conduit/internal/layoutdecl"
 	"github.com/qlustra/conduit/layout"
-	"github.com/qlustra/conduit/legend"
 	"github.com/qlustra/sail"
 )
 
